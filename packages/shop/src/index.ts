@@ -22,6 +22,15 @@ export * from "./components/bulk-tier-table";
 export * from "./splash/splash-gateway";
 export * from "./splash/metadata";
 
+// Product detail. The gallery, buy box and sticky buy bar land with Task 10,
+// which needs the cart; these are the parts below them that do not.
+export * from "./product/product-tabs";
+export * from "./product/overview-tab";
+export * from "./product/description-tab";
+export * from "./product/parameters-tab";
+export * from "./product/reviews-tab";
+export * from "./product/order-info";
+
 // The relocated Waitlister embed, which collects real signups.
 export * from "./waitlist/waitlist-page";
 export * from "./waitlist/waitlist-embed";
