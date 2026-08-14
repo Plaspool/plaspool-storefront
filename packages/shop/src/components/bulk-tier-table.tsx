@@ -28,10 +28,6 @@ export function BulkTierTable({ tiers, basePrice, quantity }: BulkTierTableProps
 
   const reached = quantity === undefined ? null : tierFor(tiers, quantity);
   const savings = quantity === undefined ? 0 : savingsFor(basePrice, tiers, quantity);
-  /* Below the first rung there is no saving to report, so the table says what
-     would earn one instead of showing a dead state. */
-  const nextTier = tiers[0];
-  const showNudge = quantity !== undefined && reached === null && quantity < nextTier.minQty;
 
   return (
     <div>
@@ -90,15 +86,6 @@ export function BulkTierTable({ tiers, basePrice, quantity }: BulkTierTableProps
           <span className="font-mono font-bold tabular-nums text-foreground">
             {formatNaira(savings)}
           </span>
-        </p>
-      )}
-
-      {showNudge && (
-        <p className="mt-3 text-sm text-muted-foreground">
-          Buy{" "}
-          <span className="font-mono tabular-nums text-foreground">{nextTier.minQty}</span> or more
-          to save{" "}
-          <span className="font-mono tabular-nums text-foreground">{nextTier.discountPct}%</span>
         </p>
       )}
     </div>

@@ -20,7 +20,7 @@ export interface QuantityStepperProps {
 }
 
 const STEP_BUTTON =
-  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-foreground transition-colors hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-40";
+  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-foreground transition-colors motion-reduce:transition-none hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-40";
 
 export function QuantityStepper({
   value,
