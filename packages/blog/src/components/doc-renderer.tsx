@@ -15,14 +15,20 @@ export function DocRenderer({ doc }: { doc: DocNode }) {
 }
 
 /**
- * Same allow-list the editor gates links on. A single leading slash is
- * root-relative and allowed; a double leading slash is protocol-relative
- * (browser resolves it to `<current-scheme>://evil.com`) and rejected.
+ * Same allow-list the editor gates links on. A single slash with a
+ * non-slash, non-backslash character right after it is root-relative and
+ * allowed. Anything where the browser would instead read the start of the
+ * string as "an authority follows" is rejected: `//host`, `///host`,
+ * `/\host`, `\\host`. Per the WHATWG URL spec, browsers normalise a
+ * leading backslash to a forward slash when resolving a relative
+ * reference against an http(s) page, so `/\evil.com` parses identically
+ * to `//evil.com` — both hand navigation to evil.com — which is why a
+ * bare `!startsWith("//")` check is not enough on its own.
  */
 function isAllowedHref(href: string): boolean {
   return (
     /^(https?:|mailto:|tel:)/i.test(href) ||
-    (href.startsWith("/") && !href.startsWith("//"))
+    /^\/(?![\\/])/.test(href)
   );
 }
 
