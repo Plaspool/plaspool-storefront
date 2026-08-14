@@ -29,7 +29,11 @@ export function ShopShell({ children }: ShopShellProps) {
       <div className="flex min-h-screen flex-col">
         <AnnouncementBar />
         <ShopNav />
-        <main className="flex-1">{children}</main>
+        {/* id/tabIndex: the root layout's skip link jumps here. Each route
+            group owns its own <main>, so the shop supplies this one. */}
+        <main id="content" tabIndex={-1} className="flex-1 focus:outline-none">
+          {children}
+        </main>
         <ShopFooter />
       </div>
       <CartDrawer />

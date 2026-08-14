@@ -1,12 +1,9 @@
 import "./globals.css";
 
 import { cn, ThemeProvider } from "@plaspool/ui";
-import {
-  CookieBanner,
-  Footer,
-  GoogleAnalytics,
-  Nav,
-} from "@plaspool/web";
+// Nav and Footer moved to `(site)/layout.tsx` — the shop route group brings its
+// own chrome, and rendering both here doubled them on every /store page.
+import { CookieBanner, GoogleAnalytics } from "@plaspool/web";
 import { siteConfig } from "@plaspool/brand";
 
 import { Inter as FontSans } from "next/font/google";
@@ -111,13 +108,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <Nav />
-          {/* tabIndex={-1}: programmatically focusable as the skip link's
-              jump target, without joining the normal Tab order. */}
-          <main id="content" tabIndex={-1} className="focus:outline-none">
-            {children}
-          </main>
-          <Footer />
+          {/* Chrome belongs to the route groups, not here: `(site)` carries the
+              marketing nav and footer, `(shop)` carries the shop's own via
+              ShopShell. Each supplies its own <main id="content"> as the skip
+              link's target. The root layout owns only what is genuinely global. */}
+          {children}
         </ThemeProvider>
         <CookieBanner />
         <GoogleAnalytics />
