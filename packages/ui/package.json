@@ -6,7 +6,9 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./tailwind-preset": "./tailwind-preset.ts"
+    "./tailwind-preset": "./tailwind-preset.ts",
+    "./cn": "./src/cn.ts",
+    "./primitives/*": "./src/primitives/*.tsx"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.14",

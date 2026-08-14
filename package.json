@@ -9,6 +9,7 @@
     "lint": "npm run lint:app && npm run lint:packages",
     "lint:app": "npm run lint -w @plaspool/storefront",
     "lint:packages": "eslint packages",
+    "typecheck": "tsc --noEmit -p apps/storefront/tsconfig.json && tsc --noEmit -p packages/ui/tsconfig.json && tsc --noEmit -p packages/brand/tsconfig.json && tsc --noEmit -p packages/blog/tsconfig.json && tsc --noEmit -p packages/web/tsconfig.json",
     "preview": "npm run preview -w @plaspool/storefront",
     "deploy": "npm run deploy -w @plaspool/storefront"
   },
