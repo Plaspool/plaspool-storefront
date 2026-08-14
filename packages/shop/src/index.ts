@@ -34,3 +34,13 @@ export * from "./chrome/announcement-bar";
 export * from "./chrome/shop-nav";
 export * from "./chrome/shop-footer";
 export * from "./chrome/shop-shell";
+
+// `/store` — the shop home. Six sections between the shell's chrome, plus the
+// metadata the host route re-exports.
+export * from "./home/hero-carousel";
+export * from "./home/category-tiles";
+export * from "./home/featured-products";
+export * from "./home/why-shop";
+export * from "./home/bulk-promo";
+export * from "./home/blog-strip";
+export * from "./home/home-page";
