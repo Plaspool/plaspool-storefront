@@ -2,7 +2,10 @@
   "name": "plaspool-storefront",
   "private": true,
   "version": "0.1.0",
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "npm run dev -w @plaspool/storefront",
     "build": "npm run build -w @plaspool/storefront",
@@ -15,8 +18,10 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
+    "@opennextjs/cloudflare": "^1.14.1",
     "eslint": "^9.28.0",
     "eslint-config-next": "^15.3.3",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "wrangler": "^4.123.0"
   }
 }

@@ -3,10 +3,10 @@ Plaspool Storefront
 ===================
 
 The public-facing website for Plaspool — Nigerian-made PLA filament for 3D
-printing. Built on Next.js 15 (App Router). Target deployment is Cloudflare
-Workers via OpenNext, though that tooling is not yet wired in this repo (see
-*Deployment* below). Blog content is read from a REST API; there is no local
-content source and no build-time WordPress dependency.
+printing. Built on Next.js 15 (App Router). Deployment target is Cloudflare
+Workers via OpenNext (see *Deployment* below). Blog content is read from a
+REST API; there is no local content source and no build-time WordPress
+dependency.
 
 .. contents:: Contents
    :local:
@@ -118,7 +118,7 @@ Content source       REST API (blog admin)
 Mail                 Resend, over HTTP
 Analytics            Vercel Analytics
 Consent              vanilla-cookieconsent
-Deployment           Cloudflare Workers, via OpenNext (not yet wired)
+Deployment           Cloudflare Workers, via OpenNext
 ===================  =========================================================
 
 
@@ -137,12 +137,25 @@ Command                               Effect
 Deployment
 ==========
 
-Target deployment is Cloudflare Workers via OpenNext. The root
-``package.json`` already defines ``npm run preview`` and ``npm run deploy``
-for that path, but as of this commit they fail: ``apps/storefront`` has no
-matching ``preview``/``deploy`` script yet, and there is no wrangler config
-or ``@opennextjs/cloudflare`` dependency in the repo. Wiring that up is
-tracked as separate follow-up work, not part of this change.
+Target deployment is Cloudflare Workers via OpenNext. Config lives in
+``apps/storefront/wrangler.jsonc`` and
+``apps/storefront/open-next.config.ts``; the root ``package.json`` defines
+``npm run preview`` and ``npm run deploy``, which delegate to
+``apps/storefront``'s own scripts
+(``opennextjs-cloudflare build && opennextjs-cloudflare {preview,deploy}``).
+
+No Cloudflare bindings are configured — ``deploy`` does not require
+provisioning any KV/R2/D1 resources first. ISR (see *Caching* above)
+therefore does not persist across Worker instances; an R2-backed incremental
+cache can be added later if that is needed.
+
+``npm run deploy`` authenticates to and publishes on the account's
+Cloudflare account. It is run by a human, never by an agent. Before the
+first deploy: ``wrangler login``, then set the mail secret from
+``apps/storefront``: ``npx wrangler secret put RESEND_API_KEY``.
+
+``npm run preview`` builds and serves the app locally against the Workers
+runtime (via ``wrangler``/``miniflare``) and does not publish anything.
 
 
 Attribution

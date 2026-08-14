@@ -45,3 +45,8 @@ next-env.d.ts
 
 # Subagent-driven development scratch (ledger, briefs, review packages).
 .superpowers/
+
+# Cloudflare Workers / OpenNext build output and local state.
+.open-next/
+.wrangler/
+cloudflare-env.d.ts
