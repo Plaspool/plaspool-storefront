@@ -64,9 +64,6 @@ export function ShopFooter() {
             >
               <BrandLogo variant="lockup" tone="dark" className="h-7 w-auto" />
             </Link>
-            <p className="mt-4 max-w-xs text-sm text-white/60">
-              Filament for 3D printing, made and shipped from Lagos.
-            </p>
           </div>
 
           <FooterColumn title="Shop">
@@ -108,7 +105,7 @@ export function ShopFooter() {
         </div>
 
         <div className="mt-10 flex flex-col gap-2 border-t border-white/10 pt-6 text-xs text-white/50 sm:flex-row sm:items-center sm:justify-between">
-          <p>© {year} PlaSpool. All rights reserved.</p>
+          <p>© {year} PlaSpool</p>
           <p>Made in Nigeria.</p>
         </div>
       </div>
