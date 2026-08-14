@@ -1,0 +1,258 @@
+"use client";
+
+import * as React from "react";
+import Link from "next/link";
+import { Menu, Search, ShoppingCart, User } from "lucide-react";
+import {
+  Button,
+  Input,
+  ScrollArea,
+  Separator,
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  cn,
+} from "@plaspool/ui";
+import { BrandLogo } from "@plaspool/brand";
+
+import { listCategories } from "../data/catalog";
+import { useCart } from "../cart/cart-context";
+import type { Category } from "../data/types";
+
+/**
+ * The shop's own nav — not the marketing header with a cart bolted on. It
+ * carries categories, search, the cart and an account link, none of which
+ * belong on the marketing site.
+ *
+ * `"use client"` because it holds the mobile search disclosure's open state
+ * and reads the live cart count from `useCart()`. The mobile category menu's
+ * own open state lives inside `Sheet` itself — uncontrolled, since nothing
+ * here needs to react to it beyond what `SheetClose` already handles.
+ */
+
+const MOBILE_SEARCH_ID = "shop-nav-mobile-search";
+
+const LINK_FOCUS =
+  "rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+const SHEET_LINK =
+  "flex items-center gap-2 px-2 py-2.5 font-sans text-sm font-medium text-foreground hover:bg-brand-soft hover:text-brand";
+
+function CategoryLink({ category }: { category: Category }) {
+  return (
+    <Link
+      href={`/store/${category.slug}`}
+      className={cn(
+        "font-sans text-sm font-medium text-foreground/70 transition-colors hover:text-brand motion-reduce:transition-none",
+        LINK_FOCUS,
+      )}
+    >
+      {category.name}
+    </Link>
+  );
+}
+
+function SearchForm({
+  id,
+  className,
+  autoFocus,
+}: {
+  id: string;
+  className?: string;
+  autoFocus?: boolean;
+}) {
+  return (
+    <form
+      action="/store/all"
+      method="GET"
+      role="search"
+      className={cn("flex items-center gap-1.5", className)}
+    >
+      <Input
+        id={id}
+        type="search"
+        name="q"
+        placeholder="Search filament"
+        aria-label="Search products"
+        autoFocus={autoFocus}
+        className="min-w-0 flex-1"
+      />
+      <Button
+        type="submit"
+        variant="ghost"
+        size="icon"
+        aria-label="Search"
+        className="shrink-0 focus-visible:ring-brand focus-visible:ring-offset-background"
+      >
+        <Search aria-hidden="true" className="h-4 w-4" />
+      </Button>
+    </form>
+  );
+}
+
+function CartButton() {
+  const cart = useCart();
+  const showBadge = cart.hydrated && cart.itemCount > 0;
+  const label = showBadge
+    ? `Cart, ${cart.itemCount} item${cart.itemCount === 1 ? "" : "s"}`
+    : "Cart";
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      onClick={cart.open}
+      aria-label={label}
+      className="relative focus-visible:ring-brand focus-visible:ring-offset-background"
+    >
+      <ShoppingCart aria-hidden="true" className="h-5 w-5" />
+      {showBadge && (
+        <span
+          aria-hidden="true"
+          className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 font-mono text-[10px] font-semibold leading-none text-brand-ink"
+        >
+          {cart.itemCount}
+        </span>
+      )}
+    </Button>
+  );
+}
+
+/** Icon-only from `md`, where the six category names already fill most of
+ *  the row; the label rejoins at `xl` once there is room for it. The
+ *  accessible name always says "Account", labelled or not. */
+function AccountLink({ className }: { className?: string }) {
+  return (
+    <Button
+      asChild
+      variant="ghost"
+      size="icon"
+      aria-label="Account"
+      className={cn(
+        "xl:h-10 xl:w-auto xl:gap-2 xl:px-4 focus-visible:ring-brand focus-visible:ring-offset-background",
+        className,
+      )}
+    >
+      <Link href="/waitlist">
+        <User aria-hidden="true" className="h-4 w-4" />
+        <span className="hidden xl:inline">Account</span>
+      </Link>
+    </Button>
+  );
+}
+
+function MobileMenu({ categories }: { categories: Category[] }) {
+  return (
+    <Sheet>
+      <SheetTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="Menu"
+          className="md:hidden focus-visible:ring-brand focus-visible:ring-offset-background"
+        >
+          <Menu aria-hidden="true" className="h-5 w-5" />
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="left" className="flex flex-col gap-0 overflow-hidden p-0">
+        <SheetHeader className="border-b border-brand-line px-6 py-5 text-left">
+          <SheetTitle>Menu</SheetTitle>
+          <SheetDescription className="sr-only">
+            Browse filament categories and your account.
+          </SheetDescription>
+        </SheetHeader>
+        <ScrollArea className="min-h-0 flex-1">
+          <nav aria-label="Shop menu" className="px-4 py-5">
+            <ul className="flex flex-col gap-1">
+              {categories.map((category) => (
+                <li key={category.slug}>
+                  <SheetClose asChild>
+                    <Link href={`/store/${category.slug}`} className={cn(SHEET_LINK, LINK_FOCUS)}>
+                      {category.name}
+                    </Link>
+                  </SheetClose>
+                </li>
+              ))}
+            </ul>
+            <Separator className="my-4" />
+            <SheetClose asChild>
+              <Link href="/waitlist" className={cn(SHEET_LINK, LINK_FOCUS)}>
+                <User aria-hidden="true" className="h-4 w-4" />
+                Account
+              </Link>
+            </SheetClose>
+          </nav>
+        </ScrollArea>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+export function ShopNav() {
+  const categories = listCategories();
+  const [mobileSearchOpen, setMobileSearchOpen] = React.useState(false);
+
+  return (
+    <header className="sticky top-0 z-40 border-b border-brand-line bg-background/95 backdrop-blur">
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
+        <div className="flex min-w-0 items-center gap-4 lg:gap-6">
+          <MobileMenu categories={categories} />
+
+          <Link
+            href="/store"
+            aria-label="PlaSpool store home"
+            className={cn("shrink-0", LINK_FOCUS)}
+          >
+            <BrandLogo variant="lockup" tone="light" className="h-6 w-auto md:h-7 lg:h-8" />
+          </Link>
+
+          <nav aria-label="Shop categories" className="hidden md:block">
+            <ul className="flex items-center gap-3 lg:gap-6">
+              {categories.map((category) => (
+                <li key={category.slug} className="whitespace-nowrap">
+                  <CategoryLink category={category} />
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </div>
+
+        {/* Between `md` and `xl` the six category names already fill the row,
+            so the full search input and the account label wait for `xl`; a
+            compact icon toggle covers search below that, the same as it
+            does on mobile. */}
+        <div className="ml-auto flex items-center gap-1 sm:gap-2">
+          <SearchForm id="shop-search-desktop" className="hidden xl:flex xl:w-64" />
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="Search"
+            aria-expanded={mobileSearchOpen}
+            aria-controls={MOBILE_SEARCH_ID}
+            onClick={() => setMobileSearchOpen((open) => !open)}
+            className="xl:hidden focus-visible:ring-brand focus-visible:ring-offset-background"
+          >
+            <Search aria-hidden="true" className="h-5 w-5" />
+          </Button>
+
+          <CartButton />
+          <AccountLink className="hidden md:inline-flex" />
+        </div>
+      </div>
+
+      {mobileSearchOpen && (
+        <div id={MOBILE_SEARCH_ID} className="border-t border-brand-line px-4 py-3 xl:hidden">
+          <SearchForm id="shop-search-mobile" autoFocus />
+        </div>
+      )}
+    </header>
+  );
+}

@@ -24,3 +24,11 @@ export * from "./cart/types";
 export * from "./cart/cart-context";
 export * from "./cart/cart-drawer";
 export * from "./cart/add-to-cart";
+
+// The shop's own chrome — announcement bar, sticky nav, footer, and the
+// shell that composes them around the cart. Tasks 8 and 9 mount their pages
+// inside `ShopShell`.
+export * from "./chrome/announcement-bar";
+export * from "./chrome/shop-nav";
+export * from "./chrome/shop-footer";
+export * from "./chrome/shop-shell";
