@@ -18,8 +18,14 @@ import { PAYMENT_METHODS } from "../data/config";
  * `/store`, never `/shop`, which is the noindex splash gateway.
  */
 
+/* The ring is white, not `ring-brand`: brand navy (#231c50) on slate-900
+   (#0f172a) is invisible, and a focus ring you cannot see is not a focus ring.
+   Explicit `white` rather than `brand-ink`, because `--brand-ink` inverts to
+   navy in dark mode while this footer's ground stays slate-900 in both themes
+   — the token would put the ring back where it started. White matches the
+   text this footer already sets. */
 const FOOTER_LINK_FOCUS =
-  "rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900";
+  "rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900";
 
 function FooterColumn({ title, children }: { title: string; children: ReactNode }) {
   return (

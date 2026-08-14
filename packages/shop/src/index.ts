@@ -54,3 +54,8 @@ export * from "./listing/filter-drawer";
 export * from "./listing/listing-search";
 export * from "./listing/sort-select";
 export * from "./listing/listing-page";
+
+// `CardAddButton` was extracted out of `product-card.tsx` so that the card
+// itself could go back to being a server component; this is the only part of
+// it that needs `"use client"`.
+export * from "./components/card-add-button";

@@ -1,14 +1,10 @@
-"use client";
-
-import * as React from "react";
 import Link from "next/link";
-import { Check, ShoppingCart } from "lucide-react";
 import { Badge, cn } from "@plaspool/ui";
 
-import type { Colour, Product, SizeOption } from "../data/types";
-import { priceFrom, ratingSummary } from "../data/money";
+import type { Product } from "../data/types";
+import { cheapestSize, firstInStockColour, priceFrom, ratingSummary } from "../data/money";
 import { SHOW_FIXTURE_REVIEWS } from "../data/config";
-import { useCart } from "../cart/cart-context";
+import { CardAddButton } from "./card-add-button";
 import { SpoolImage } from "./spool-image";
 import { Price } from "./price";
 import { ColourSwatches } from "./colour-swatches";
@@ -29,87 +25,10 @@ import { RatingStars } from "./rating-stars";
  *    explicit `aria-label` — otherwise its accessible name would be the
  *    product name followed by a recital of ten colours.
  *
- * `"use client"` because the add button reads `useCart()`. It cannot reuse
- * `AddToCartButton`: that component builds its own accessible name from its
- * visible label, and this one needs to name the colour and size it will add
- * while showing only a short label.
+ * No `"use client"`: the only part that needs the boundary is `CardAddButton`,
+ * which reads `useCart()` and lives in its own client module. Everything else
+ * here — the spool SVG especially — renders on the server.
  */
-
-/** The colour the spool is tinted with, and the one the add button adds. */
-function firstInStockColour(product: Product): Colour {
-  return product.colours.find((colour) => colour.inStock) ?? product.colours[0];
-}
-
-/** The cheapest size — the one `priceFrom` quotes, so the two agree. */
-function cheapestSize(product: Product): SizeOption {
-  return product.sizes.reduce((min, size) =>
-    size.priceNaira < min.priceNaira ? size : min,
-  );
-}
-
-const CONFIRM_MS = 1800;
-
-function CardAddButton({ product }: { product: Product }) {
-  const cart = useCart();
-  const colour = firstInStockColour(product);
-  const size = cheapestSize(product);
-  const [justAdded, setJustAdded] = React.useState(false);
-  const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  React.useEffect(() => {
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, []);
-
-  const soldOut = !colour.inStock;
-
-  function handleClick() {
-    cart.add(
-      { productSlug: product.slug, colourId: colour.id, sizeId: size.id },
-      1,
-    );
-    setJustAdded(true);
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => setJustAdded(false), CONFIRM_MS);
-  }
-
-  const label = `Add ${product.name}, ${colour.name}, ${size.label} to cart`;
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={soldOut}
-        aria-label={soldOut ? `${label} — out of stock` : label}
-        className={cn(
-          /* Above the link's stretched overlay, so the click lands here. */
-          "absolute inset-x-2 bottom-2 z-10 inline-flex h-9 items-center justify-center gap-2",
-          "rounded-md bg-brand px-3 font-sans text-sm font-medium text-brand-ink",
-          "shadow-sm transition-opacity duration-150 motion-reduce:transition-none",
-          "hover:bg-brand-hover disabled:pointer-events-none disabled:opacity-50",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-          /* Hidden until the card is hovered or something inside it has
-             focus, so it is reachable by keyboard and not just by mouse.
-             `opacity` rather than `hidden`, because a focusable control that
-             is `display:none` is not focusable at all. */
-          "opacity-0 focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100",
-        )}
-      >
-        {justAdded ? (
-          <Check aria-hidden="true" className="h-4 w-4" />
-        ) : (
-          <ShoppingCart aria-hidden="true" className="h-4 w-4" />
-        )}
-        <span aria-hidden="true">{justAdded ? "Added" : "Add to cart"}</span>
-      </button>
-      <span role="status" aria-live="polite" className="sr-only">
-        {justAdded ? `${product.name} added to cart` : ""}
-      </span>
-    </>
-  );
-}
 
 export interface ProductCardProps {
   product: Product;

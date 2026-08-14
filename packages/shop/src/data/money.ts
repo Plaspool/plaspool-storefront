@@ -1,4 +1,4 @@
-import type { BulkTier, Product, Review, RatingSummary } from "./types";
+import type { BulkTier, Colour, Product, Review, RatingSummary, SizeOption } from "./types";
 
 /**
  * `₦18,500` — sign, comma groups, no decimals.
@@ -42,6 +42,19 @@ export function savingsFor(basePrice: number, tiers: BulkTier[], qty: number): n
 /** The "From ₦X" figure on a card: the cheapest size. */
 export function priceFrom(product: Product): number {
   return Math.min(...product.sizes.map((s) => s.priceNaira));
+}
+
+/** The size `priceFrom` quotes. A card's add button adds this one, so the
+ *  price shown and the price added always agree. */
+export function cheapestSize(product: Product): SizeOption {
+  return product.sizes.reduce((min, size) =>
+    size.priceNaira < min.priceNaira ? size : min,
+  );
+}
+
+/** The colour a card tints its spool with, and the one its add button adds. */
+export function firstInStockColour(product: Product): Colour {
+  return product.colours.find((colour) => colour.inStock) ?? product.colours[0];
 }
 
 export function ratingSummary(reviews: Review[]): RatingSummary {
