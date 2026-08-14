@@ -1,0 +1,277 @@
+import {
+  getPostBySlug,
+  getFeaturedMediaById,
+  getAuthorById,
+  getCategoryById,
+  getAllPosts,
+} from "@/lib/wordpress";
+
+import {
+  Article,
+  badgeVariants,
+  cn,
+  Container,
+  Prose,
+  Section,
+} from "@plaspool/ui";
+import { siteConfig } from "@plaspool/brand";
+
+import Link from "next/link";
+import Balancer from "react-wrap-balancer";
+
+import type { Metadata } from "next";
+
+export async function generateStaticParams() {
+  const { posts } = await getAllPosts();
+
+  return posts.map((post) => ({
+    slug: post.slug,
+  }));
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const post = await getPostBySlug(slug);
+
+  if (!post) {
+    return {};
+  }
+
+  const ogUrl = new URL(`${siteConfig.site_domain}/api/og`);
+  ogUrl.searchParams.append("title", post.title.rendered);
+  // Strip HTML tags for description
+  const description = post.excerpt.rendered.replace(/<[^>]*>/g, "").trim();
+  ogUrl.searchParams.append("description", description);
+
+  return {
+    title: post.title.rendered,
+    description: description,
+    openGraph: {
+      title: post.title.rendered,
+      description: description,
+      type: "article",
+      url: `${siteConfig.site_domain}/posts/${post.slug}`,
+      images: [
+        {
+          url: ogUrl.toString(),
+          width: 1200,
+          height: 630,
+          alt: post.title.rendered,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: post.title.rendered,
+      description: description,
+      images: [ogUrl.toString()],
+    },
+  };
+}
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const post = await getPostBySlug(slug);
+
+if (!post) {
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="text-center">
+        <h1 className="text-2xl font-bold text-gray-800 mb-4">Post Not Found</h1>
+        <p className="text-gray-600">The post you&apos;re looking for could not be found or is temporarily unavailable.</p>
+      </div>
+    </div>
+  );
+}
+
+
+
+  const featuredMedia = post.featured_media
+    ? await getFeaturedMediaById(post.featured_media)
+    : null;
+  const author = await getAuthorById(post.author);
+  const date = new Date(post.date).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+  const category = await getCategoryById(post.categories[0]);
+
+    if (!category) {
+    return {};
+  }
+
+    if (!author) {
+    return {};
+  }
+
+  return (
+    <Section className="font-mono text-gray-800 bg-gray-50">
+      <Container>
+        <Prose>
+          <h1>
+            <Balancer>
+              <span
+                className="font-mono"
+                dangerouslySetInnerHTML={{ __html: post.title.rendered }}
+              ></span>
+            </Balancer>
+          </h1>
+          <div className="flex font-mono justify-between items-center gap-4 text-sm mb-4">
+            <h5>
+              Published {date} by {author.name}
+            </h5>
+
+            <Link
+              href={`/posts/?category=${category.id}`}
+              className={cn(
+                badgeVariants({ variant: "outline" }),
+                "!no-underline text-gray-800"
+              )}
+            >
+              {category.name}
+            </Link>
+          </div>
+          {featuredMedia?.source_url && (
+            <div className="h-full my-12 md:h-[500px] overflow-hidden flex items-center justify-center border rounded-lg bg-accent/25">
+              {/* eslint-disable-next-line */}
+              <img
+                className="w-full h-full object-cover my-0"
+                src={featuredMedia.source_url}
+                alt={post.title.rendered}
+              />
+            </div>
+          )}
+        </Prose>
+
+        <Article
+          className="font-mono"
+          dangerouslySetInnerHTML={{ __html: post.content.rendered }}
+        />
+        <div className="flex flex-row items-end gap-3 mt-24 border-t-2 border-gray-500 py-4">
+          <span className="text-lg md:text-xl">Share on:</span>
+          <a
+            target="blank"
+            href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(
+              `${siteConfig.site_domain}/posts/${post.slug}`
+            )}&text=${encodeURIComponent(post.title.rendered)}`}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              x="0px"
+              y="0px"
+              width="48"
+              height="48"
+              viewBox="0 0 48 48"
+            >
+              <path
+                fill="#212121"
+                fill-rule="evenodd"
+                d="M38,42H10c-2.209,0-4-1.791-4-4V10c0-2.209,1.791-4,4-4h28	c2.209,0,4,1.791,4,4v28C42,40.209,40.209,42,38,42z"
+                clip-rule="evenodd"
+              ></path>
+              <path
+                fill="#fff"
+                d="M34.257,34h-6.437L13.829,14h6.437L34.257,34z M28.587,32.304h2.563L19.499,15.696h-2.563 L28.587,32.304z"
+              ></path>
+              <polygon
+                fill="#fff"
+                points="15.866,34 23.069,25.656 22.127,24.407 13.823,34"
+              ></polygon>
+              <polygon
+                fill="#fff"
+                points="24.45,21.721 25.355,23.01 33.136,14 31.136,14"
+              ></polygon>
+            </svg>
+          </a>
+          <a
+            target="blank"
+            href={`https://wa.me/?text=${encodeURIComponent(
+              `${post.title.rendered} ${siteConfig.site_domain}/posts/${post.slug}`
+            )}`}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              x="0px"
+              y="0px"
+              width="48"
+              height="48"
+              viewBox="0 0 48 48"
+            >
+              <path
+                fill="#fff"
+                d="M4.868,43.303l2.694-9.835C5.9,30.59,5.026,27.324,5.027,23.979C5.032,13.514,13.548,5,24.014,5c5.079,0.002,9.845,1.979,13.43,5.566c3.584,3.588,5.558,8.356,5.556,13.428c-0.004,10.465-8.522,18.98-18.986,18.98c-0.001,0,0,0,0,0h-0.008c-3.177-0.001-6.3-0.798-9.073-2.311L4.868,43.303z"
+              ></path>
+              <path
+                fill="#fff"
+                d="M4.868,43.803c-0.132,0-0.26-0.052-0.355-0.148c-0.125-0.127-0.174-0.312-0.127-0.483l2.639-9.636c-1.636-2.906-2.499-6.206-2.497-9.556C4.532,13.238,13.273,4.5,24.014,4.5c5.21,0.002,10.105,2.031,13.784,5.713c3.679,3.683,5.704,8.577,5.702,13.781c-0.004,10.741-8.746,19.48-19.486,19.48c-3.189-0.001-6.344-0.788-9.144-2.277l-9.875,2.589C4.953,43.798,4.911,43.803,4.868,43.803z"
+              ></path>
+              <path
+                fill="#cfd8dc"
+                d="M24.014,5c5.079,0.002,9.845,1.979,13.43,5.566c3.584,3.588,5.558,8.356,5.556,13.428c-0.004,10.465-8.522,18.98-18.986,18.98h-0.008c-3.177-0.001-6.3-0.798-9.073-2.311L4.868,43.303l2.694-9.835C5.9,30.59,5.026,27.324,5.027,23.979C5.032,13.514,13.548,5,24.014,5 M24.014,42.974C24.014,42.974,24.014,42.974,24.014,42.974C24.014,42.974,24.014,42.974,24.014,42.974 M24.014,42.974C24.014,42.974,24.014,42.974,24.014,42.974C24.014,42.974,24.014,42.974,24.014,42.974 M24.014,4C24.014,4,24.014,4,24.014,4C12.998,4,4.032,12.962,4.027,23.979c-0.001,3.367,0.849,6.685,2.461,9.622l-2.585,9.439c-0.094,0.345,0.002,0.713,0.254,0.967c0.19,0.192,0.447,0.297,0.711,0.297c0.085,0,0.17-0.011,0.254-0.033l9.687-2.54c2.828,1.468,5.998,2.243,9.197,2.244c11.024,0,19.99-8.963,19.995-19.98c0.002-5.339-2.075-10.359-5.848-14.135C34.378,6.083,29.357,4.002,24.014,4L24.014,4z"
+              ></path>
+              <path
+                fill="#40c351"
+                d="M35.176,12.832c-2.98-2.982-6.941-4.625-11.157-4.626c-8.704,0-15.783,7.076-15.787,15.774c-0.001,2.981,0.833,5.883,2.413,8.396l0.376,0.597l-1.595,5.821l5.973-1.566l0.577,0.342c2.422,1.438,5.2,2.198,8.032,2.199h0.006c8.698,0,15.777-7.077,15.78-15.776C39.795,19.778,38.156,15.814,35.176,12.832z"
+              ></path>
+              <path
+                fill="#fff"
+                fill-rule="evenodd"
+                d="M19.268,16.045c-0.355-0.79-0.729-0.806-1.068-0.82c-0.277-0.012-0.593-0.011-0.909-0.011c-0.316,0-0.83,0.119-1.265,0.594c-0.435,0.475-1.661,1.622-1.661,3.956c0,2.334,1.7,4.59,1.937,4.906c0.237,0.316,3.282,5.259,8.104,7.161c4.007,1.58,4.823,1.266,5.693,1.187c0.87-0.079,2.807-1.147,3.202-2.255c0.395-1.108,0.395-2.057,0.277-2.255c-0.119-0.198-0.435-0.316-0.909-0.554s-2.807-1.385-3.242-1.543c-0.435-0.158-0.751-0.237-1.068,0.238c-0.316,0.474-1.225,1.543-1.502,1.859c-0.277,0.317-0.554,0.357-1.028,0.119c-0.474-0.238-2.002-0.738-3.815-2.354c-1.41-1.257-2.362-2.81-2.639-3.285c-0.277-0.474-0.03-0.731,0.208-0.968c0.213-0.213,0.474-0.554,0.712-0.831c0.237-0.277,0.316-0.475,0.474-0.791c0.158-0.317,0.079-0.594-0.04-0.831C20.612,19.329,19.69,16.983,19.268,16.045z"
+                clip-rule="evenodd"
+              ></path>
+            </svg>
+          </a>
+          <a
+            target="blank"
+            href={`https://www.reddit.com/submit?url=${encodeURIComponent(
+              `${siteConfig.site_domain}/posts/${post.slug}`
+            )}&title=${encodeURIComponent(post.title.rendered)}`}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              x="0px"
+              y="0px"
+              width="48"
+              height="48"
+              viewBox="0 0 48 48"
+            >
+              <path
+                fill="#FFF"
+                d="M12.193 19.555c-1.94-1.741-4.79-1.727-6.365.029-1.576 1.756-1.301 5.023.926 6.632L12.193 19.555zM35.807 19.555c1.939-1.741 4.789-1.727 6.365.029 1.575 1.756 1.302 5.023-.927 6.632L35.807 19.555zM38.32 6.975A3.5 3.5 0 1 0 38.32 13.975 3.5 3.5 0 1 0 38.32 6.975z"
+              ></path>
+              <path
+                fill="#FFF"
+                d="M24.085 15.665000000000001A18.085 12.946 0 1 0 24.085 41.557A18.085 12.946 0 1 0 24.085 15.665000000000001Z"
+              ></path>
+              <g>
+                <path
+                  fill="#D84315"
+                  d="M30.365 23.506A2.884 2.884 0 1 0 30.365 29.274 2.884 2.884 0 1 0 30.365 23.506zM17.635 23.506A2.884 2.884 0 1 0 17.635 29.274 2.884 2.884 0 1 0 17.635 23.506z"
+                ></path>
+              </g>
+              <g>
+                <path
+                  fill="#37474F"
+                  d="M24.002 34.902c-3.252 0-6.14-.745-8.002-1.902 1.024 2.044 4.196 4 8.002 4 3.802 0 6.976-1.956 7.998-4C30.143 34.157 27.254 34.902 24.002 34.902zM41.83 27.026l-1.17-1.621c.831-.6 1.373-1.556 1.488-2.623.105-.98-.157-1.903-.721-2.531-.571-.637-1.391-.99-2.307-.994-.927.013-1.894.365-2.646 1.041l-1.336-1.488c1.123-1.008 2.545-1.523 3.991-1.553 1.488.007 2.833.596 3.786 1.658.942 1.05 1.387 2.537 1.221 4.081C43.961 24.626 43.121 26.096 41.83 27.026zM6.169 27.026c-1.29-.932-2.131-2.401-2.306-4.031-.166-1.543.279-3.03 1.221-4.079.953-1.062 2.297-1.651 3.785-1.658.009 0 .018 0 .027 0 1.441 0 2.849.551 3.965 1.553l-1.336 1.488c-.753-.676-1.689-1.005-2.646-1.041-.916.004-1.735.357-2.306.994-.563.628-.826 1.55-.721 2.53.115 1.067.657 2.023 1.488 2.624L6.169 27.026zM25 16.84h-2c0-2.885 0-10.548 4.979-10.548 2.154 0 3.193 1.211 3.952 2.096.629.734.961 1.086 1.616 1.086h1.37v2h-1.37c-1.604 0-2.453-.99-3.135-1.785-.67-.781-1.198-1.398-2.434-1.398C25.975 8.292 25 11.088 25 16.84z"
+                ></path>
+                <path
+                  fill="#37474F"
+                  d="M24.085 16.95c9.421 0 17.085 5.231 17.085 11.661 0 6.431-7.664 11.662-17.085 11.662S7 35.042 7 28.611C7 22.181 14.664 16.95 24.085 16.95M24.085 14.95C13.544 14.95 5 21.066 5 28.611c0 7.546 8.545 13.662 19.085 13.662 10.54 0 19.085-6.116 19.085-13.662C43.17 21.066 34.625 14.95 24.085 14.95L24.085 14.95zM38.32 7.975c1.379 0 2.5 1.122 2.5 2.5s-1.121 2.5-2.5 2.5-2.5-1.122-2.5-2.5S36.941 7.975 38.32 7.975M38.32 5.975c-2.484 0-4.5 2.015-4.5 4.5s2.016 4.5 4.5 4.5c2.486 0 4.5-2.015 4.5-4.5S40.807 5.975 38.32 5.975L38.32 5.975z"
+                ></path>
+              </g>
+            </svg>
+          </a>
+        </div>
+      </Container>
+    </Section>
+  );
+}
