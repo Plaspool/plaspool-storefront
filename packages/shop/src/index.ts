@@ -44,3 +44,13 @@ export * from "./home/why-shop";
 export * from "./home/bulk-promo";
 export * from "./home/blog-strip";
 export * from "./home/home-page";
+
+// `/store/[category]` — the listing. Filter state lives in the URL, so the
+// grid stays server-rendered and a filtered view is shareable; the rail,
+// drawer, search and sort are the only client code.
+export * from "./listing/filter-state";
+export * from "./listing/filter-rail";
+export * from "./listing/filter-drawer";
+export * from "./listing/listing-search";
+export * from "./listing/sort-select";
+export * from "./listing/listing-page";
