@@ -12,3 +12,5 @@ export * from "./data/doc";
 
 export { default as PostPage, postMetadata, postParams } from "./pages/post";
 export { default as PostsIndexPage, postsIndexMetadata } from "./pages/posts-index";
+export { default as CategoriesPage, categoriesPageMetadata } from "./pages/categories";
+export { default as TagsPage, tagsPageMetadata } from "./pages/tags";

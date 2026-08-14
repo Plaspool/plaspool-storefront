@@ -1,9 +1,12 @@
 import { MetadataRoute } from "next";
-import { getAllPosts } from "@/lib/wordpress";
+import { listPosts, DETAIL_REVALIDATE } from "@plaspool/blog";
 import { siteConfig } from "@plaspool/brand";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const { posts, totalPages } = await getAllPosts();
+  const { items: posts } = await listPosts({ limit: 100 }).catch(() => ({
+    items: [],
+    nextCursor: null,
+  }));
 
   const staticUrls: MetadataRoute.Sitemap = [
     {
@@ -19,31 +22,39 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     },
     {
-      url: `${siteConfig.site_domain}/authors`,
+      url: `${siteConfig.site_domain}/posts/categories`,
       lastModified: new Date(),
       changeFrequency: "monthly",
       priority: 0.5,
     },
     {
-      url: `${siteConfig.site_domain}/categories`,
+      url: `${siteConfig.site_domain}/posts/tags`,
       lastModified: new Date(),
       changeFrequency: "monthly",
       priority: 0.5,
     },
     {
-      url: `${siteConfig.site_domain}/tags`,
+      url: `${siteConfig.site_domain}/privacy`,
       lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.5,
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
+    {
+      url: `${siteConfig.site_domain}/terms`,
+      lastModified: new Date(),
+      changeFrequency: "yearly",
+      priority: 0.3,
     },
   ];
 
   const postUrls: MetadataRoute.Sitemap = posts.map((post) => ({
     url: `${siteConfig.site_domain}/posts/${post.slug}`,
-    lastModified: new Date(post.modified),
+    lastModified: new Date(post.updatedAt),
     changeFrequency: "weekly",
     priority: 0.5,
   }));
 
   return [...staticUrls, ...postUrls];
 }
+
+export const revalidate = DETAIL_REVALIDATE;

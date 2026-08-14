@@ -1,35 +1,5 @@
-import { getAllTags } from "@/lib/wordpress";
-import { Section, Container, Prose } from "@plaspool/ui";
-import { Metadata } from "next";
-import { BackButton } from "@plaspool/web";
-import Link from "next/link";
+import { TagsPage, tagsPageMetadata, DETAIL_REVALIDATE } from "@plaspool/blog";
 
-export const metadata: Metadata = {
-  title: "All Tags",
-  description: "Browse all tags of our blog posts",
-  alternates: {
-    canonical: "/posts/tags",
-  },
-};
-
-export default async function Page() {
-  const tags = await getAllTags();
-
-  return (
-    <Section>
-      <Container className="space-y-6">
-        <Prose className="mb-8">
-          <h2>All Tags</h2>
-          <ul className="grid">
-            {tags.map((tag: any) => (
-              <li key={tag.id}>
-                <Link href={`/posts/?tag=${tag.id}`}>{tag.name}</Link>
-              </li>
-            ))}
-          </ul>
-        </Prose>
-        <BackButton />
-      </Container>
-    </Section>
-  );
-}
+export default TagsPage;
+export const metadata = tagsPageMetadata;
+export const revalidate = DETAIL_REVALIDATE;
