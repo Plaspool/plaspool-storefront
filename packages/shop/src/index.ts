@@ -16,6 +16,8 @@ export * from "./components/empty-state";
 export * from "./components/breadcrumb";
 export * from "./components/quantity-stepper";
 export * from "./components/bulk-tier-table";
+export * from "./components/product-card";
+export * from "./components/product-grid";
 
 // The cart. Browser-local, localStorage-persisted, with bulk-tier
 // recalculation. `storage.ts` stays internal — everything outside `cart/`

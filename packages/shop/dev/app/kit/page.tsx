@@ -14,7 +14,9 @@ import {
   COLOURS,
   ColourSwatches,
   EmptyState,
+  listProducts,
   Price,
+  ProductGrid,
   QuantityStepper,
   RatingStars,
   SpoolImage,
@@ -453,6 +455,17 @@ export default function KitPage() {
           </h3>
           <BulkTierTable tiers={STANDARD_TIERS} basePrice={BASE_PRICE} />
         </div>
+      </Kit>
+
+      <Kit
+        title="Product grid"
+        note="All sixteen fixture products. Two columns at 375 px, three at md, four at xl. Hover or tab into a card and the add button appears over the spool."
+      >
+        <ProductGrid products={listProducts()} />
+      </Kit>
+
+      <Kit title="Product grid — empty" note="No products, no supplied empty state: the default fallback.">
+        <ProductGrid products={[]} />
       </Kit>
     </main>
   );
