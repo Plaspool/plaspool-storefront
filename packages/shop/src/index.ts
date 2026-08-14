@@ -5,3 +5,14 @@ export * from "./data/types";
 export * from "./data/money";
 export * from "./data/config";
 export * from "./data/catalog";
+
+// Presentational primitives. Every later surface — cards, listings, the
+// product page, the cart — composes from these.
+export * from "./components/spool-image";
+export * from "./components/price";
+export * from "./components/colour-swatches";
+export * from "./components/rating-stars";
+export * from "./components/empty-state";
+export * from "./components/breadcrumb";
+export * from "./components/quantity-stepper";
+export * from "./components/bulk-tier-table";
