@@ -8,7 +8,9 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@plaspool/brand": "*",
     "@plaspool/ui": "*",
+    "react-wrap-balancer": "^1.1.1",
     "use-debounce": "^10.0.5"
   },
   "peerDependencies": {

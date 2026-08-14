@@ -8,3 +8,5 @@ export * from "./data/types";
 export * from "./data/client";
 export * from "./data/posts";
 export * from "./data/doc";
+
+export { default as PostPage, postMetadata, postParams } from "./pages/post";
