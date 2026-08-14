@@ -2,23 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@plaspool/ui", "@plaspool/brand", "@plaspool/web", "@plaspool/blog"],
-  images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: `${process.env.WORDPRESS_HOSTNAME}`,
-        port: "",
-        pathname: '/wp-content/uploads/**',
-      },
-    ],
-  },
   async redirects() {
     return [
-      {
-        source: "/admin",
-        destination: `${process.env.WORDPRESS_URL}/wp-admin`,
-        permanent: true,
-      },
       {
         source: "/:path*",
         has: [
