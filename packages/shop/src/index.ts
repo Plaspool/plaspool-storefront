@@ -86,3 +86,7 @@ export * from "./product/buy-section";
 export * from "./waitlist/waitlist-page";
 export * from "./waitlist/waitlist-embed";
 export * from "./waitlist/metadata";
+
+// The assembled `/store/products/<slug>`, and the metadata and static params
+// the host route re-exports.
+export * from "./product/product-page";
