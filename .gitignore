@@ -39,3 +39,6 @@ next-env.d.ts
 # Markdown is not published to the remote. Project documentation lives in
 # README.rst; notes and guidance stay local to the working copy.
 *.md
+
+# Local tooling and editor state, not project source.
+.claude/
