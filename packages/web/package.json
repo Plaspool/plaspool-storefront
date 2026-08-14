@@ -5,13 +5,15 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./mail": "./src/mail.ts"
   },
   "dependencies": {
     "@plaspool/brand": "*",
     "@plaspool/ui": "*",
     "lucide-react": "^0.469.0",
-    "react-hot-toast": "^2.5.2"
+    "react-hot-toast": "^2.5.2",
+    "vanilla-cookieconsent": "^3.1.0"
   },
   "peerDependencies": {
     "next": "^15.3.3",

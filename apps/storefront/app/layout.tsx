@@ -1,30 +1,17 @@
 import "./globals.css";
 
+import { cn, ThemeProvider } from "@plaspool/ui";
 import {
-  Button,
-  cn,
-  Container,
-  Section,
-  ThemeProvider,
-  ThemeToggle,
-} from "@plaspool/ui";
-import {
-  contentMenu,
+  CookieBanner,
   Footer,
-  mainMenu,
-  MobileNav,
+  GoogleAnalytics,
   Nav,
 } from "@plaspool/web";
 import { siteConfig } from "@plaspool/brand";
 
 import { Inter as FontSans } from "next/font/google";
-import { Analytics } from "@vercel/analytics/react";
+import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 import Script from "next/script";
-
-import Balancer from "react-wrap-balancer";
-import Logo from "@/public/logo.svg";
-import Image from "next/image";
-import Link from "next/link";
 
 import type { Metadata } from "next";
 
@@ -33,37 +20,57 @@ const font = FontSans({
   variable: "--font-sans",
 });
 
+const TITLE = "PlaSpool — Buy 3D Printing Filament in Nigeria";
+const DESCRIPTION = siteConfig.site_description;
+
 export const metadata: Metadata = {
-  title: "Plaspool - Buy 3D Printing Filaments in Nigeria",
-  description: "PLA filaments for high‑quality 3D printing in Nigeria. Durable, affordable, and ready to ship nationwide. Trusted by makers, printing labs, and tested for precision.",
+  title: { default: TITLE, template: "%s | PlaSpool" },
+  description: DESCRIPTION,
   metadataBase: new URL(siteConfig.site_domain),
-  keywords: "3d printing, filaments, PLA, CNC",
-  alternates: {
-    canonical: "/",
-  },
+  applicationName: "PlaSpool",
+  keywords: [
+    "3d printing filament nigeria",
+    "buy pla filament nigeria",
+    "pla filament lagos",
+    "3d printer filament",
+    "bulk filament nigeria",
+    "petg filament nigeria",
+    "made in nigeria filament",
+  ],
+  alternates: { canonical: "/" },
+  robots: { index: true, follow: true },
   icons: {
     icon: "/brand/icon.png",
+    apple: "/brand/icon.png",
   },
+  // `openGraph.images` and `twitter.images` are deliberately omitted:
+  // app/opengraph-image.tsx supplies them by file convention, and naming them
+  // here would override it.
   openGraph: {
     type: "website",
-    title: "Plaspool - Buy 3D Printing Filaments in Nigeria",
-    description: "PLA filaments for high‑quality 3D printing in Nigeria. Durable, affordable, and ready to ship nationwide. Trusted by makers, printing labs, and tested for precision.",
+    siteName: "PlaSpool",
+    title: TITLE,
+    description: DESCRIPTION,
     url: siteConfig.site_domain,
-    images: [
-      {
-        url: `${siteConfig.site_domain}/layers.png`,
-        width: 1200,
-        height: 630,
-        alt: "Plaspool - 3D Printing Filaments",
-      },
-    ],
+    locale: "en_NG",
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "Plaspool",
-    description: "PLA filaments for high‑quality 3D printing in Nigeria. Durable, affordable, and ready to ship nationwide. Trusted by makers, printing labs, and tested for precision.",
-    images: [`${siteConfig.site_domain}/layers.png`],
-  },
+  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
+};
+
+const storeJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "OnlineStore",
+  name: "PlaSpool",
+  description: siteConfig.site_description,
+  url: siteConfig.site_domain,
+  logo: `${siteConfig.site_domain}/brand/icon.png`,
+  areaServed: { "@type": "Country", name: "Nigeria" },
+  knowsAbout: [
+    "3D printing",
+    "PLA filament",
+    "PETG filament",
+    "additive manufacturing",
+  ],
 };
 
 export default function RootLayout({
@@ -74,44 +81,22 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <meta name="robots" content="index, follow" />
-        <meta name="googlebot" content="index,follow" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link
-          rel="preload"
-          href="https://waitlister.me/js/embed.js"
-          as="script"
-        ></link>
-        <meta name="theme-color" content="#FFFFFF" />
+        <meta name="theme-color" content="#231c50" />
+        {/* Waitlister stays: /shop still uses the embed in Phase 1. */}
+        <link rel="preload" href="https://waitlister.me/js/embed.js" as="script" />
         <Script
           src="https://waitlister.me/js/embed.js"
           strategy="afterInteractive"
           async
         />
-        <Script
-          src="https://cdn.jsdelivr.net/gh/orestbida/cookieconsent@3.1.0/dist/cookieconsent.umd.js"
-          strategy="afterInteractive"
-          async
-        />
-        <Script
-          src="https://www.googletagmanager.com/gtag/js?id=G-40STPM61PP"
-          strategy="afterInteractive"
-        />
-        <Script id="ga4-init" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', 'G-40STPM61PP');
-          `}
-        </Script>
-        <link
-          rel="stylesheet"
-          href="https://cdn.jsdelivr.net/gh/orestbida/cookieconsent@3.1.0/dist/cookieconsent.css"
-        ></link>
       </head>
 
       <body className={cn("min-h-screen font-sans antialiased", font.variable)}>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(storeJsonLd) }}
+        />
         {/* Skip link: first focusable element on the page. Visually hidden
             until it receives keyboard focus, then jumps to <main id="content">. */}
         <a
@@ -134,7 +119,9 @@ export default function RootLayout({
           </main>
           <Footer />
         </ThemeProvider>
-        <Analytics />
+        <CookieBanner />
+        <GoogleAnalytics />
+        <VercelAnalytics />
       </body>
     </html>
   );

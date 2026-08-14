@@ -8,3 +8,7 @@ export { default as ContactPage } from "./pages/contact";
 export { default as ShippingPolicy } from "./pages/shipping";
 export { default as PlaspoolLanding } from "./pages/landing";
 export * from "./menu";
+export * from "./consent";
+// `./mail` is deliberately NOT re-exported here. The sendmail route handler is
+// server-only; pulling it through this barrel would drag every client component
+// and the consent stylesheet into that bundle. Import "@plaspool/web/mail".

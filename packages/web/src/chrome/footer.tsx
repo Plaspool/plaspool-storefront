@@ -1,5 +1,7 @@
 import Link from "next/link"
 import { BrandLogo } from "@plaspool/brand"
+// Extracted client component: keeps this footer a server component.
+import { CookiePreferencesButton } from "../consent/preferences-button"
 
 export default function Footer() {
   return (
@@ -61,6 +63,19 @@ export default function Footer() {
                 <Link href="/shipping" className="hover:text-white font-mono text-sm">
                   Shipping Info
                 </Link>
+              </li>
+              <li>
+                <Link href="/privacy" className="hover:text-white font-mono text-sm">
+                  Privacy policy
+                </Link>
+              </li>
+              <li>
+                <Link href="/terms" className="hover:text-white font-mono text-sm">
+                  Terms of service
+                </Link>
+              </li>
+              <li>
+                <CookiePreferencesButton className="hover:text-white font-mono text-sm" />
               </li>
             </ul>
           </div>
