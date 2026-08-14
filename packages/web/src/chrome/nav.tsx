@@ -1,19 +1,19 @@
 "use client"
 
-import { Layers } from "lucide-react"
+import * as React from "react"
 import Link from "next/link"
-import { Button } from "@plaspool/ui"
+import { Button, cn } from "@plaspool/ui"
+import { BrandLogo } from "@plaspool/brand"
 
 export default function Nav() {
+    const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
+
     return (
          <nav className="bg-white border-b font-mono border-slate-200 sticky top-0 z-50">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                   <div className="flex justify-between items-center h-16">
-                    <Link href="/" className="flex items-center space-x-2">
-                      <div className="w-8 h-8 bg-blue-900 rounded-lg flex items-center justify-center">
-                        <Layers className="w-5 h-5 text-white" />
-                      </div>
-                      <span className="text-xl font-bold text-slate-900 tracking-tight">PlaSpool</span>
+                    <Link href="/" className="flex items-center" aria-label="PlaSpool home">
+                      <BrandLogo variant="lockup" tone="light" className="h-8" />
                     </Link>
                     <div className="hidden md:flex items-center space-x-8">
                       <Link href="/#about" className="text-slate-600 hover:text-slate-900 font-medium tracking-wide">
@@ -33,15 +33,15 @@ export default function Nav() {
                       </a>
                       {/* <Button className="bg-blue-900 hover:bg-blue-800">Contact Us</Button> */}
                     </div>
-        
+
                     {/* Mobile menu button */}
                     <div className="md:hidden">
                       <button
                         type="button"
                         className="inline-flex items-center justify-center p-2 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-900"
                         aria-controls="mobile-menu"
-                        aria-expanded="false"
-                        onClick={() => document.getElementById("mobile-menu")?.classList.toggle("hidden")}
+                        aria-expanded={mobileMenuOpen}
+                        onClick={() => setMobileMenuOpen((open) => !open)}
                       >
                         <span className="sr-only">Open main menu</span>
                         {/* Hamburger icon */}
@@ -59,35 +59,35 @@ export default function Nav() {
                     </div>
                   </div>
                 </div>
-        
+
                 {/* Mobile menu, show/hide based on menu state */}
-                <div className="hidden md:hidden bg-white border-t border-slate-200" id="mobile-menu">
+                <div className={cn("md:hidden bg-white border-t border-slate-200", mobileMenuOpen ? "block" : "hidden")} id="mobile-menu">
                   <div className="px-2 pt-2 pb-3 space-y-1 font-mono">
-                    <Link onClick={() => document.getElementById("mobile-menu")?.classList.toggle("hidden")}
+                    <Link onClick={() => setMobileMenuOpen(false)}
                       href="/#about"
                       className="block px-3 py-2 rounded-md text-base font-medium text-slate-900 hover:bg-slate-100"
                     >
                       About
                     </Link>
-                    <Link onClick={() => document.getElementById("mobile-menu")?.classList.toggle("hidden")}
+                    <Link onClick={() => setMobileMenuOpen(false)}
                       target="_blank" rel="noopener noreferrer" href="https://store.plaspool.com/"
                       className="block px-3 py-2 rounded-md text-base font-medium text-slate-900 hover:bg-slate-100"
                     >
                       Products
                     </Link>
-                    <Link onClick={() => document.getElementById("mobile-menu")?.classList.toggle("hidden")}
+                    <Link onClick={() => setMobileMenuOpen(false)}
                       href="/posts"
                       className="block px-3 py-2 rounded-md text-base font-medium text-slate-900 hover:bg-slate-100"
                     >
                       Blog
                     </Link>
-                       <Link onClick={() => document.getElementById("mobile-menu")?.classList.toggle("hidden")}
+                       <Link onClick={() => setMobileMenuOpen(false)}
                       href="/contact"
                       className="block px-3 py-2 rounded-md text-base font-medium text-slate-900 hover:bg-slate-100"
                     >
                       Contact us
                     </Link>
-                      <a onClick={() => document.getElementById("mobile-menu")?.classList.toggle("hidden")}
+                      <a onClick={() => setMobileMenuOpen(false)}
                      target="_blank" rel="noopener noreferrer" href="https://store.plaspool.com/"
                       className="block px-3 py-2 rounded-md text-base font-medium text-slate-900 hover:bg-slate-100"
                     >

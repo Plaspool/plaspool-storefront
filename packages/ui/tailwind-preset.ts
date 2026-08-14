@@ -17,11 +17,11 @@ export const preset = {
       },
       colors: {
         brand: {
-          DEFAULT: "#231c50",
-          hover: "#171041",
-          soft: "#e9e7f3",
-          line: "#b8b2d6",
-          ink: "#ffffff",
+          DEFAULT: "hsl(var(--brand-accent))",
+          hover: "hsl(var(--brand-hover))",
+          soft: "hsl(var(--brand-soft))",
+          line: "hsl(var(--brand-line))",
+          ink: "hsl(var(--brand-ink))",
         },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

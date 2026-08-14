@@ -42,7 +42,7 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   icons: {
-    icon: "/layers.svg",
+    icon: "/brand/icon.png",
   },
   openGraph: {
     type: "website",
@@ -112,6 +112,14 @@ export default function RootLayout({
       </head>
 
       <body className={cn("min-h-screen font-sans antialiased", font.variable)}>
+        {/* Skip link: first focusable element on the page. Visually hidden
+            until it receives keyboard focus, then jumps to <main id="content">. */}
+        <a
+          href="#content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:rounded-md focus:bg-brand focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-brand-ink focus:shadow-lg"
+        >
+          Skip to content
+        </a>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -119,7 +127,11 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <Nav />
-          {children}
+          {/* tabIndex={-1}: programmatically focusable as the skip link's
+              jump target, without joining the normal Tab order. */}
+          <main id="content" tabIndex={-1} className="focus:outline-none">
+            {children}
+          </main>
           <Footer />
         </ThemeProvider>
         <Analytics />
