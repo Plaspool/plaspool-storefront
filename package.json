@@ -6,8 +6,16 @@
   "scripts": {
     "dev": "npm run dev -w @plaspool/storefront",
     "build": "npm run build -w @plaspool/storefront",
-    "lint": "npm run lint -w @plaspool/storefront",
+    "lint": "npm run lint:app && npm run lint:packages",
+    "lint:app": "npm run lint -w @plaspool/storefront",
+    "lint:packages": "eslint packages",
     "preview": "npm run preview -w @plaspool/storefront",
     "deploy": "npm run deploy -w @plaspool/storefront"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
+    "eslint": "^9.28.0",
+    "eslint-config-next": "^15.3.3",
+    "typescript": "^5.8.3"
   }
 }

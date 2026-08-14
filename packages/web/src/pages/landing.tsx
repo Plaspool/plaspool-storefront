@@ -14,7 +14,7 @@ import {
 } from "@plaspool/ui"
 import Link from "next/link"
 
-export default function Component() {
+export default function PlaspoolLanding() {
   return (
     <div className="min-h-screen bg-slate-100 font-mono">
 
