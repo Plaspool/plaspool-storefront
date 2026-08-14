@@ -1,6 +1,7 @@
 export * from "./components/post-card";
 export * from "./components/filter";
 export * from "./components/search-input";
+export * from "./components/doc-renderer";
 
 export * from "./data/config";
 export * from "./data/types";
