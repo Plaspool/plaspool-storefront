@@ -14,9 +14,16 @@ export function DocRenderer({ doc }: { doc: DocNode }) {
   return <>{(doc.content ?? []).map((n, i) => renderNode(n, i))}</>;
 }
 
-/** Same allow-list the editor gates links on. */
+/**
+ * Same allow-list the editor gates links on. A single leading slash is
+ * root-relative and allowed; a double leading slash is protocol-relative
+ * (browser resolves it to `<current-scheme>://evil.com`) and rejected.
+ */
 function isAllowedHref(href: string): boolean {
-  return /^(https?:|mailto:|tel:|\/)/i.test(href);
+  return (
+    /^(https?:|mailto:|tel:)/i.test(href) ||
+    (href.startsWith("/") && !href.startsWith("//"))
+  );
 }
 
 function renderNode(node: DocNode, key: number): ReactNode {
@@ -57,6 +64,7 @@ function renderNode(node: DocNode, key: number): ReactNode {
             type="checkbox"
             checked={checked}
             readOnly
+            disabled
             aria-label={plainText(node) || "task item"}
             className="mt-1.5"
           />
@@ -143,7 +151,11 @@ function applyMarks(node: DocNode): ReactNode {
       case "link": {
         const href = String(mark.attrs?.href ?? "");
         if (isAllowedHref(href)) {
-          out = (
+          // Internal (root-relative) links stay plain: no new tab, no nofollow
+          // — these are the site's own SEO surface. External links get both.
+          out = href.startsWith("/") ? (
+            <a href={href}>{out}</a>
+          ) : (
             <a href={href} target="_blank" rel="noopener noreferrer nofollow">
               {out}
             </a>
