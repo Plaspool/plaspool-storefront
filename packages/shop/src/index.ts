@@ -74,6 +74,14 @@ export * from "./product/parameters-tab";
 export * from "./product/reviews-tab";
 export * from "./product/order-info";
 
+// The buy side of the product page. `ProductBuySection` is the one that
+// matters — it owns the selected colour, size and quantity that the gallery,
+// the buy box and the sticky bar all read.
+export * from "./product/gallery";
+export * from "./product/buy-box";
+export * from "./product/sticky-buy-bar";
+export * from "./product/buy-section";
+
 // The relocated Waitlister embed, which collects real signups.
 export * from "./waitlist/waitlist-page";
 export * from "./waitlist/waitlist-embed";
