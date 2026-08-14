@@ -4,3 +4,4 @@
 export * from "./data/types";
 export * from "./data/money";
 export * from "./data/config";
+export * from "./data/catalog";
