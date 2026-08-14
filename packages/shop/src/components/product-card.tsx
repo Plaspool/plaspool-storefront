@@ -7,6 +7,7 @@ import { Badge, cn } from "@plaspool/ui";
 
 import type { Colour, Product, SizeOption } from "../data/types";
 import { priceFrom, ratingSummary } from "../data/money";
+import { SHOW_FIXTURE_REVIEWS } from "../data/config";
 import { useCart } from "../cart/cart-context";
 import { SpoolImage } from "./spool-image";
 import { Price } from "./price";
@@ -180,8 +181,11 @@ export function ProductCard({ product, className }: ProductCardProps) {
       </Link>
 
       {/* Nothing at all when there are no reviews — "0.0 (0)" is worse than
-          silence on a card. */}
-      {rating.count > 0 && (
+          silence on a card. With `SHOW_FIXTURE_REVIEWS` off every card takes
+          that same no-reviews path: invented stars must never ship looking
+          like genuine customer ratings, and an empty star row would still
+          claim a rating exists. */}
+      {SHOW_FIXTURE_REVIEWS && rating.count > 0 && (
         <RatingStars
           rating={rating.average}
           count={rating.count}
