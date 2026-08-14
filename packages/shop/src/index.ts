@@ -16,3 +16,8 @@ export * from "./components/empty-state";
 export * from "./components/breadcrumb";
 export * from "./components/quantity-stepper";
 export * from "./components/bulk-tier-table";
+
+// The `/shop` gateway. The engine itself is vendored and not re-exported —
+// nothing outside `./splash` should mount it directly.
+export * from "./splash/splash-gateway";
+export * from "./splash/metadata";
