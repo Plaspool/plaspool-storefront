@@ -42,3 +42,6 @@ next-env.d.ts
 
 # Local tooling and editor state, not project source.
 .claude/
+
+# Subagent-driven development scratch (ledger, briefs, review packages).
+.superpowers/
