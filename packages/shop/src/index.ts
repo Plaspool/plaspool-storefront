@@ -21,3 +21,8 @@ export * from "./components/bulk-tier-table";
 // nothing outside `./splash` should mount it directly.
 export * from "./splash/splash-gateway";
 export * from "./splash/metadata";
+
+// The relocated Waitlister embed, which collects real signups.
+export * from "./waitlist/waitlist-page";
+export * from "./waitlist/waitlist-embed";
+export * from "./waitlist/metadata";
