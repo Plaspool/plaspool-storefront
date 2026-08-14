@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 import { Check } from "lucide-react";
-import { useDebouncedCallback } from "use-debounce";
 import { Button, Input, Label, Separator, cn } from "@plaspool/ui";
 
 import { formatNaira } from "../data/money";
@@ -12,6 +11,7 @@ import {
   formatWeight,
   type Facets,
 } from "./filter-state";
+import { useDebouncedField } from "./use-debounced-field";
 import { useListingUrl } from "./use-listing-url";
 
 /**
@@ -100,13 +100,29 @@ export function FilterRail({
   const toggle = <T,>(list: T[], value: T): T[] =>
     list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
 
-  const writePrice = useDebouncedCallback((key: "minPrice" | "maxPrice", raw: string) => {
+  /* Same local-buffer treatment as the search box, for the same reason: a field
+     keyed on the value its own debounced write produces remounts itself and
+     loses the caret mid-typing. `commit` returns the string the URL will report
+     back, so the hook can tell its own echo from a back button or "Clear all". */
+  const commitPrice = (key: "minPrice" | "maxPrice") => (raw: string) => {
     const parsed = Number.parseInt(raw, 10);
     const value = Number.isFinite(parsed) ? parsed : null;
     /* Replace, as with the search box: a number being typed digit by digit is
        continuous input, not a discrete choice worth a history entry. */
     patch(key === "minPrice" ? { minPrice: value } : { maxPrice: value }, "replace");
-  }, 400);
+    return value === null ? "" : String(value);
+  };
+
+  const minField = useDebouncedField({
+    external: filters.minPrice === null ? "" : String(filters.minPrice),
+    delay: 400,
+    commit: commitPrice("minPrice"),
+  });
+  const maxField = useDebouncedField({
+    external: filters.maxPrice === null ? "" : String(filters.maxPrice),
+    delay: 400,
+    commit: commitPrice("maxPrice"),
+  });
 
   const [minBound, maxBound] = facets.priceBounds;
 
@@ -237,10 +253,9 @@ export function FilterRail({
               type="number"
               inputMode="numeric"
               min={0}
-              key={`min-${filters.minPrice ?? ""}`}
-              defaultValue={filters.minPrice ?? ""}
+              value={minField.value}
               placeholder={String(minBound)}
-              onChange={(event) => writePrice("minPrice", event.target.value)}
+              onChange={(event) => minField.onChange(event.target.value)}
               className="mt-1 font-mono"
             />
           </div>
@@ -256,10 +271,9 @@ export function FilterRail({
               type="number"
               inputMode="numeric"
               min={0}
-              key={`max-${filters.maxPrice ?? ""}`}
-              defaultValue={filters.maxPrice ?? ""}
+              value={maxField.value}
               placeholder={String(maxBound)}
-              onChange={(event) => writePrice("maxPrice", event.target.value)}
+              onChange={(event) => maxField.onChange(event.target.value)}
               className="mt-1 font-mono"
             />
           </div>
