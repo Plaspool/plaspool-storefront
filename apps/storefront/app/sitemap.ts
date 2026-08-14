@@ -1,5 +1,5 @@
 import { MetadataRoute } from "next";
-import { listPosts, DETAIL_REVALIDATE } from "@plaspool/blog";
+import { listPosts } from "@plaspool/blog";
 import { siteConfig } from "@plaspool/brand";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -57,4 +57,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [...staticUrls, ...postUrls];
 }
 
-export const revalidate = DETAIL_REVALIDATE;
+// Must match DETAIL_REVALIDATE in packages/blog/src/data/config.ts.
+// Next.js requires route segment config to be a statically analysable
+// literal, so this cannot import the constant.
+export const revalidate = 3600;

@@ -1,7 +1,10 @@
-import { PostPage, postMetadata, postParams, DETAIL_REVALIDATE } from "@plaspool/blog";
+import { PostPage, postMetadata, postParams } from "@plaspool/blog";
 
 export default PostPage;
 export const generateMetadata = postMetadata;
 export const generateStaticParams = postParams;
-export const revalidate = DETAIL_REVALIDATE;
+// Must match DETAIL_REVALIDATE in packages/blog/src/data/config.ts.
+// Next.js requires route segment config to be a statically analysable
+// literal, so this cannot import the constant.
+export const revalidate = 3600;
 export const dynamicParams = true;
