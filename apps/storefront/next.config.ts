@@ -8,12 +8,12 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@plaspool/ui", "@plaspool/brand", "@plaspool/web", "@plaspool/blog"],
+  transpilePackages: ["@plaspool/ui", "@plaspool/brand", "@plaspool/web", "@plaspool/blog", "@plaspool/shop"],
   experimental: {
     // Barrel-export packages pulled in wholesale via transpilePackages inflate
     // First Load JS on every route that imports from them; this makes Next
     // trace and tree-shake the actual imports instead of the full re-export.
-    optimizePackageImports: ["@plaspool/ui", "@plaspool/brand", "@plaspool/web", "@plaspool/blog"],
+    optimizePackageImports: ["@plaspool/ui", "@plaspool/brand", "@plaspool/web", "@plaspool/blog", "@plaspool/shop"],
   },
   images: {
     // Cloudflare Workers has no sharp, so on-the-fly optimisation is not

@@ -1,0 +1,172 @@
+"use client";
+
+import * as React from "react";
+import Link from "next/link";
+import { cn } from "@plaspool/ui";
+
+import { COLOURS } from "../data/catalog";
+import { SpoolImage } from "../components/spool-image";
+
+/**
+ * The shop home's first screen. Three slides, each a two-column split: copy on
+ * the left, a large spool on the right.
+ *
+ * The spool is the hero image, per design system rule 3. There is no
+ * photography in this store, and a gradient panel would be a second accent
+ * competing with the navy — so what carries the hero is a filament colour on
+ * a quiet ground, re-tinted per slide.
+ */
+
+const SLIDE_MS = 6000;
+
+interface Slide {
+  eyebrow: string;
+  heading: string;
+  body: string;
+  colourHex: string;
+  colourName: string;
+}
+
+const SLIDES: Slide[] = [
+  {
+    eyebrow: "Made in Lagos",
+    heading: "Filament extruded in Nigeria",
+    body: "Every spool is made here, not repackaged from an import — so a reorder in March matches the batch you printed in January.",
+    colourHex: COLOURS["brand-navy"].hex,
+    colourName: COLOURS["brand-navy"].name,
+  },
+  {
+    eyebrow: "±0.02 mm, every batch",
+    heading: "Measured before it ships",
+    body: "Diameter is laser-checked along the whole spool, so your first layer behaves the same on the last hundred metres as the first.",
+    colourHex: COLOURS["signal-red"].hex,
+    colourName: COLOURS["signal-red"].name,
+  },
+  {
+    eyebrow: "Buy by the box",
+    heading: "Print farm pricing",
+    body: "Quantity discounts start at four spools and reach 22% at ten, on the same line, with no account or quote to wait for.",
+    colourHex: COLOURS["palm-green"].hex,
+    colourName: COLOURS["palm-green"].name,
+  },
+];
+
+const BUTTON_FOCUS =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+export function HeroCarousel() {
+  const [index, setIndex] = React.useState(0);
+  const [paused, setPaused] = React.useState(false);
+
+  React.useEffect(() => {
+    if (paused) return undefined;
+    /* Read at effect time rather than at render: `matchMedia` does not exist
+       on the server, and reading it during render would make the first client
+       paint disagree with the server's. */
+    const reduced =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) return undefined;
+
+    const timer = setInterval(
+      () => setIndex((current) => (current + 1) % SLIDES.length),
+      SLIDE_MS,
+    );
+    return () => clearInterval(timer);
+  }, [paused]);
+
+  function onKeyDown(event: React.KeyboardEvent<HTMLElement>) {
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      setIndex((current) => (current + 1) % SLIDES.length);
+    } else if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      setIndex((current) => (current - 1 + SLIDES.length) % SLIDES.length);
+    }
+  }
+
+  const slide = SLIDES[index];
+
+  return (
+    <section
+      aria-label="Featured"
+      aria-roledescription="carousel"
+      onKeyDown={onKeyDown}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
+      className="border-b border-brand-line bg-background"
+    >
+      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 md:py-16 lg:px-8">
+        <div
+          aria-roledescription="slide"
+          aria-label={`Slide ${index + 1} of ${SLIDES.length}: ${slide.eyebrow}`}
+          className="grid items-center gap-8 md:grid-cols-2 md:gap-12"
+        >
+          <div>
+            <p className="font-mono text-xs uppercase tracking-widest text-brand">
+              {slide.eyebrow}
+            </p>
+            <h1 className="mt-3 font-sans text-3xl font-bold leading-tight text-foreground sm:text-4xl lg:text-5xl">
+              {slide.heading}
+            </h1>
+            <p className="mt-4 max-w-prose text-base leading-7 text-muted-foreground">
+              {slide.body}
+            </p>
+            <div className="mt-7 flex flex-wrap gap-3">
+              <Link
+                href="/store/pla"
+                className={cn(
+                  "inline-flex h-11 items-center justify-center rounded-md bg-brand px-6 font-sans text-sm font-medium text-brand-ink",
+                  "transition-colors hover:bg-brand-hover motion-reduce:transition-none",
+                  BUTTON_FOCUS,
+                )}
+              >
+                Shop PLA
+              </Link>
+              <Link
+                href="#bulk"
+                className={cn(
+                  "inline-flex h-11 items-center justify-center rounded-md border border-brand-line bg-background px-6 font-sans text-sm font-medium text-foreground",
+                  "transition-colors hover:bg-brand-soft motion-reduce:transition-none",
+                  BUTTON_FOCUS,
+                )}
+              >
+                Bulk pricing
+              </Link>
+            </div>
+          </div>
+
+          {/* Order-first on mobile would push the copy below the fold on a
+              375 px screen, so the spool stays second and capped in width. */}
+          <div className="flex justify-center md:justify-end">
+            <SpoolImage
+              colourHex={slide.colourHex}
+              weightGrams={1000}
+              label={`Filament spool in ${slide.colourName}`}
+              className="w-56 max-w-full sm:w-72 lg:w-[22rem]"
+            />
+          </div>
+        </div>
+
+        <div className="mt-8 flex items-center gap-2">
+          {SLIDES.map((item, dot) => (
+            <button
+              key={item.eyebrow}
+              type="button"
+              aria-label={`Show slide ${dot + 1}`}
+              aria-current={dot === index ? "true" : undefined}
+              onClick={() => setIndex(dot)}
+              className={cn(
+                "h-2.5 rounded-full transition-all duration-200 motion-reduce:transition-none",
+                BUTTON_FOCUS,
+                dot === index ? "w-8 bg-brand" : "w-2.5 bg-brand-line hover:bg-brand/40",
+              )}
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}

@@ -15,6 +15,7 @@
     "@hookform/resolvers": "^3.10.0",
     "@plaspool/blog": "*",
     "@plaspool/brand": "*",
+    "@plaspool/shop": "*",
     "@plaspool/ui": "*",
     "@plaspool/web": "*",
     "@vercel/analytics": "^1.5.0",
