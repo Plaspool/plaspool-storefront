@@ -16,3 +16,11 @@ export * from "./components/empty-state";
 export * from "./components/breadcrumb";
 export * from "./components/quantity-stepper";
 export * from "./components/bulk-tier-table";
+
+// The cart. Browser-local, localStorage-persisted, with bulk-tier
+// recalculation. `storage.ts` stays internal — everything outside `cart/`
+// goes through `useCart()`, never through `readCart`/`writeCart` directly.
+export * from "./cart/types";
+export * from "./cart/cart-context";
+export * from "./cart/cart-drawer";
+export * from "./cart/add-to-cart";
