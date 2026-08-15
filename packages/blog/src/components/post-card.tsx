@@ -13,11 +13,16 @@ export function PostCard({ post }: { post: PublicPost }) {
   });
 
   return (
+    // The navy-to-slate gradient this replaced was one hardcoded dark panel
+    // among otherwise-light cards — visually the loudest thing on the page
+    // for no reason tied to the content. A post card is not the shop; it
+    // gets the same neutral card treatment as everything else: a plain
+    // surface, a border, a subtle lift on hover.
     <Link
       href={`/posts/${post.slug}`}
       className={cn(
-        "border p-4 bg-gradient-to-r from-blue-900 to-slate-900 rounded-lg group flex justify-between flex-col not-prose gap-8",
-        "hover:bg-slate-600 transition-all",
+        "border bg-card p-4 rounded-lg group flex justify-between flex-col not-prose gap-8",
+        "transition-shadow hover:shadow-md motion-reduce:transition-none",
       )}
     >
       <div className="flex flex-col gap-4">
@@ -37,15 +42,15 @@ export function PostCard({ post }: { post: PublicPost }) {
             </div>
           )}
         </div>
-        <div className="text-xl text-white font-medium group-hover:underline decoration-muted-foreground underline-offset-4 decoration-dotted transition-all">
+        <div className="text-xl text-card-foreground font-medium group-hover:underline decoration-muted-foreground underline-offset-4 decoration-dotted transition-all">
           {post.title}
         </div>
-        <div className="text-sm text-white">{post.excerpt}</div>
+        <div className="text-sm text-muted-foreground">{post.excerpt}</div>
       </div>
 
       <div className="flex flex-col gap-4">
         <hr />
-        <div className="flex justify-between items-center text-xs text-white">
+        <div className="flex justify-between items-center text-xs text-muted-foreground">
           <p>{post.category || "Uncategorised"}</p>
           <p>{date}</p>
         </div>
