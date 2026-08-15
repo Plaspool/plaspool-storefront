@@ -104,8 +104,15 @@ export default function RootLayout({
         </a>
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          // Light mode is a product decision, not a fallback: the brand ramp, the
+          // spool artwork and the marketing chrome are all designed against a
+          // white ground. forcedTheme pins it so a visitor's OS dark-mode
+          // preference cannot flip the site into a palette nothing was designed
+          // for. Remove forcedTheme (and restore enableSystem) if a theme toggle
+          // is ever put back in front of users.
+          defaultTheme="light"
+          enableSystem={false}
+          forcedTheme="light"
           disableTransitionOnChange
         >
           {/* Chrome belongs to the route groups, not here: `(site)` carries the

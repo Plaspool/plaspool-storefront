@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { Button, cn } from "@plaspool/ui"
+import { buttonVariants, cn } from "@plaspool/ui"
 import { BrandLogo } from "@plaspool/brand"
 
 export default function Nav() {
@@ -19,18 +19,27 @@ export default function Nav() {
                       <Link href="/#about" className="text-slate-600 hover:text-slate-900 font-medium tracking-wide">
                         About
                       </Link>
-                      <Link target="_blank" rel="noopener noreferrer" href="https://store.plaspool.com/" className="text-slate-600 hover:text-slate-900 font-medium tracking-wide">
+                      <Link href="/shop" className="whitespace-nowrap text-slate-600 hover:text-slate-900 font-medium tracking-wide">
                         Products
                       </Link>
-                      <Link href="/posts" className="text-slate-600 hover:text-slate-900 font-medium tracking-wide">
+                      <Link href="/posts" className="whitespace-nowrap text-slate-600 hover:text-slate-900 font-medium tracking-wide">
                         Blog
                       </Link>
-                      <Link href="/contact" className="text-slate-600 hover:text-slate-900 font-medium tracking-wide">
+                      <Link href="/contact" className="whitespace-nowrap text-slate-600 hover:text-slate-900 font-medium tracking-wide">
                         Contact Us
                       </Link>
-                        <a target="_blank" rel="noopener noreferrer" href="https://store.plaspool.com/" className="t font-medium tracking-wide">
-                      <Button className="bg-slate-800 text-white hover:bg-slate-700">Shop Filaments</Button>
-                      </a>
+                      {/* buttonVariants on the Link rather than a <Button> inside an <a>:
+                          a <button> nested in an anchor is invalid HTML and breaks
+                          keyboard activation. */}
+                      <Link
+                        href="/shop"
+                        className={cn(
+                          buttonVariants(),
+                          "whitespace-nowrap bg-slate-800 text-white hover:bg-slate-700"
+                        )}
+                      >
+                        Shop Filaments
+                      </Link>
                       {/* <Button className="bg-blue-900 hover:bg-blue-800">Contact Us</Button> */}
                     </div>
 
@@ -70,7 +79,7 @@ export default function Nav() {
                       About
                     </Link>
                     <Link onClick={() => setMobileMenuOpen(false)}
-                      target="_blank" rel="noopener noreferrer" href="https://store.plaspool.com/"
+                      href="/shop"
                       className="block px-3 py-2 rounded-md text-base font-medium text-slate-900 hover:bg-slate-100"
                     >
                       Products
@@ -87,12 +96,12 @@ export default function Nav() {
                     >
                       Contact us
                     </Link>
-                      <a onClick={() => setMobileMenuOpen(false)}
-                     target="_blank" rel="noopener noreferrer" href="https://store.plaspool.com/"
+                    <Link onClick={() => setMobileMenuOpen(false)}
+                      href="/shop"
                       className="block px-3 py-2 rounded-md text-base font-medium text-slate-900 hover:bg-slate-100"
                     >
-                     Shop Filaments
-                                        </a>
+                      Shop Filaments
+                    </Link>
                   </div>
                 </div>
               </nav>

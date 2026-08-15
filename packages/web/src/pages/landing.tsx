@@ -42,7 +42,7 @@ export default function PlaspoolLanding() {
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-4">
-                <a target="_blank" rel="noopener noreferrer" href="https://store.plaspool.com">
+                <a href="/shop">
                 <Button size="lg" className="bg-blue-800 text-gray-200 hover:bg-blue-700 font-mono">
                   Shop Filaments <ArrowRight className="ml-2 w-4 h-4" />
                 </Button></a>
@@ -365,7 +365,7 @@ export default function PlaspoolLanding() {
             filament that performs consistently.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a target="_blank" rel="noopener noreferrer" href="https://store.plaspool.com" className="">
+            <a href="/shop">
             <Button size="lg" className="bg-white w-full text-blue-900 hover:bg-slate-100 font-mono">
               Shop Now <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
