@@ -50,7 +50,10 @@ const CardDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("text-sm text-slate-400", className)}
+    // `text-muted-foreground` (45% grey in light mode) rather than
+    // `text-slate-400` (#94a3b8), which is too light against a white card to
+    // clear a comfortable contrast ratio — and does not move with the theme.
+    className={cn("text-sm text-muted-foreground", className)}
     {...props}
   />
 ))
