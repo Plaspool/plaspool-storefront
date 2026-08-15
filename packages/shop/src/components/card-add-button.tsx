@@ -1,0 +1,87 @@
+"use client";
+
+import * as React from "react";
+import { Check, ShoppingCart } from "lucide-react";
+import { cn } from "@plaspool/ui";
+
+import type { Product } from "../data/types";
+import { cheapestSize, firstInStockColour } from "../data/money";
+import { useCart } from "../cart/cart-context";
+
+/**
+ * The add button that sits in a `ProductCard`'s image well.
+ *
+ * It lives in its own module purely to keep the `"use client"` boundary here.
+ * `ProductCard` is otherwise a server component — `SpoolImage` in particular is
+ * deliberately hook-free so its SVG renders on the server — and a sixteen-card
+ * grid should not ship sixteen spools, badge rows and swatch rows to the
+ * browser for the sake of one button that reads `useCart()`.
+ *
+ * It cannot reuse `AddToCartButton`: that component builds its accessible name
+ * from its visible label, and this one needs to name the colour and size it
+ * will add while showing only a short label.
+ */
+
+const CONFIRM_MS = 1800;
+
+export function CardAddButton({ product }: { product: Product }) {
+  const cart = useCart();
+  const colour = firstInStockColour(product);
+  const size = cheapestSize(product);
+  const [justAdded, setJustAdded] = React.useState(false);
+  const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  const soldOut = !colour.inStock;
+
+  function handleClick() {
+    cart.add(
+      { productSlug: product.slug, colourId: colour.id, sizeId: size.id },
+      1,
+    );
+    setJustAdded(true);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => setJustAdded(false), CONFIRM_MS);
+  }
+
+  const label = `Add ${product.name}, ${colour.name}, ${size.label} to cart`;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={soldOut}
+        aria-label={soldOut ? `${label} — out of stock` : label}
+        className={cn(
+          /* Above the link's stretched overlay, so the click lands here. */
+          "absolute inset-x-2 bottom-2 z-10 inline-flex h-9 items-center justify-center gap-2",
+          "rounded-md bg-brand px-3 font-sans text-sm font-medium text-brand-ink",
+          "shadow-sm transition-opacity duration-150 motion-reduce:transition-none",
+          "hover:bg-brand-hover disabled:pointer-events-none disabled:opacity-50",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+          /* Hidden until the card is hovered or something inside it has
+             focus, so it is reachable by keyboard and not just by mouse.
+             `opacity` rather than `hidden`, because a focusable control that
+             is `display:none` is not focusable at all. */
+          "opacity-0 focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100",
+        )}
+      >
+        {justAdded ? (
+          <Check aria-hidden="true" className="h-4 w-4" />
+        ) : (
+          <ShoppingCart aria-hidden="true" className="h-4 w-4" />
+        )}
+        <span aria-hidden="true">{justAdded ? "Added" : "Add to cart"}</span>
+      </button>
+      <span role="status" aria-live="polite" className="sr-only">
+        {justAdded ? `${product.name} added to cart` : ""}
+      </span>
+    </>
+  );
+}
