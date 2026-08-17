@@ -2,6 +2,7 @@ export * from "./craft";
 // `craft.tsx` ships its own local `cn`; the explicit re-export below resolves
 // the star-export ambiguity in favour of the shared helper in `./cn`.
 export { cn } from "./cn";
+export * from "./json-ld";
 export * from "./primitives/button";
 export * from "./primitives/badge";
 export * from "./primitives/card";
