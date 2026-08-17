@@ -1,65 +1,113 @@
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 
-import { cn, NEO_SURFACE, NEO_BRAND_SHADOW } from "@plaspool/ui";
-
-import { imageUrl } from "../data/posts";
+import { CoverImg } from "./cover-img";
 import type { PublicPost } from "../data/types";
 
-export function PostCard({ post }: { post: PublicPost }) {
+/**
+ * The post card, ported from the admin app's `PostCard` (issue #15): the
+ * cream pressable card — hard edge, hard offset shadow, press-down on click
+ * — with text first and the picture under it, in the order the grid is
+ * actually scanned. The geometry lives in `blog.css`; this file is the
+ * public adaptation of the admin's markup.
+ *
+ * What the adaptation drops is everything a reader cannot do: no status
+ * chip (the public API only serves published posts — the accent spine
+ * carries that instead), no Edit/Read/overflow actions, no restore. The
+ * whole card is one link, drawn as an absolutely-positioned hit target so
+ * the tag links can sit above it and stay independently clickable — the
+ * admin's own pattern.
+ *
+ * The byline shows the ABSOLUTE date, not the admin's "3d ago": a relative
+ * timestamp computed at render time is a hydration mismatch waiting to
+ * happen on an ISR page (the server rendered it up to five minutes ago),
+ * and it goes stale inside the cache window. The admin is a live SPA; this
+ * is not.
+ *
+ * This replaces the interim NEO_SURFACE treatment from #7 — the issue that
+ * predicted exactly this convergence: "both should be satisfied by this
+ * port rather than implemented independently."
+ */
+export function PostCard({ post, index = 0 }: { post: PublicPost; index?: number }) {
+  const title = post.title.trim() || "Untitled";
   const date = new Date(post.publishedAt).toLocaleDateString("en-NG", {
-    month: "long",
+    month: "short",
     day: "numeric",
     year: "numeric",
   });
 
   return (
-    // The navy-to-slate gradient this replaced was one hardcoded dark panel
-    // among otherwise-light cards — visually the loudest thing on the page
-    // for no reason tied to the content. A post card is not the shop; it
-    // gets the same neutral card treatment as everything else: a plain
-    // surface and a border.
-    //
-    // The hover state is neobrutalist rather than a soft lift — the geometry
-    // and the reasoning both live in `NEO_SURFACE`. This card takes the brand
-    // accent for its shadow; the product CTAs keep the default foreground.
-    <Link
-      href={`/posts/${post.slug}`}
-      className={cn(
-        "bg-card p-4 rounded-lg group flex justify-between flex-col not-prose gap-8",
-        NEO_SURFACE,
-        NEO_BRAND_SHADOW,
-      )}
+    <article
+      className={["card", post.coverImage ? "" : "card--textonly"].filter(Boolean).join(" ")}
+      // Position in the grid — drives the entrance stagger only. Capped so
+      // a long page doesn't take seconds to appear.
+      style={{ ["--i" as string]: Math.min(index, 12) }}
     >
-      <div className="flex flex-col gap-4">
-        <div className="h-48 w-full overflow-hidden relative rounded-md border flex items-center justify-center bg-muted">
-          {post.coverImage ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              className="h-full w-full object-cover"
-              style={{ objectPosition: post.coverImage.focalPoint || undefined }}
-              src={imageUrl(post.coverImage.url)}
-              alt={post.coverImage.alt || post.title}
-              loading="lazy"
-            />
-          ) : (
-            <div className="flex items-center justify-center w-full h-full text-muted-foreground">
-              No image available
-            </div>
-          )}
-        </div>
-        <div className="text-xl text-card-foreground font-medium group-hover:underline decoration-muted-foreground underline-offset-4 decoration-dotted transition-all">
-          {post.title}
-        </div>
-        <div className="text-sm text-muted-foreground">{post.excerpt}</div>
+      <Link className="card__hit" href={`/posts/${post.slug}`} aria-label={`Read ${title}`} />
+
+      <div className="card__body">
+        {post.category && (
+          <div className="card__meta">
+            <span className="card__cat">{post.category}</span>
+          </div>
+        )}
+
+        <h2 className="card__title">{title}</h2>
+        {post.subtitle && <p className="card__subtitle">{post.subtitle}</p>}
+        {post.excerpt && <p className="card__excerpt">{post.excerpt}</p>}
+
+        {post.tags.length > 0 && (
+          <div className="card__tags">
+            {post.tags.slice(0, 4).map((t) => (
+              <Link
+                key={t}
+                className="card__tag"
+                href={`/posts?tag=${encodeURIComponent(t)}`}
+              >
+                {t}
+              </Link>
+            ))}
+            {post.tags.length > 4 && (
+              <span className="card__tag card__tag--more">+{post.tags.length - 4}</span>
+            )}
+          </div>
+        )}
+
+        <footer className="card__by">
+          <span className="card__avatar" aria-hidden="true">
+            {initials(post.author.name)}
+          </span>
+          <span className="card__byline">
+            <span className="card__author">{post.author.name || "Unknown writer"}</span>
+            <span className="card__when">
+              <time dateTime={new Date(post.publishedAt).toISOString()}>{date}</time>
+              {" · "}
+              {post.wordCount === 0 ? "Empty" : `${post.readingTime} min read`}
+            </span>
+          </span>
+        </footer>
       </div>
 
-      <div className="flex flex-col gap-4">
-        <hr />
-        <div className="flex justify-between items-center text-xs text-muted-foreground">
-          <p>{post.category || "Uncategorised"}</p>
-          <p>{date}</p>
+      {post.coverImage && (
+        <div className="card__media">
+          <CoverImg image={post.coverImage} fallbackAlt={title} className="card__img" />
+          {/* Not a control — the whole card is the control. The reference
+              design's cue that the picture is pressable. */}
+          <span className="card__more" aria-hidden="true">
+            Read More
+            <ArrowRight className="ui-ic" />
+          </span>
         </div>
-      </div>
-    </Link>
+      )}
+    </article>
   );
+}
+
+/** Up to two initials for the byline disc — the admin's rule, ported. */
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "·";
+  const first = parts[0]![0]!;
+  const last = parts.length > 1 ? parts[parts.length - 1]![0]! : "";
+  return (first + last).toUpperCase();
 }

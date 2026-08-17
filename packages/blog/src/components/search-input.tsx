@@ -2,8 +2,6 @@
 
 import { Search } from "lucide-react";
 
-import { Input } from "@plaspool/ui";
-
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useDebouncedCallback } from "use-debounce";
 
@@ -23,19 +21,20 @@ export function SearchInput({ defaultValue }: { defaultValue?: string }) {
   }, 300);
 
   return (
-    // The plain `<Input>` this replaced hardcoded a dark slate fill with
-    // white text, matching nothing else on the page. A search field on a
-    // light page reads as an ordinary field: white background, a visible
-    // border, a leading icon rather than a colour block.
+    // A plain input carrying the ported field treatment (`.searchbox` in
+    // blog.css) rather than the shadcn `<Input>`: the blog's controls sit on
+    // the design system's own grid — one height for every control on the
+    // row, derived from `--ctl-*`.
     <div className="relative w-full max-w-sm">
       <Search
         aria-hidden="true"
-        className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+        className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+        style={{ color: "var(--ink-4)" }}
       />
-      <Input
+      <input
         type="search"
         name="search"
-        className="pl-9"
+        className="searchbox"
         placeholder="Search posts..."
         defaultValue={defaultValue}
         onChange={(e) => handleSearch(e.target.value)}

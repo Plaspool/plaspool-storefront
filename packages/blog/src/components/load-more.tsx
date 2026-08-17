@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 
-import { Button } from "@plaspool/ui";
-
 import { PostCard } from "./post-card";
 import { BLOG_API, POSTS_PER_PAGE } from "../data/config";
 import type { ListParams, PublicPost } from "../data/types";
@@ -48,19 +46,24 @@ export function LoadMore({
   return (
     <>
       {posts.length > 0 && (
-        <div className="grid md:grid-cols-3 gap-4 mt-4">
-          {posts.map((post) => (
-            <PostCard key={post.id} post={post} />
+        <div className="post-grid">
+          {posts.map((post, i) => (
+            <PostCard key={post.id} post={post} index={i} />
           ))}
         </div>
       )}
       {cursor && (
         <div className="flex flex-col items-center gap-2 mt-8">
-          <Button onClick={loadMore} disabled={loading} variant="outline">
+          <button
+            type="button"
+            className="btn btn--outline"
+            onClick={loadMore}
+            disabled={loading}
+          >
             {loading ? "Loading…" : "Load more posts"}
-          </Button>
+          </button>
           {failed && (
-            <p role="alert" className="text-sm text-red-600">
+            <p role="alert" className="text-sm" style={{ color: "var(--danger)" }}>
               Could not load more posts. Try again.
             </p>
           )}
