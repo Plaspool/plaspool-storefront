@@ -1,7 +1,8 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { PackageSearch, SearchX } from "lucide-react";
+import { PackageSearch } from "lucide-react";
 import { Button, cn } from "@plaspool/ui";
 
 import { categoryPaths, getCategory, listProducts, listProductsByCategory } from "../data/catalog";
@@ -9,6 +10,7 @@ import { Breadcrumb } from "../components/breadcrumb";
 import { EmptyState } from "../components/empty-state";
 import { ProductGrid } from "../components/product-grid";
 import { applyFilters, facetsFor, parseFilters } from "./filter-state";
+import { FilteredGrid } from "./filtered-grid";
 import { FilterRail } from "./filter-rail";
 import { FilterDrawer } from "./filter-drawer";
 import { ListingSearch } from "./listing-search";
@@ -17,14 +19,26 @@ import { SortSelect } from "./sort-select";
 /**
  * `/store/[category]` — the listing.
  *
- * A server component. The grid is rendered on the server from the URL's search
- * params, so a filtered view is shareable and crawlable; the rail, drawer,
- * search box and sort select are the only client code, and all four do nothing
- * but rewrite the URL.
+ * STATIC, AND THAT IS THE FIX FOR #9. This page used to await
+ * `searchParams`, and in the App Router that single read makes the whole
+ * route dynamic at runtime — the build summary printed ● SSG, but the
+ * prerender manifest told the truth: `/store/all` was in neither `routes`
+ * nor `dynamicRoutes`, so EVERY visit was a full server render of the
+ * heaviest page in the store. On the Workers free plan's 10ms CPU budget
+ * that was Error 1102 roughly once in twenty requests.
  *
- * `all` is a pseudo-category meaning every product. Task 6's nav search submits
- * to `/store/all?q=…` and Task 8's "View all" links to `/store/all`, so it is
- * a real route and is statically generated alongside the six real categories.
+ * Now nothing here reads request state. The page prerenders for every
+ * category (plus `all`), revalidates on the 300s window, and is served from
+ * the incremental cache without executing a render. Filtering moved into
+ * `FilteredGrid`, which applies the SAME `filter-state.ts` functions over
+ * the same fixture array in the browser. Every filter control was already a
+ * client component that only rewrites the URL; they now sit in Suspense
+ * boundaries because a static page requires it of `useSearchParams`
+ * readers.
+ *
+ * `all` is a pseudo-category meaning every product. The nav search submits
+ * to `/store/all?q=…` and "View all" links here, so it is a real route and
+ * is statically generated alongside the real categories.
  */
 
 const ALL_META = { name: "All filament", blurb: "Every spool we make." };
@@ -58,29 +72,29 @@ export function categoryParams(): { category: string }[] {
 
 export async function CategoryPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ category: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { category } = await params;
-  const filters = parseFilters(await searchParams);
 
   const isAll = category === "all";
   const meta = metaFor(category);
   if (!meta) notFound();
 
   const base = isAll ? listProducts() : listProductsByCategory(category);
-  const products = applyFilters(base, filters);
   const facets = facetsFor(base);
 
-  /* Two different situations, two different empty states. A category with
-     nothing in it yet (`support` today) is not the same as a filter that
-     matched nothing, and collapsing them would tell a shopper to clear
-     filters they never set. */
+  /* The default presentation — featured first, catalog order after — is what
+     the static HTML carries and what the Suspense fallback shows, so the
+     hydration swap is invisible until a query string makes the views differ. */
+  const defaultOrder = applyFilters(base, parseFilters({}));
+
   const categoryEmpty = base.length === 0;
 
-  const emptyState = categoryEmpty ? (
+  /* A category with nothing in it yet (`support` today) is not a filter that
+     matched nothing; that second state lives in FilteredGrid with the
+     filters themselves. */
+  const categoryEmptyState = (
     <EmptyState
       icon={<PackageSearch aria-hidden="true" className="h-6 w-6" />}
       title="No products in this category yet"
@@ -88,17 +102,6 @@ export async function CategoryPage({
       action={
         <Button asChild>
           <Link href="/store/pla">Browse PLA</Link>
-        </Button>
-      }
-    />
-  ) : (
-    <EmptyState
-      icon={<SearchX aria-hidden="true" className="h-6 w-6" />}
-      title="No spools match these filters"
-      body="Try widening the price range or clearing a colour."
-      action={
-        <Button asChild variant="outline">
-          <Link href={`/store/${category}`}>Clear all filters</Link>
         </Button>
       }
     />
@@ -118,8 +121,10 @@ export async function CategoryPage({
         <h1 className="font-sans text-2xl font-semibold text-foreground sm:text-3xl">
           {meta.name}
         </h1>
+        {/* The category's size — static on purpose. When filters narrow the
+            view, FilteredGrid announces the match count beside the grid. */}
         <p className="font-mono text-sm text-muted-foreground">
-          {products.length} {products.length === 1 ? "product" : "products"}
+          {base.length} {base.length === 1 ? "product" : "products"}
         </p>
       </div>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{meta.blurb}</p>
@@ -134,24 +139,61 @@ export async function CategoryPage({
         )}
       >
         {/* The rail and the drawer render the same `FilterRail`, so a group
-            added later cannot appear in one and not the other. */}
+            added later cannot appear in one and not the other. Each control
+            sits in its own Suspense boundary: they read `useSearchParams`,
+            and on a static page that read must have a fallback to bail to.
+            The fallbacks are fixed-size ghosts, so nothing shifts when the
+            controls hydrate in. */}
         {!categoryEmpty && (
           <aside className="hidden md:block">
-            <FilterRail facets={facets} />
+            <Suspense fallback={<div aria-hidden="true" className="min-h-[24rem]" />}>
+              <FilterRail facets={facets} />
+            </Suspense>
           </aside>
         )}
 
         <div className="min-w-0">
           {!categoryEmpty && (
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <FilterDrawer facets={facets} className="md:hidden" />
-              <ListingSearch className="sm:flex-1" />
-              <SortSelect />
+              <Suspense
+                fallback={
+                  <div aria-hidden="true" className="h-10 w-28 rounded-md border md:hidden" />
+                }
+              >
+                <FilterDrawer facets={facets} className="md:hidden" />
+              </Suspense>
+              <Suspense
+                fallback={
+                  <div aria-hidden="true" className="h-10 rounded-md border sm:flex-1" />
+                }
+              >
+                <ListingSearch className="sm:flex-1" />
+              </Suspense>
+              <Suspense
+                fallback={<div aria-hidden="true" className="h-10 w-44 rounded-md border" />}
+              >
+                <SortSelect />
+              </Suspense>
             </div>
           )}
 
           <div className={cn(!categoryEmpty && "mt-6")}>
-            <ProductGrid products={products} emptyState={emptyState} />
+            {/* The fallback IS the page: the full grid in default order (or
+                the category's own empty state), server-rendered into the
+                static HTML. FilteredGrid replaces it on hydration with the
+                same markup — or the filtered view, when the URL carries
+                one. */}
+            <Suspense
+              fallback={
+                categoryEmpty ? categoryEmptyState : <ProductGrid products={defaultOrder} />
+              }
+            >
+              <FilteredGrid
+                base={base}
+                clearHref={`/store/${category}`}
+                emptyState={categoryEmptyState}
+              />
+            </Suspense>
           </div>
         </div>
       </div>

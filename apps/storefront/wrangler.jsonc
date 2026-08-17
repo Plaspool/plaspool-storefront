@@ -7,5 +7,37 @@
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
+  },
+  /*
+   * The incremental cache (#9). Without a cache binding, every route with
+   * `revalidate` — /store/all, the blog, the product pages — re-rendered on
+   * EVERY request: OpenNext's default cache is a no-op, so "ISR" was a full
+   * SSR per view, and the free plan's 10ms CPU budget was blown by a 27ms
+   * median. Error 1102 was the enforcement.
+   *
+   * KV was created with `wrangler kv namespace create NEXT_INC_CACHE_KV`
+   * (the binding name @opennextjs/cloudflare expects). Deploy populates the
+   * build-time prerendered pages into it automatically.
+   */
+  "kv_namespaces": [
+    {
+      "binding": "NEXT_INC_CACHE_KV",
+      "id": "16301371e9434e11aed74d90477fa25e"
+    }
+  ],
+  /* The memory queue revalidates stale ISR pages by calling the Worker back
+     on itself; this service binding is how it reaches "itself". */
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "plaspool-storefront"
+    }
+  ],
+  /* Issue #9's first acceptance criterion: without logs there is no telling
+     WHICH route or operation burns the budget — everything else is inference
+     from the dashboard's aggregates. */
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
   }
 }
