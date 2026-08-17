@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { siteConfig } from "@plaspool/brand";
+import { cn } from "@plaspool/ui";
 
 import PlaSpoolSplash from "./splash-engine";
 import type { SplashHandle } from "./splash-engine";
@@ -54,9 +55,26 @@ export interface SplashGatewayProps {
   destination?: string;
 }
 
+/**
+ * When the wordmark and tagline join the mark.
+ *
+ * `forge` draws for 1560 ms. Landing the text at the end of that draw is the
+ * admin app's ordering — mark first, then the words — instead of all three
+ * arriving together at t=0, which read as a static poster with a moving logo
+ * on it. Comfortably inside `MAX_MS`, so the text is never still fading in
+ * when the redirect fires.
+ */
+const TEXT_AT_MS = 1560;
+
 export function SplashGateway({ destination = DESTINATION }: SplashGatewayProps) {
   const router = useRouter();
   const hostRef = React.useRef<HTMLDivElement | null>(null);
+  const [textIn, setTextIn] = React.useState(false);
+
+  React.useEffect(() => {
+    const t = window.setTimeout(() => setTextIn(true), TEXT_AT_MS);
+    return () => window.clearTimeout(t);
+  }, []);
 
   React.useEffect(() => {
     let settled = false;
@@ -114,6 +132,23 @@ export function SplashGateway({ destination = DESTINATION }: SplashGatewayProps)
             engine-drawn glyphs, and a storefront has no boot to narrate.
           */
           chrome: false,
+          /*
+            WHY THE ANIMATION SOMETIMES DID NOT PLAY AT ALL.
+
+            `once` defaults to TRUE: the engine stamps a "seen" key and then
+            skips the whole sequence for the next `seenWindowMs` — six hours.
+            Nothing here ever passed it, so the splash played on a visitor's
+            first `/shop` of the morning and then silently did nothing for the
+            rest of the day. It reproduced "on the reporter's PC" and not on a
+            fresh machine because it is per-browser state, not per-machine.
+
+            A once-a-session boot screen is right for the admin app, which is
+            a tool people keep open. This route exists only to give the brand
+            one moment before the shop, and that moment is 2.8 seconds with a
+            skip on any input — if it is worth playing it is worth playing
+            every time, and "sometimes" is worse than either.
+          */
+          once: false,
           maxMs: MAX_MS,
           debugHandle: false,
           onDone: go,
@@ -192,7 +227,23 @@ export function SplashGateway({ destination = DESTINATION }: SplashGatewayProps)
         */}
         <div ref={hostRef} data-splash-host="" className="h-32 w-32 sm:h-40 sm:w-40" />
 
-        <div className="flex flex-col items-center gap-2 px-6 text-center">
+        {/*
+          The words arrive after the mark has drawn — see `TEXT_AT_MS`. Opacity
+          and a short rise only: no layout animation, because the block is
+          already in flow and reflowing the overlay mid-sequence is the exact
+          thing the fixed mark box above avoids.
+
+          Reduced motion gets the same ordering without the movement; the delay
+          is sequencing, not decoration, so it stays.
+        */}
+        <div
+          className={cn(
+            "flex flex-col items-center gap-2 px-6 text-center",
+            "transition-[opacity,transform] duration-500 ease-out motion-reduce:transition-opacity",
+            textIn ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1",
+            "motion-reduce:translate-y-0",
+          )}
+        >
           <p className="font-sans text-2xl font-semibold tracking-tight text-foreground">
             {siteConfig.site_name}
           </p>
