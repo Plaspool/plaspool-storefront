@@ -1,13 +1,41 @@
-import { BLOG_API_BASE, DETAIL_REVALIDATE, LIST_REVALIDATE, POSTS_PER_PAGE } from "./config";
+import {
+  BLOG_API_BASE,
+  BLOG_IMAGE_PATH,
+  DETAIL_REVALIDATE,
+  LIST_REVALIDATE,
+  POSTS_PER_PAGE,
+} from "./config";
 import { BlogAPIError, blogFetch } from "./client";
 import type { ListParams, PostList, PublicPostDetail, PublicTerm } from "./types";
 
 /**
- * Absolute URL for a cover image. The API returns `/api/public/images/<id>`,
- * which 302s to a presigned R2 URL with a 300-second TTL — so this stable form
- * is the only one that may ever reach rendered HTML.
+ * The image id when `url` is the API's stable `/api/public/images/<id>`
+ * form; `null` for anything else (absolute pasted images in post bodies).
+ */
+export function publicImageId(url: string): string | null {
+  const m = /^\/api\/public\/images\/([A-Za-z0-9_-]+)$/.exec(url);
+  return m ? m[1] : null;
+}
+
+/**
+ * The URL a rendered `<img>` may carry.
+ *
+ * API-hosted images map to the same-origin proxy (`/images/blog/<id>`)
+ * instead of the upstream `/api/public/images/<id>`: the upstream form 302s
+ * to a presigned R2 URL with a 300-second TTL and `private, no-store` on the
+ * redirect, so every single view paid two round trips and nothing was
+ * cacheable anywhere (issue #14 — production showed more 3xx responses than
+ * 2xx). The proxy serves the bytes from a stable URL with long caching.
+ *
+ * The presigned URL itself must still never reach HTML — that rule is
+ * unchanged; the proxy follows the redirect server-side, per request.
+ *
+ * Anything already absolute passes through untouched, which keeps pasted
+ * remote images in post bodies working.
  */
 export function imageUrl(url: string): string {
+  const id = publicImageId(url);
+  if (id) return `${BLOG_IMAGE_PATH}/${id}`;
   return url.startsWith("http") ? url : `${BLOG_API_BASE}${url}`;
 }
 

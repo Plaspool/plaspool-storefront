@@ -5,6 +5,18 @@ import type { NextConfig } from "next";
 const config: NextConfig = {
   transpilePackages: ["@plaspool/ui", "@plaspool/brand", "@plaspool/web", "@plaspool/blog"],
   images: { unoptimized: true },
+  async rewrites() {
+    // The harness has no `/images/blog/[id]` route of its own — that proxy
+    // lives in apps/storefront. Map the same path straight to the API; the
+    // upstream 302 passes through to the browser, which keeps the redirect
+    // hop in dev only. `imageUrl()` emits this path everywhere.
+    return [
+      {
+        source: "/images/blog/:id",
+        destination: "https://blog-admin-app-gold.vercel.app/api/public/images/:id",
+      },
+    ];
+  },
 };
 
 export default config;
