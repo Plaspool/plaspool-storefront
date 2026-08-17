@@ -1,5 +1,4 @@
 import { listPosts, listCategories, listTags } from "../data/posts";
-import { Section, Container, Prose } from "@plaspool/ui";
 import { PostCard } from "../components/post-card";
 import { LoadMore } from "../components/load-more";
 import { FilterPosts } from "../components/filter";
@@ -29,16 +28,16 @@ export default async function PostsIndexPage({
   ]);
 
   return (
-    <Section>
-      <Container className="space-y-8">
-        <Prose className="mb-8">
-          <h1 className="mb-2">Posts</h1>
-          <p className="text-muted-foreground">
+    <div className="blog">
+      <div className="blog-shell">
+        <header>
+          <h1 className="blog-head__title">Posts</h1>
+          <p className="blog-head__sub">
             3D printing guides, material notes and case studies from Nigeria.
           </p>
-        </Prose>
+        </header>
 
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="blog-toolbar">
           <SearchInput defaultValue={search} />
           <FilterPosts
             categories={categories.map((c) => c.name)}
@@ -49,20 +48,20 @@ export default async function PostsIndexPage({
         </div>
 
         {page.items.length === 0 ? (
-          <div className="h-24 w-full border rounded-lg bg-accent/25 flex items-center justify-center">
-            <p className="text-muted-foreground">No posts found.</p>
+          <div className="blog-empty">
+            <p>No posts found.</p>
           </div>
         ) : (
           <>
-            <div className="grid md:grid-cols-3 gap-4">
-              {page.items.map((post) => (
-                <PostCard key={post.id} post={post} />
+            <div className="post-grid">
+              {page.items.map((post, i) => (
+                <PostCard key={post.id} post={post} index={i} />
               ))}
             </div>
             <LoadMore initialCursor={page.nextCursor} params={params} />
           </>
         )}
-      </Container>
-    </Section>
+      </div>
+    </div>
   );
 }

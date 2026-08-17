@@ -44,46 +44,42 @@ export async function BlogStrip() {
           </Link>
         </div>
 
-        <ul className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {/* `blog-scope` puts the blog's design tokens in reach WITHOUT
+            repainting the shop band they sit on: the cards below are blog
+            objects — cream paper, hard edge, hard offset shadow, press-down
+            on click — displayed inside shop chrome. The heading above stays
+            the shop's; the boundary between the two systems runs exactly
+            here (#15). */}
+        <ul className="blog-scope mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {posts.map((post) => (
-            <li key={post.id} className="group">
+            <li key={post.id}>
               <Link
                 href={`/posts/${post.slug}`}
                 className={cn(
-                  "block rounded-sm",
+                  "blog-strip-card",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                 )}
               >
-                {/* A plain `<img>`: the deploy target is Workers, which has no
-                    sharp, and the cover URL is presigned — it is resolved
-                    through `imageUrl()` on every render and never baked into
-                    the page. */}
-                {post.coverImage ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={imageUrl(post.coverImage.url)}
-                    alt=""
-                    loading="lazy"
-                    className="aspect-[16/9] w-full rounded-lg border border-brand-line object-cover"
-                  />
-                ) : (
-                  <div
-                    aria-hidden="true"
-                    className="aspect-[16/9] w-full rounded-lg border border-brand-line bg-brand-soft"
-                  />
-                )}
-                <h3
-                  className={cn(
-                    "mt-3 font-sans text-base font-semibold leading-snug text-foreground",
-                    "transition-colors group-hover:text-brand motion-reduce:transition-none",
-                  )}
-                >
-                  {post.title}
-                </h3>
+                <div className="strip__media">
+                  {post.coverImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={imageUrl(post.coverImage.url)}
+                      alt=""
+                      width={post.coverImage.width || undefined}
+                      height={post.coverImage.height || undefined}
+                      loading="lazy"
+                      decoding="async"
+                      className="strip__img"
+                      style={{ objectPosition: post.coverImage.focalPoint || undefined }}
+                    />
+                  ) : null}
+                </div>
+                <div className="strip__body">
+                  <h3 className="strip__title">{post.title}</h3>
+                  <p className="strip__when">{post.readingTime} min read</p>
+                </div>
               </Link>
-              <p className="mt-1.5 font-mono text-xs tabular-nums text-muted-foreground">
-                {post.readingTime} min read
-              </p>
             </li>
           ))}
         </ul>

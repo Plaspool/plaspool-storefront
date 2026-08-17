@@ -1,4 +1,7 @@
 import "./globals.css";
+// The blog's ported design system — scoped under `.blog`, so importing it
+// globally costs nothing on shop routes. See packages/blog/src/styles/blog.css.
+import "@plaspool/blog/styles.css";
 
 import { cn, JsonLd, ThemeProvider } from "@plaspool/ui";
 // Nav and Footer moved to `(site)/layout.tsx` — the shop route group brings its
@@ -6,7 +9,7 @@ import { cn, JsonLd, ThemeProvider } from "@plaspool/ui";
 import { CookieBanner, GoogleAnalytics } from "@plaspool/web";
 import { siteConfig } from "@plaspool/brand";
 
-import { Inter as FontSans } from "next/font/google";
+import { Inter as FontSans, JetBrains_Mono, Spectral } from "next/font/google";
 import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 import Script from "next/script";
 
@@ -15,6 +18,32 @@ import type { Metadata } from "next";
 const font = FontSans({
   subsets: ["latin"],
   variable: "--font-sans",
+});
+
+/*
+ * The blog's faces (#15): Spectral for display/prose, JetBrains Mono for
+ * code — the same faces the admin app's tokens name, self-hosted by
+ * next/font at build time so the CSP's `font-src 'self'` stays true.
+ *
+ * `preload: false` on both, deliberately: preload would put six Spectral
+ * files in the <head> of every shop page that never draws a serif glyph.
+ * Without it the browser only fetches a face when rendered text actually
+ * uses it, so shop routes pay nothing and blog routes swap in a fallback
+ * serif for the first paint — the right trade for faces only one section
+ * of the site uses.
+ */
+const spectral = Spectral({
+  subsets: ["latin"],
+  weight: ["400", "600", "700"],
+  style: ["normal", "italic"],
+  variable: "--font-spectral",
+  preload: false,
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains-mono",
+  preload: false,
 });
 
 const TITLE = "PlaSpool — Buy 3D Printing Filament in Nigeria";
@@ -89,7 +118,14 @@ export default function RootLayout({
         />
       </head>
 
-      <body className={cn("min-h-screen font-sans antialiased", font.variable)}>
+      <body
+        className={cn(
+          "min-h-screen font-sans antialiased",
+          font.variable,
+          spectral.variable,
+          jetbrainsMono.variable,
+        )}
+      >
         <JsonLd data={storeJsonLd} />
         {/* Skip link: first focusable element on the page. Visually hidden
             until it receives keyboard focus, then jumps to <main id="content">. */}

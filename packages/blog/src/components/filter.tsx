@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import {
-  Button,
   Select,
   SelectContent,
   SelectItem,
@@ -64,7 +63,7 @@ export function FilterPosts({
           value={selectedTag || "all"}
           onValueChange={(value) => handleFilterChange("tag", value)}
         >
-          <SelectTrigger className="w-auto min-w-[9rem] whitespace-nowrap">
+          <SelectTrigger className="blog-ctl w-auto min-w-[9rem] whitespace-nowrap">
             <SelectValue placeholder="All tags" />
           </SelectTrigger>
           <SelectContent>
@@ -83,7 +82,7 @@ export function FilterPosts({
           value={selectedCategory || "all"}
           onValueChange={(value) => handleFilterChange("category", value)}
         >
-          <SelectTrigger className="w-auto min-w-[11rem] whitespace-nowrap">
+          <SelectTrigger className="blog-ctl w-auto min-w-[11rem] whitespace-nowrap">
             <SelectValue placeholder="All categories" />
           </SelectTrigger>
           <SelectContent>
@@ -104,13 +103,13 @@ export function FilterPosts({
       {/* Only offered once something is actually filtered — a reset that resets
           nothing is a dead control. */}
       {hasFilter && (
-        <Button
-          variant="outline"
-          className="whitespace-nowrap"
+        <button
+          type="button"
+          className="btn btn--outline whitespace-nowrap"
           onClick={() => router.push("/posts")}
         >
           Reset filters
-        </Button>
+        </button>
       )}
     </div>
   );
