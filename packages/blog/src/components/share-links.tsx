@@ -31,7 +31,12 @@ export function ShareLinks({ title, slug }: { title: string; slug: string }) {
   const url = `${origin}${path}`;
 
   return (
-    <div className="flex flex-row items-end gap-3 mt-24 border-t-2 border-gray-500 py-4">
+    // Border colour comes from the blog's own rule token now that the page
+    // around this row is the ported design system, not generic Tailwind.
+    <div
+      className="flex flex-row items-end gap-3 mt-6 border-t py-4"
+      style={{ borderColor: "var(--rule, #e2ded2)" }}
+    >
       <span className="text-lg md:text-xl">Share on:</span>
       <a
         target="_blank"

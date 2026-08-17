@@ -9,6 +9,23 @@ import type { DocNode } from "../data/types";
  * become markup unless it matches a node type listed here. An unknown node
  * renders its children as plain text rather than disappearing or executing.
  * These documents arrive from another service, so that property is the point.
+ *
+ * THE MARKUP VOCABULARY IS THE ADMIN APP'S (`doc-quote`, `doc-code`,
+ * `doc-tasks`, `doc-table-wrap`, …), synced as part of the design-system
+ * port (#15): the ported prose stylesheet describes both renderers, and body
+ * rendering is where a reader spends their time — matching chrome around a
+ * mismatched article would miss the whole point. The checklist DOM in
+ * particular (li > label(input + span) + div) is load-bearing: the ported
+ * CSS positions the box against the first line box of that exact shape.
+ *
+ * Two deliberate divergences from the admin renderer:
+ * - No syntax highlighting. lowlight and its grammars are an editor-sized
+ *   dependency; code blocks render as plain text on the dark code surface,
+ *   and the hljs colour ramp is already in the stylesheet for the day this
+ *   changes.
+ * - Root-relative links stay same-tab with no `nofollow` — these are the
+ *   site's own SEO surface. The admin sends every link to a new tab because
+ *   its reader is a workspace someone is in the middle of using.
  */
 export function DocRenderer({ doc }: { doc: DocNode }) {
   return <>{(doc.content ?? []).map((n, i) => renderNode(n, i))}</>;
@@ -45,7 +62,11 @@ function renderNode(node: DocNode, key: number): ReactNode {
       return <Tag key={key}>{kids()}</Tag>;
     }
     case "blockquote":
-      return <blockquote key={key}>{kids()}</blockquote>;
+      return (
+        <blockquote key={key} className="doc-quote">
+          {kids()}
+        </blockquote>
+      );
     case "bulletList":
       return <ul key={key}>{kids()}</ul>;
     case "orderedList":
@@ -58,29 +79,31 @@ function renderNode(node: DocNode, key: number): ReactNode {
       return <li key={key}>{kids()}</li>;
     case "taskList":
       return (
-        <ul key={key} className="list-none pl-0">
+        <ul key={key} className="doc-tasks" data-type="taskList">
           {kids()}
         </ul>
       );
     case "taskItem": {
       const checked = !!node.attrs?.checked;
       return (
-        <li key={key} className="flex items-start gap-2">
-          <input
-            type="checkbox"
-            checked={checked}
-            readOnly
-            disabled
-            aria-label={plainText(node) || "task item"}
-            className="mt-1.5"
-          />
+        <li key={key} data-checked={String(checked)} data-type="taskItem">
+          <label>
+            <input
+              type="checkbox"
+              checked={checked}
+              readOnly
+              disabled
+              aria-label={plainText(node) || "task item"}
+            />
+            <span />
+          </label>
           <div>{kids()}</div>
         </li>
       );
     }
     case "codeBlock":
       return (
-        <pre key={key}>
+        <pre key={key} className="doc-code">
           <code>{plainText(node)}</code>
         </pre>
       );
@@ -88,12 +111,15 @@ function renderNode(node: DocNode, key: number): ReactNode {
       return (
         <div
           key={key}
-          className="overflow-x-auto"
+          className="doc-table-wrap"
+          // A scroll container only a mouse can reach is a trap, and on a
+          // narrow screen this one always overflows. Give it a tab stop.
           tabIndex={0}
           role="region"
           aria-label="Table"
         >
-          <table>
+          <table className="doc-table">
+            {colGroup(node)}
             <tbody>{kids()}</tbody>
           </table>
         </div>
@@ -113,7 +139,7 @@ function renderNode(node: DocNode, key: number): ReactNode {
         </td>
       );
     case "horizontalRule":
-      return <hr key={key} />;
+      return <hr key={key} className="doc-rule" />;
     case "hardBreak":
       return <br key={key} />;
     case "image": {
@@ -122,10 +148,16 @@ function renderNode(node: DocNode, key: number): ReactNode {
       const caption = String(node.attrs?.title ?? "");
       if (!isAllowedHref(src)) return null;
       return (
-        <figure key={key}>
+        <figure key={key} className="doc-figure">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={imageUrl(src)} alt={alt} loading="lazy" className="w-full" />
-          {caption && <figcaption>{caption}</figcaption>}
+          <img
+            className="doc-image"
+            src={imageUrl(src)}
+            alt={alt}
+            loading="lazy"
+            decoding="async"
+          />
+          {caption && <figcaption className="doc-caption">{caption}</figcaption>}
         </figure>
       );
     }
@@ -160,9 +192,16 @@ function applyMarks(node: DocNode): ReactNode {
           // Internal (root-relative) links stay plain: no new tab, no nofollow
           // — these are the site's own SEO surface. External links get both.
           out = href.startsWith("/") ? (
-            <a href={href}>{out}</a>
+            <a className="doc-link" href={href}>
+              {out}
+            </a>
           ) : (
-            <a href={href} target="_blank" rel="noopener noreferrer nofollow">
+            <a
+              className="doc-link"
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+            >
               {out}
             </a>
           );
@@ -187,4 +226,34 @@ function cellSpans(node: DocNode) {
     colSpan: colSpan > 1 ? colSpan : undefined,
     rowSpan: rowSpan > 1 ? rowSpan : undefined,
   };
+}
+
+/**
+ * Column widths live on the first row's cells, the same place ProseMirror's
+ * table view reads them from, so a table the writer resized in the editor
+ * reads at the width it was written at. Ported with the markup sync — the
+ * old renderer dropped them, which is exactly the class of drift #15 calls
+ * out: the two surfaces disagreeing about the same document.
+ */
+function colGroup(table: DocNode): ReactNode {
+  const firstRow = (table.content ?? []).find((n) => n.type === "tableRow");
+  if (!firstRow) return null;
+  const widths: (number | null)[] = [];
+  for (const cell of firstRow.content ?? []) {
+    const span = Number(cell.attrs?.colspan) || 1;
+    const cw = cell.attrs?.colwidth;
+    const list = Array.isArray(cw) ? (cw as unknown[]) : null;
+    for (let i = 0; i < span; i += 1) {
+      const w = Number(list?.[i]);
+      widths.push(Number.isFinite(w) && w > 0 ? w : null);
+    }
+  }
+  if (!widths.some((w) => w !== null)) return null;
+  return (
+    <colgroup>
+      {widths.map((w, i) => (
+        <col key={i} style={w ? { width: w } : undefined} />
+      ))}
+    </colgroup>
+  );
 }

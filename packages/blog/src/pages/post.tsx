@@ -1,17 +1,28 @@
 import { getPostBySlug, imageUrl, listPosts } from "../data/posts";
 import { docToText, truncate } from "../data/doc";
-import { DocRenderer } from "../components/doc-renderer";
-
+import { ArticleTemplate } from "../components/templates";
 import { ShareLinks } from "../components/share-links";
 
-import { Section, Container, Article, Prose, JsonLd, badgeVariants, cn } from "@plaspool/ui";
+import { JsonLd } from "@plaspool/ui";
 import { siteConfig } from "@plaspool/brand";
 
-import Link from "next/link";
-import Balancer from "react-wrap-balancer";
 import { notFound } from "next/navigation";
 
 import type { Metadata } from "next";
+
+/**
+ * `/posts/<slug>` — the reading view.
+ *
+ * The page itself decides almost nothing any more: the whole article — head,
+ * cover, byline, body, tags — is one of the four ported reading templates,
+ * chosen by the post's own `template` field (#15). What stays here is what
+ * is not the article: metadata, structured data, and the share row.
+ */
+
+/** Absolute form for metadata surfaces that must name a full URL. */
+function absoluteImage(url: string): string {
+  return new URL(imageUrl(url), siteConfig.site_domain).toString();
+}
 
 export async function postMetadata({
   params,
@@ -24,7 +35,7 @@ export async function postMetadata({
 
   const description = post.excerpt || truncate(docToText(post.content));
   const url = `${siteConfig.site_domain}/posts/${post.slug}`;
-  const image = post.coverImage ? imageUrl(post.coverImage.url) : undefined;
+  const image = post.coverImage ? absoluteImage(post.coverImage.url) : undefined;
 
   return {
     title: post.title,
@@ -69,12 +80,6 @@ export default async function PostPage({
   const post = await getPostBySlug(slug);
   if (!post) notFound();
 
-  const date = new Date(post.publishedAt).toLocaleDateString("en-NG", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
-
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Article",
@@ -89,54 +94,22 @@ export default async function PostPage({
       logo: { "@type": "ImageObject", url: `${siteConfig.site_domain}/brand/icon.png` },
     },
     mainEntityOfPage: `${siteConfig.site_domain}/posts/${post.slug}`,
-    ...(post.coverImage ? { image: imageUrl(post.coverImage.url) } : {}),
+    // Absolute on purpose: `imageUrl()` now emits the site-relative proxy
+    // path, and structured-data consumers resolve nothing.
+    ...(post.coverImage ? { image: absoluteImage(post.coverImage.url) } : {}),
   };
 
   return (
-    <Section className="font-mono text-gray-800 bg-gray-50">
-      <Container>
-        {/* `headline`, `description` and `author.name` are CMS-authored, so
-            this block must never be hand-injected — see `JsonLd`. */}
-        <JsonLd data={jsonLd} />
-        <Prose>
-          <h1>
-            <Balancer>
-              <span className="font-mono">{post.title}</span>
-            </Balancer>
-          </h1>
-          {post.subtitle && <p className="text-lg text-gray-600">{post.subtitle}</p>}
-          <div className="flex font-mono justify-between items-center gap-4 text-sm mb-4">
-            <h5>
-              Published {date} by {post.author.name} · {post.readingTime} min read
-            </h5>
-            {post.category && (
-              <Link
-                href={`/posts?category=${encodeURIComponent(post.category)}`}
-                className={cn(badgeVariants({ variant: "outline" }), "!no-underline text-gray-800")}
-              >
-                {post.category}
-              </Link>
-            )}
-          </div>
-          {post.coverImage && (
-            <div className="h-full my-12 md:h-[500px] overflow-hidden flex items-center justify-center border rounded-lg bg-accent/25">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                className="w-full h-full object-cover my-0"
-                style={{ objectPosition: post.coverImage.focalPoint || undefined }}
-                src={imageUrl(post.coverImage.url)}
-                alt={post.coverImage.alt || post.title}
-              />
-            </div>
-          )}
-        </Prose>
+    <div className="blog">
+      {/* `headline`, `description` and `author.name` are CMS-authored, so
+          this block must never be hand-injected — see `JsonLd`. */}
+      <JsonLd data={jsonLd} />
 
-        <Article className="font-mono">
-          <DocRenderer doc={post.content} />
-        </Article>
+      <ArticleTemplate post={post} />
 
+      <div className="blog-share">
         <ShareLinks title={post.title} slug={post.slug} />
-      </Container>
-    </Section>
+      </div>
+    </div>
   );
 }
