@@ -2,7 +2,23 @@
 
 import * as React from "react";
 import { Check, ShoppingCart } from "lucide-react";
-import { Button, cn } from "@plaspool/ui";
+import { Button, cn, NEO_SURFACE } from "@plaspool/ui";
+
+/**
+ * THE DEEP BLUE, AND WHY IT IS NOT A NEW HEX.
+ *
+ * Issue #10 asked for the black fill to become a rich deep blue, and to
+ * confirm the shade with design so it lands in the palette rather than as a
+ * one-off. The palette already has it: `--brand-accent` is a deep indigo-navy
+ * (`#231c50`), it is the accent the whole storefront is built around, and
+ * `--brand-ink` is its paired foreground. So this is the ramp doing its job,
+ * not a colour invented for one button.
+ *
+ * The button was `bg-primary`, which is `0 0% 9%` — near-black, and a shadcn
+ * default nobody chose. Contrast of white on `#231c50` is roughly 13:1,
+ * comfortably past WCAG AA's 4.5:1 for body text and AAA's 7:1.
+ */
+const DEEP_BLUE = "bg-brand text-brand-ink hover:bg-brand-hover";
 
 import { useCart } from "./cart-context";
 import type { CartLineKey } from "./types";
@@ -26,6 +42,16 @@ export interface AddToCartButtonProps {
   disabled?: boolean;
   variant?: "default" | "outline";
   label?: string;
+  /**
+   * The accessible name, when the visible label has to be shorter than the
+   * action. The sticky bar renders "Add" because a third of a 320px viewport
+   * will not hold "Add to cart" — but "Add" on its own is not a description of
+   * anything, so the button keeps the full name for assistive tech. Defaults to
+   * `label`, which is the right answer everywhere the label already fits.
+   */
+  srLabel?: string;
+  /** Confirmation text, for the same width reason. Defaults to "Added to cart". */
+  addedLabel?: string;
   className?: string;
 }
 
@@ -35,8 +61,11 @@ export function AddToCartButton({
   disabled = false,
   variant = "default",
   label = "Add to cart",
+  srLabel,
+  addedLabel = "Added to cart",
   className,
 }: AddToCartButtonProps) {
+  const name = srLabel ?? label;
   const cart = useCart();
   const [justAdded, setJustAdded] = React.useState(false);
   const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -68,18 +97,30 @@ export function AddToCartButton({
         variant={variant}
         disabled={disabled}
         onClick={handleClick}
-        aria-label={disabled ? `${label} — out of stock` : undefined}
-        className={cn("focus-visible:ring-brand focus-visible:ring-offset-background", className)}
+        /* Always set, not only when disabled: the visible label may be an
+           abbreviation, and the out-of-stock reason belongs in the name. */
+        aria-label={disabled ? `${name} — out of stock` : name}
+        className={cn(
+          // Taller than the shadcn default `h-10`, with the label stepped up
+          // to match: this is the page's primary action and it is thumbed on
+          // a phone. 48px is also the tap target Android and iOS both ask for.
+          "h-12 px-5 text-base",
+          NEO_SURFACE,
+          // `variant="outline"` callers keep their own fill; only the default
+          // variant is the deep blue.
+          variant === "default" && DEEP_BLUE,
+          className,
+        )}
       >
         {justAdded ? (
           <>
-            <Check aria-hidden="true" className="mr-2 h-4 w-4" />
-            Added to cart
+            <Check aria-hidden="true" className="mr-2 h-4 w-4 shrink-0" />
+            <span className="truncate">{addedLabel}</span>
           </>
         ) : (
           <>
-            <ShoppingCart aria-hidden="true" className="mr-2 h-4 w-4" />
-            {label}
+            <ShoppingCart aria-hidden="true" className="mr-2 h-4 w-4 shrink-0" />
+            <span className="truncate">{label}</span>
           </>
         )}
       </Button>

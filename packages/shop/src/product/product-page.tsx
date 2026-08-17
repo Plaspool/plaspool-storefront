@@ -62,9 +62,9 @@ export async function ProductPage({ params }: { params: Promise<{ slug: string }
 
       <ProductBuySection product={product} className="mt-6" />
 
-      {/* Extra bottom room so the last of the page is not sitting under the
-          sticky buy bar. */}
-      <div className="mt-12 pb-24">
+      {/* Clearance for the sticky buy bar is reserved by ShopShell, not here:
+          it has to cover the footer too, which is outside this page. */}
+      <div className="mt-12">
         <ProductTabs product={product} />
         <OrderInfo className="mt-6" />
       </div>

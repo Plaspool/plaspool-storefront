@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Check, Truck } from "lucide-react";
-import { Button, cn } from "@plaspool/ui";
+import { Button, cn, NEO_SURFACE } from "@plaspool/ui";
 
 import type { Colour, Product, SizeOption } from "../data/types";
 import { formatNaira, ratingSummary, unitPriceFor } from "../data/money";
@@ -58,7 +58,17 @@ export function BuyNowButton({
         cart.open();
       }}
       className={cn(
-        "focus-visible:ring-brand focus-visible:ring-offset-background",
+        // Matched to AddToCartButton so the pair reads as one control: same
+        // height, same label size, same stroke and press. The fill stays
+        // white — it is the secondary of the two, and #10 kept its colour.
+        "h-12 px-5 text-base",
+        NEO_SURFACE,
+        // `variant="outline"` brings `border border-input`; the neobrutalist
+        // stroke is 2px and foreground-coloured, and tailwind-merge only
+        // resolves conflicts within a class group — `border-input` and
+        // `border-foreground` are both colour, so the later one wins, but the
+        // width needs its own token to beat `border`.
+        "border-2 border-foreground bg-background hover:bg-background",
         className,
       )}
     >

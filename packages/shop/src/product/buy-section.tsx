@@ -32,24 +32,9 @@ export function ProductBuySection({ product, className }: ProductBuySectionProps
   const colour = product.colours.find((c) => c.id === colourId) ?? product.colours[0];
   const size = product.sizes.find((s) => s.id === sizeId) ?? product.sizes[0];
 
-  const buyBoxRef = React.useRef<HTMLDivElement | null>(null);
-  const [barVisible, setBarVisible] = React.useState(false);
-
-  React.useEffect(() => {
-    const el = buyBoxRef.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      ([entry]) =>
-        /* Both terms matter. `!isIntersecting` alone is true on first paint
-           for a buy box below the fold, which would flash the bar before the
-           buy box has ever been scrolled past; `top < 0` says it left
-           upwards, which is the only direction that should summon it. */
-        setBarVisible(!entry.isIntersecting && entry.boundingClientRect.top < 0),
-      { threshold: 0 },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
+  /* The IntersectionObserver that used to gate the sticky bar is gone (#10):
+     the bar is pinned for the whole scroll now, so there is nothing to
+     observe and no reason for this component to hold a ref to the buy box. */
 
   return (
     <div className={cn("w-full min-w-0", className)}>
@@ -62,7 +47,7 @@ export function ProductBuySection({ product, className }: ProductBuySectionProps
           weightGrams={size.weightGrams}
         />
 
-        <div ref={buyBoxRef} className="min-w-0">
+        <div className="min-w-0">
           <BuyBox
             product={product}
             colour={colour}
@@ -81,7 +66,6 @@ export function ProductBuySection({ product, className }: ProductBuySectionProps
         size={size}
         quantity={quantity}
         onQuantityChange={setQuantity}
-        visible={barVisible}
       />
     </div>
   );
