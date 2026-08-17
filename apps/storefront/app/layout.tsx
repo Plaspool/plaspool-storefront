@@ -1,6 +1,6 @@
 import "./globals.css";
 
-import { cn, ThemeProvider } from "@plaspool/ui";
+import { cn, JsonLd, ThemeProvider } from "@plaspool/ui";
 // Nav and Footer moved to `(site)/layout.tsx` — the shop route group brings its
 // own chrome, and rendering both here doubled them on every /store page.
 import { CookieBanner, GoogleAnalytics } from "@plaspool/web";
@@ -90,10 +90,7 @@ export default function RootLayout({
       </head>
 
       <body className={cn("min-h-screen font-sans antialiased", font.variable)}>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(storeJsonLd) }}
-        />
+        <JsonLd data={storeJsonLd} />
         {/* Skip link: first focusable element on the page. Visually hidden
             until it receives keyboard focus, then jumps to <main id="content">. */}
         <a
