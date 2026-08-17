@@ -26,7 +26,24 @@ export interface ShopShellProps {
 export function ShopShell({ children }: ShopShellProps) {
   return (
     <CartProvider>
-      <div className="flex min-h-screen flex-col">
+      {/*
+        `has-[[data-cta-bar]]` reserves room for the product page's sticky buy
+        bar — and only on the routes that render one.
+
+        The bar is `position: fixed`, so it is outside flow and sits over
+        whatever is at the bottom of the scroll. The page it belongs to cannot
+        solve that alone: its own padding stops at the end of `<main>`, while
+        the footer below is the shell's, so the last band of the footer stayed
+        under the bar at full scroll — permanently unreadable, since there is
+        no further to scroll.
+
+        Reserving it here instead of on the page is what reaches the footer,
+        and `:has()` is what keeps `/store` and the category pages from paying
+        for a bar they never render. Height matches the bar: a 3rem button plus
+        `py-3` either side plus the 2px stroke, rounded up, plus the iOS
+        home-indicator inset the bar also pads itself by.
+      */}
+      <div className="flex min-h-screen flex-col has-[[data-cta-bar]]:pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
         <AnnouncementBar />
         <ShopNav />
         {/* id/tabIndex: the root layout's skip link jumps here. Each route
