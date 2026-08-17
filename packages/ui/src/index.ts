@@ -3,6 +3,7 @@ export * from "./craft";
 // the star-export ambiguity in favour of the shared helper in `./cn`.
 export { cn } from "./cn";
 export * from "./json-ld";
+export * from "./neo";
 export * from "./primitives/button";
 export * from "./primitives/badge";
 export * from "./primitives/card";

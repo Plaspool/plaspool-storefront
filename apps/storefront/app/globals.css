@@ -40,6 +40,11 @@
     --brand-soft: 250 33.3% 92.9%;
     --brand-line: 250 30.5% 76.9%;
     --brand-ink: 0 0% 100%;
+
+    /* Default colour of the neobrutalist hard shadow (see packages/ui/src/neo.ts).
+       A raw HSL triple, not a colour function, so an element can swap it for
+       another ramp token with `[--neo-shadow:var(--brand-accent)]`. */
+    --neo-shadow: 0 0% 3.9%;
   }
 
   .dark {
@@ -77,6 +82,10 @@
     --brand-soft: 250.9 27.5% 15.7%;
     --brand-line: 250.2 26.1% 30.8%;
     --brand-ink: 249.7 49.3% 14.7%;
+
+    /* The storefront is pinned to light (see the root layout), so this exists
+       for the package dev harnesses and for whenever dark is unpinned. */
+    --neo-shadow: 0 0% 98%;
   }
 }
 
