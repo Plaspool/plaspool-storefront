@@ -4,6 +4,7 @@
 export * from "./data/types";
 export * from "./data/money";
 export * from "./data/config";
+export * from "./data/reviews";
 export * from "./data/catalog";
 
 // Presentational primitives. Every later surface — cards, listings, the
@@ -72,6 +73,7 @@ export * from "./product/overview-tab";
 export * from "./product/description-tab";
 export * from "./product/parameters-tab";
 export * from "./product/reviews-tab";
+export * from "./product/review-form";
 export * from "./product/order-info";
 
 // The buy side of the product page. `ProductBuySection` is the one that

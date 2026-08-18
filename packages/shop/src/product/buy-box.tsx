@@ -5,8 +5,10 @@ import { Check, Truck } from "lucide-react";
 import { Button, cn, NEO_SURFACE } from "@plaspool/ui";
 
 import type { Colour, Product, SizeOption } from "../data/types";
-import { formatNaira, ratingSummary, unitPriceFor } from "../data/money";
-import { SHOW_FIXTURE_REVIEWS, DELIVERY } from "../data/config";
+import { formatNaira, unitPriceFor } from "../data/money";
+import { DELIVERY } from "../data/config";
+import { starsFromAggregate } from "../data/reviews";
+import type { ReviewAggregate } from "../data/reviews";
 import { Price } from "../components/price";
 import { ColourSwatches } from "../components/colour-swatches";
 import { RatingStars } from "../components/rating-stars";
@@ -82,6 +84,8 @@ export interface BuyBoxProps {
   colour: Colour;
   size: SizeOption;
   quantity: number;
+  /** Approved-review summary from the API; draws the stars under the name. */
+  reviewAggregate: ReviewAggregate;
   onColourChange: (id: string) => void;
   onSizeChange: (id: string) => void;
   onQuantityChange: (n: number) => void;
@@ -93,13 +97,16 @@ export function BuyBox({
   colour,
   size,
   quantity,
+  reviewAggregate,
   onColourChange,
   onSizeChange,
   onQuantityChange,
   className,
 }: BuyBoxProps) {
-  const summary = ratingSummary(product.reviews);
-  const showRating = SHOW_FIXTURE_REVIEWS && summary.count > 0;
+  /* Real reviews only. This read the invented fixtures behind a feature flag
+     until there was an API to ask; a product nobody has reviewed now shows no
+     stars rather than a manufactured score. */
+  const showRating = reviewAggregate.count > 0;
 
   const unit = unitPriceFor(size.priceNaira, product.bulkTiers, quantity);
   const line: CartLineKey = {
@@ -124,7 +131,13 @@ export function BuyBox({
         <p className="mt-2 text-sm leading-6 text-muted-foreground">{product.summary}</p>
       </div>
 
-      {showRating && <RatingStars rating={summary.average} count={summary.count} size="md" />}
+      {showRating && (
+        <RatingStars
+          rating={starsFromAggregate(reviewAggregate)}
+          count={reviewAggregate.count}
+          size="md"
+        />
+      )}
 
       <Price amount={unit} compareAt={size.compareAtNaira} size="lg" />
 
