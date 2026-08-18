@@ -187,8 +187,15 @@ export function CartDrawer() {
                 </Button>
               </SheetClose>
 
+              {/* THIS SENTENCE USED TO SAY "it stays on this device", WHICH WAS
+                  TRUE OF A `localStorage` CART AND IS NOT TRUE OF THIS ONE. The
+                  basket is now held by the commerce API against a cookie, so it
+                  survives a reload and a new tab in this browser, and it
+                  EXPIRES — the cart cookie carries a two-week `Max-Age`.
+                  Promising a basket keeps itself indefinitely on a device is a
+                  promise the server does not make. */}
               <p className="text-center text-xs text-muted-foreground">
-                {"We're still building checkout. Save your cart and come back — it stays on this device."}
+                {"We're still building checkout. Your cart is saved for two weeks — come back to it in this browser."}
               </p>
             </SheetFooter>
           </>
