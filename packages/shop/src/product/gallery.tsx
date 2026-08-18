@@ -41,24 +41,53 @@ export function Gallery({
 
   return (
     <div className={cn("flex w-full min-w-0 flex-col gap-4 md:flex-row-reverse", className)}>
-      {/* SpoolImage fills its flange and bore with the page background, so it
+      {/* THE STAGE IS A SQUARE, AND IT SIZES ITSELF (#21).
+
+          It used to be `flex-1` with no shape of its own, so it took whatever
+          height the grid handed the gallery column — the buy box's height —
+          and drew a border around a tall run of nothing under the spool.
+          `aspect-square` gives it proportions, `self-start` stops the flex row
+          stretching it back, and `max-w-md` is the cap SpoolImage used to
+          carry, moved out to the box so the box is what gets sized rather than
+          the drawing inside it. `mx-auto` centres it in the width left beside
+          the rail.
+
+          SpoolImage fills its flange and bore with the page background, so it
           stays on the background surface and never on a tinted one. */}
-      <div className="min-w-0 flex-1 rounded-xl border border-brand-line bg-background p-4 sm:p-8">
+      <div className="mx-auto aspect-square w-full min-w-0 max-w-md self-start rounded-xl border border-brand-line bg-background p-4 sm:p-8 md:flex-1">
         <SpoolImage
           colourHex={selected.hex}
           weightGrams={weightGrams}
           label={`${name}, ${selected.name}`}
-          className="mx-auto max-w-md"
+          className="h-full w-full"
         />
       </div>
 
-      {/* A strip below md, a column at md and up. The strip scrolls inside
-          itself at 375 px rather than widening the page. */}
+      {/* THE WRAPPER EXISTS TO HAVE NO HEIGHT OF ITS OWN.
+
+          The rail has always carried `md:overflow-y-auto` — the intent that it
+          scroll rather than run long was there from the start — but it never
+          had a bounded height to scroll within, so it just grew. Eight 80px
+          thumbnails stand ~700px tall, which beside a square stage would make
+          the rail the tallest thing here and put back the imbalance #21 is
+          about removing.
+
+          So at md and up the rail is absolutely positioned inside a wrapper
+          that contributes no intrinsic height: the row's height is the stage's
+          alone, the wrapper stretches to it, and the rail scrolls inside
+          exactly the square the spool occupies. Below md none of it applies —
+          the wrapper is an ordinary block and the rail is the horizontal strip
+          it always was, scrolling inside itself at 375px rather than widening
+          the page. */}
+      <div className="w-full min-w-0 shrink-0 md:relative md:w-20 md:self-stretch">
       <ul
         aria-label="Colours"
         className={cn(
-          "flex w-full min-w-0 shrink-0 gap-2 overflow-x-auto pb-1",
-          "md:w-20 md:flex-col md:overflow-x-visible md:overflow-y-auto md:pb-0",
+          "flex w-full min-w-0 gap-2 overflow-x-auto pb-1",
+          "md:absolute md:inset-0 md:flex-col md:overflow-x-visible md:overflow-y-auto md:pb-0",
+          /* One thumbnail wide, so a scrollbar gutter would come out of the
+             thumbnail itself. The strip below md already scrolls without one. */
+          "no-scrollbar",
         )}
       >
         {colours.map((colour) => {
@@ -87,6 +116,7 @@ export function Gallery({
           );
         })}
       </ul>
+      </div>
     </div>
   );
 }
