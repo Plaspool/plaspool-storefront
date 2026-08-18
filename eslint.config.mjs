@@ -1,36 +1,50 @@
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import { FlatCompat } from "@eslint/eslintrc";
+import next from "eslint-config-next/core-web-vitals";
 
-// `next lint` roots at apps/storefront and only scans app|pages|components|lib|src
-// inside that project, so nothing under packages/ is reachable from it. This config
-// restores the coverage those files had before they moved out of the app, using the
-// same ruleset the storefront uses (`next/core-web-vitals`) so the bar is unchanged.
-const compat = new FlatCompat({
-  baseDirectory: dirname(fileURLToPath(import.meta.url)),
-});
-
+/**
+ * One ESLint config for the whole monorepo.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * IT USED TO BE TWO, AND THE REASON IS GONE.
+ *
+ * `next lint` rooted at `apps/storefront` and only scanned `app|pages|
+ * components|lib|src` inside that project, so nothing under `packages/` was
+ * reachable from it. This file existed to restore that coverage, and deliberately
+ * ignored `apps/**` so the two did not lint the same files twice — with
+ * `apps/storefront/.eslintrc.json` holding the other half.
+ *
+ * Next.js 16 REMOVED `next lint`. So the split has nothing left to reconcile:
+ * one flat config at the root covers the app and the packages with the same
+ * ruleset, which is what the old comment said it was trying to achieve anyway.
+ *
+ * `.eslintrc.json` is deleted with it. `@next/eslint-plugin-next` defaults to
+ * flat config in 16, ahead of ESLint v10 dropping legacy support, and
+ * `eslint-config-next/core-web-vitals` now exports a flat array directly — so
+ * `FlatCompat` is gone too, along with the `@eslint/eslintrc` dependency that
+ * existed only to provide it.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 export default [
   {
     ignores: [
       "**/node_modules/**",
       "**/.next/**",
+      "**/.open-next/**",
+      "**/.wrangler/**",
       "**/out/**",
       "**/build/**",
       "**/coverage/**",
-      // Linted by `next lint` via apps/storefront/.eslintrc.json.
-      "apps/**",
     ],
   },
-  ...compat.extends("next/core-web-vitals").map((config) => ({
+  ...next.map((config) => ({
     ...config,
-    files: ["packages/**/*.ts", "packages/**/*.tsx"],
+    files: ["apps/**/*.{ts,tsx}", "packages/**/*.{ts,tsx}"],
   })),
   {
-    files: ["packages/**/*.ts", "packages/**/*.tsx"],
+    files: ["apps/**/*.{ts,tsx}", "packages/**/*.{ts,tsx}"],
     settings: {
-      // Packages are consumed by the storefront; point the Next plugin at it so it
-      // does not warn about being unable to detect the Next.js root directory.
+      /* The packages are consumed by the storefront rather than being apps of
+         their own, so the Next plugin is pointed at the one real app — without
+         it, it warns that it cannot detect the Next.js root directory. */
       next: { rootDir: "apps/storefront" },
     },
   },

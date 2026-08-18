@@ -105,7 +105,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    /*
+     * `data-scroll-behavior="smooth"` PRESERVES A BEHAVIOUR NEXT 16 STOPPED
+     * DOING FOR US.
+     *
+     * `globals.css` sets `html { scroll-behavior: smooth }`, which is wanted for
+     * in-page anchors — the hero's "Bulk pricing" jump, the product tab strip.
+     * Through Next 15, Next overrode it during SPA route transitions so a
+     * navigation still landed at the top instantly instead of animating the
+     * whole page up.
+     *
+     * Next 16 no longer overrides it unless this attribute says to. Without it,
+     * every route change would smooth-scroll the viewport, which on a long
+     * listing reads as the page sliding around after a click.
+     */
+    <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#231c50" />

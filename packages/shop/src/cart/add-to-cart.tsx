@@ -70,12 +70,25 @@ export function AddToCartButton({
   const [justAdded, setJustAdded] = React.useState(false);
   const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // A stale "Added to cart" must not survive a colour or size change on a
-  // reused button instance — a buy box keeps the same `AddToCartButton`
-  // mounted while its `line` prop changes under it.
-  React.useEffect(() => {
+  /*
+   * A stale "Added to cart" must not survive a colour or size change on a
+   * reused button instance — a buy box keeps the same `AddToCartButton`
+   * mounted while its `line` prop changes under it.
+   *
+   * ADJUSTED DURING RENDER, NOT IN AN EFFECT. This was a `useEffect` that called
+   * `setJustAdded(false)`, which React 19's hook lint rule
+   * (`react-hooks/set-state-in-effect`, new in the plugin Next 16 ships) flags —
+   * correctly, because it paints the stale label once and then corrects it.
+   * Comparing against the previous key during render is React's own documented
+   * pattern for resetting state when a prop changes: the re-render happens
+   * before the browser paints, so the stale label is never visible.
+   */
+  const lineId = `${line.productSlug}:${line.colourId}:${line.sizeId}`;
+  const [seenLineId, setSeenLineId] = React.useState(lineId);
+  if (seenLineId !== lineId) {
+    setSeenLineId(lineId);
     setJustAdded(false);
-  }, [line.productSlug, line.colourId, line.sizeId]);
+  }
 
   React.useEffect(() => {
     return () => {
