@@ -38,13 +38,25 @@ export function ProductBuySection({ product, className }: ProductBuySectionProps
 
   return (
     <div className={cn("w-full min-w-0", className)}>
-      <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
+      {/* `lg:items-start` — without it the grid's default `stretch` hands the
+          gallery column the buy box's full height, the gallery's stage grows
+          to fill it, and the result is a tall bordered rectangle with the
+          spool marooned at the top of it. The two columns are independent
+          objects, not two halves of one panel (#21). */}
+      <div className="grid gap-8 lg:grid-cols-2 lg:items-start lg:gap-12">
+        {/* Sticky only where there is something to be sticky against: at `lg`
+            the buy column runs roughly twice the square gallery's height, so
+            without this the product image scrolls away while you are still
+            choosing a size. `top-20` clears the shop nav (`h-16`) with a
+            little air. Below `lg` the two are stacked and there is nothing to
+            hold position beside. */}
         <Gallery
           name={product.name}
           colours={product.colours}
           selectedId={colour.id}
           onSelect={setColourId}
           weightGrams={size.weightGrams}
+          className="lg:sticky lg:top-20"
         />
 
         <div className="min-w-0">
