@@ -57,6 +57,10 @@ export async function ShopShell({ children }: ShopShellProps) {
     colours: product.colours,
     sizes: product.sizes,
     bulkTiers: product.bulkTiers,
+    /* The bridge between the two models: a UI row is (product, colour, size),
+       an API line is one variant id. Without this the drawer could render a
+       basket it had no way to modify. */
+    variantIds: product.variantIds,
   }));
 
   return (
