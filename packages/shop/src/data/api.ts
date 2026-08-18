@@ -8,6 +8,7 @@ import type {
   DiameterMm,
   Material,
   Product,
+  RatingSummary,
   SizeOption,
 } from "./types";
 
@@ -198,6 +199,13 @@ export function deriveSummary(blocks: DescriptionBlock[], limit = 160): string {
 }
 
 // -------------------------------------------------------------------- fields
+
+/** What a product with no reviews carries. Renders nothing. */
+const NO_RATING: RatingSummary = {
+  average: 0,
+  count: 0,
+  distribution: [0, 0, 0, 0, 0],
+};
 
 const MATERIALS: Material[] = ["PLA+", "PLA", "PETG", "ABS", "ASA", "TPU"];
 
@@ -406,6 +414,15 @@ export interface AdaptContext {
   categorySlugByName: Map<string, string>;
   /** Read once per fetch, never inside a render. See `badgesFrom`. */
   now: number;
+  /**
+   * slug → star summary, from `GET /api/public/reviews/aggregates`.
+   *
+   * OPTIONAL, AND AN ABSENT ENTRY MEANS "no reviews" RATHER THAN "unknown".
+   * A card renders nothing at `count: 0`, so a missing aggregate and a genuine
+   * zero look identical to a reader — which is the honest collapse, because the
+   * reviews API answering slowly should cost a star line, never a product.
+   */
+  ratings?: Map<string, RatingSummary>;
 }
 
 /**
@@ -455,10 +472,11 @@ export function toProduct(api: ApiProduct, ctx: AdaptContext): Product | null {
     overviewClaims: [],
     description,
     parameters: null,
-    /* Reviews are their own API and their own cache window. The product page
-       fetches them beside this rather than through it, so a review write never
-       invalidates the catalogue. */
-    reviews: [],
+    /* Reviews are their own API and their own cache window — the product page
+       fetches the prose beside this rather than through it, so a review write
+       never invalidates the catalogue. What a CARD needs is one number, and
+       that arrives already aggregated for the whole grid. */
+    rating: ctx.ratings?.get(api.slug) ?? NO_RATING,
     /* No `featured` column. `listFeaturedProducts()` picks the newest rather
        than reading this, so nothing here claims an editorial choice nobody
        made. */

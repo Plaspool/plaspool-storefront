@@ -1,5 +1,6 @@
 import { CATALOG_DETAIL_REVALIDATE, CATALOG_LIST_REVALIDATE, COMMERCE_API_BASE } from "./config";
 import { toCategory, toProduct } from "./api";
+import { listReviewAggregates } from "./reviews";
 import { HERO_COLOURS, STANDARD_TIERS } from "./policy";
 import type { AdaptContext, ApiCategory, ApiProduct } from "./api";
 import type { Category, Product } from "./types";
@@ -101,8 +102,26 @@ export async function listProducts(): Promise<Product[]> {
     getJson<{ items: ApiProduct[] }>("/api/shop/products", CATALOG_LIST_REVALIDATE),
     context(),
   ]);
-  return (list?.items ?? [])
-    .map((item) => toProduct(item, ctx))
+  const items = list?.items ?? [];
+
+  /*
+   * RATINGS FOR THE WHOLE GRID IN ONE REQUEST, and it has to come after the
+   * list because it is keyed by the slugs the list returns.
+   *
+   * That makes it the one place this file serialises two fetches on purpose.
+   * The alternative is a rating request per card, which on Workers is a
+   * subrequest per card against a 50-request cap — a grid-size ceiling rather
+   * than a slow path. Two sequential requests beat sixteen parallel ones here.
+   *
+   * `listReviewAggregates` never throws and answers an empty map when the
+   * reviews API is unreachable, so a bad day there costs star lines and not
+   * the catalogue.
+   */
+  const slugs = items.map((item) => item.slug).filter((slug): slug is string => !!slug);
+  const ratings = await listReviewAggregates(slugs);
+
+  return items
+    .map((item) => toProduct(item, { ...ctx, ratings }))
     .filter((p): p is Product => p !== null);
 }
 
@@ -115,6 +134,10 @@ async function fetchProduct(slug: string): Promise<ApiProduct | null> {
 }
 
 export async function getProduct(slug: string): Promise<Product | null> {
+  /* No ratings fetched here. The product PAGE renders the full review list and
+     its own aggregate beside this call (`product-page.tsx`), so asking for a
+     star summary as well would be the same numbers twice. `toProduct` leaves
+     `rating` at zero, which the page never reads. */
   const [detail, ctx] = await Promise.all([fetchProduct(slug), context()]);
   if (!detail) return null;
   return toProduct(detail, ctx);

@@ -1,5 +1,5 @@
 import type { Product } from "../data/types";
-import { priceFrom, ratingSummary } from "../data/money";
+import { priceFrom } from "../data/money";
 
 /**
  * The listing's URL contract, and the only place it is defined.
@@ -169,8 +169,8 @@ function sortProducts(products: Product[], sort: SortKey): Product[] {
          above a 4.8 under a naive descending sort. Zero-review products go
          last, in their catalog order. */
       return out.sort((a, b) => {
-        const ra = ratingSummary(a.reviews);
-        const rb = ratingSummary(b.reviews);
+        const ra = a.rating;
+        const rb = b.rating;
         if (!ra.count && !rb.count) return 0;
         if (!ra.count) return 1;
         if (!rb.count) return -1;

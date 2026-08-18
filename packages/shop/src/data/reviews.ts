@@ -1,4 +1,10 @@
-import { COMMERCE_API_BASE, REVIEWS_PER_PAGE, REVIEWS_REVALIDATE } from "./config";
+import {
+  COMMERCE_API_BASE,
+  REVIEWS_BULK_REVALIDATE,
+  REVIEWS_PER_PAGE,
+  REVIEWS_REVALIDATE,
+} from "./config";
+import type { RatingSummary } from "./types";
 
 /**
  * The reviews client — the storefront's half of the contract published on
@@ -59,6 +65,82 @@ export function emptyAggregate(productSlug: string): ReviewAggregate {
 /** `433` → `4.33`. The API sends an integer so no float crosses the wire. */
 export function starsFromAggregate(aggregate: ReviewAggregate): number {
   return aggregate.averageRating / 100;
+}
+
+/**
+ * How many slugs one bulk request may name. The API refuses more with a 400,
+ * so this batches rather than letting a big grid be silently truncated.
+ */
+const BULK_LIMIT = 60;
+
+/**
+ * Star summaries for a whole listing, in ONE request per batch.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE ENDPOINT THIS EXISTS FOR. The singular aggregate answers one slug, so a
+ * sixteen-card grid needed sixteen requests — on Cloudflare Workers that is a
+ * subrequest per card against a 50-request cap, i.e. a grid-size ceiling rather
+ * than a slow path. `Plaspool/plaspool-admin#12` added the bulk route and this
+ * is its client.
+ *
+ * It is why `ProductCard` can show a rating again at all: with only the
+ * singular route the storefront kept the card's star line and the "Best rated"
+ * sort switched OFF, because the alternative was invented numbers.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * NEVER THROWS, and an unreachable API yields an EMPTY MAP rather than a
+ * failure. A card renders nothing at `count: 0`, so a missing aggregate and a
+ * genuine zero look identical to a reader — the reviews service having a bad
+ * day costs a star line, never a product.
+ */
+export async function listReviewAggregates(
+  productSlugs: readonly string[],
+): Promise<Map<string, RatingSummary>> {
+  const out = new Map<string, RatingSummary>();
+  const wanted = [...new Set(productSlugs)].filter((slug) => slug.length > 0);
+  if (wanted.length === 0) return out;
+
+  /* Batched rather than truncated: the API refuses more than its bound with a
+     400, and a grid showing stars on the first sixty cards and blanks after is
+     the failure that bound exists to prevent. */
+  for (let i = 0; i < wanted.length; i += BULK_LIMIT) {
+    const batch = wanted.slice(i, i + BULK_LIMIT);
+    try {
+      const url = new URL(`${COMMERCE_API_BASE}/api/public/reviews/aggregates`);
+      url.searchParams.set("products", batch.join(","));
+      const res = await fetch(url, { next: { revalidate: REVIEWS_BULK_REVALIDATE } });
+      if (!res.ok) continue;
+      const body = (await res.json()) as { aggregates: Record<string, ReviewAggregate> };
+      for (const [slug, aggregate] of Object.entries(body.aggregates ?? {})) {
+        out.set(slug, toRatingSummary(aggregate));
+      }
+    } catch {
+      /* Leave the batch absent. See the rule above. */
+    }
+  }
+  return out;
+}
+
+/**
+ * The API's aggregate as the storefront's `RatingSummary`.
+ *
+ * TWO SHAPES THAT DISAGREE, reconciled in one place. The API sends the mean as
+ * an integer ×100 and the distribution as an object keyed `"1"`–`"5"`; this
+ * package wants a float and an array whose INDEX 0 IS FIVE STARS — the order a
+ * star breakdown is read in, top rating first.
+ */
+function toRatingSummary(aggregate: ReviewAggregate): RatingSummary {
+  return {
+    average: starsFromAggregate(aggregate),
+    count: aggregate.count,
+    distribution: [
+      aggregate.distribution[5],
+      aggregate.distribution[4],
+      aggregate.distribution[3],
+      aggregate.distribution[2],
+      aggregate.distribution[1],
+    ],
+  };
 }
 
 /**

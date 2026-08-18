@@ -1,22 +1,17 @@
-/**
- * Fixture reviews are for building the UI. They are not customer reviews and
- * must never be presented as them on a live store.
+/*
+ * `SHOW_FIXTURE_REVIEWS` USED TO LIVE HERE AND IS DELETED.
  *
- * OFF, NOW THAT REVIEWS ARE REAL. The product page reads the live API, so a
- * card advertising an invented "4.8 (6)" over a page that says "No reviews
- * yet" would be the store contradicting itself — worse than showing nothing.
+ * It existed to keep invented review numbers off a live store, and it ended up
+ * gating two surfaces the API could not answer: the rating line on
+ * `ProductCard` and the "Best rated" sort. Both needed a rating for EVERY
+ * product in a listing, and the public API aggregated one product at a time.
  *
- * What it still gates is the two surfaces the API cannot answer yet, because
- * both need a rating for EVERY product in a listing and the public API
- * aggregates one product at a time:
- *
- *   - the rating line on `ProductCard`
- *   - the "Best rated" option in the listing's sort
- *
- * Turning this back on means putting invented numbers in front of customers.
- * The way to bring these two back is a bulk aggregate endpoint, not this flag.
+ * Its own note said the way back was "a bulk aggregate endpoint, not this
+ * flag". That endpoint exists now (`Plaspool/plaspool-admin#12`), the fixtures
+ * it protected against are gone, and both surfaces render real customer
+ * ratings — so the flag has nothing left to gate. A constant named for fixtures
+ * in a codebase with none is a trap for whoever reads it next.
  */
-export const SHOW_FIXTURE_REVIEWS = false;
 
 /**
  * The commerce API — the same deployment the blog reads from, which is why
@@ -76,6 +71,32 @@ export const CATALOG_DETAIL_REVALIDATE = 3600;
  * the API contract describes.
  */
 export const REVIEWS_REVALIDATE = 60;
+
+/**
+ * The BULK aggregate's window, and it is deliberately five times the one above.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * BECAUSE OF WHERE IT IS FETCHED, NOT BECAUSE THE DATA IS LESS TIMELY.
+ *
+ * `REVIEWS_REVALIDATE` is 60s so an approval reaches the product PAGE within a
+ * minute — that is where a reviewer goes to look for their own review, and it
+ * is one route.
+ *
+ * The bulk aggregate is fetched by `listProducts()`, which every listing and
+ * the home page compose. Next takes a route's revalidate window to be the
+ * SHORTEST of the fetches it composes, so a 60s window here silently took
+ * `/store` and every category page from five minutes to one — five times the
+ * origin renders across the whole shop, measured in the build summary, to make
+ * a star line on a card timelier.
+ *
+ * On a runtime whose CPU budget storefront #9 was only just brought inside,
+ * that is a poor trade. A card's star count reaching a grid within five minutes
+ * is not a promise anybody notices being kept faster. The SAME trap caught
+ * `MARKETING_REVALIDATE`; the general rule is that anything composed into a
+ * shared route inherits its window to every route that composes it.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export const REVIEWS_BULK_REVALIDATE = 300;
 
 /** A page of reviews. The API caps a request at 50. */
 export const REVIEWS_PER_PAGE = 10;
