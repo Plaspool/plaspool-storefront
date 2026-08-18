@@ -20,13 +20,32 @@ import { siteConfig } from "@plaspool/brand";
  * `site_domain` remains right for metadata (canonical, og:url, sitemap),
  * which must name production wherever it is rendered.
  */
+/**
+ * The live origin, read through `useSyncExternalStore`.
+ *
+ * THIS WAS A `useState` PLUS AN EFFECT, and React 19's hook lint rule
+ * (`react-hooks/set-state-in-effect`, new in the plugin that ships with
+ * Next 16) is right to flag that shape: setting state in an effect to reach a
+ * browser-only value renders once with the wrong value and then again with the
+ * right one.
+ *
+ * `useSyncExternalStore` is the API built for exactly this — a value that
+ * genuinely differs between server and client. The server snapshot is the
+ * configured domain, which keeps the markup stable and the links valid on the
+ * first pass; the client snapshot is the real origin. React reconciles the two
+ * itself rather than us doing it with an extra render.
+ *
+ * The store never changes during a page's life, so `subscribe` returns a no-op
+ * unsubscriber and nothing is ever notified. Both snapshot functions are module
+ * scope so their identity is stable across renders.
+ */
+const subscribeToNothing = () => () => {};
+const clientOrigin = () => window.location.origin;
+const serverOrigin = () => siteConfig.site_domain;
+
 export function ShareLinks({ title, slug }: { title: string; slug: string }) {
   const path = `/posts/${slug}`;
-  const [origin, setOrigin] = React.useState(siteConfig.site_domain);
-
-  React.useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
+  const origin = React.useSyncExternalStore(subscribeToNothing, clientOrigin, serverOrigin);
 
   const url = `${origin}${path}`;
 
