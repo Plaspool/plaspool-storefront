@@ -14,7 +14,8 @@
     "lint:packages": "eslint packages",
     "typecheck": "node scripts/typecheck.mjs",
     "preview": "npm run preview -w @plaspool/storefront",
-    "deploy": "npm run deploy -w @plaspool/storefront"
+    "deploy": "npm run deploy -w @plaspool/storefront",
+    "upload": "npm run upload -w @plaspool/storefront"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
