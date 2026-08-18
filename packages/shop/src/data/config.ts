@@ -41,6 +41,31 @@ export const COMMERCE_API_BASE = "https://blog-admin-app-gold.vercel.app";
  * are revalidation windows rather than a promise about how often the origin is
  * actually hit.
  */
+/**
+ * Banners and the rewards programme.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 300s, MATCHING THE CATALOGUE, AND IT WAS 60 UNTIL A BUILD SHOWED WHY NOT.
+ *
+ * A banner is the most timely thing on the store, so a shorter window looks
+ * obviously right. It is not, and the reason is where the announcement bar
+ * lives: `ShopShell` wraps EVERY `(shop)` route, so the bar's fetch is on every
+ * one of them, and Next takes a route's revalidate window to be the SHORTEST of
+ * the fetches it composes.
+ *
+ * At 60s the build reported `/store`, `/store/[category]` and every category
+ * page revalidating every minute instead of every five — five times the origin
+ * renders across the whole shop, to make one line of copy timelier. On a runtime
+ * whose 10ms CPU budget storefront #9 (Error 1102) was only just brought inside,
+ * that is a poor trade for a shop this size.
+ *
+ * So a banner reaches a page within five minutes rather than one. The API caches
+ * these itself with its own shorter TTL, so the effective staleness is the sum of
+ * the two windows — the same arrangement `REVIEWS_REVALIDATE` describes.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export const MARKETING_REVALIDATE = 300;
+
 export const CATALOG_LIST_REVALIDATE = 300;
 export const CATALOG_DETAIL_REVALIDATE = 3600;
 

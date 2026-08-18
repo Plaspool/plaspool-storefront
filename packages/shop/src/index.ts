@@ -43,6 +43,7 @@ export * from "./home/category-tiles";
 export * from "./home/featured-products";
 export * from "./home/why-shop";
 export * from "./home/bulk-promo";
+export * from "./home/rewards-band";
 export * from "./home/blog-strip";
 export * from "./home/home-page";
 

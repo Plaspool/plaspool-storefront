@@ -5,6 +5,7 @@ import { CategoryTiles } from "./category-tiles";
 import { FeaturedProducts } from "./featured-products";
 import { WhyShop } from "./why-shop";
 import { BulkPromo } from "./bulk-promo";
+import { RewardsBand } from "./rewards-band";
 import { BlogStrip } from "./blog-strip";
 
 /**
@@ -15,6 +16,17 @@ import { BlogStrip } from "./blog-strip";
  * `BlogStrip` is async and renders `null` when the content API is empty or
  * unreachable, which is its normal state today. Nothing else on the page
  * depends on it, so it simply drops out.
+ *
+ * `RewardsBand` and `BulkPromo` now behave the same way — the first when no
+ * rewards programme is configured, the second when the catalogue has no price to
+ * quote a ladder against. Three of the sections on this page can therefore be
+ * absent, and the page is composed so that any of them dropping out leaves a
+ * shorter page rather than a gap.
+ *
+ * REWARDS SITS AFTER `BulkPromo`, which is the second money conversation on the
+ * page: buying by the box, then what happens to the empties. Putting it above
+ * the catalogue would lead with a scheme nobody can join yet — customer accounts
+ * come with the auth bundle.
  */
 
 export const storeHomeMetadata: Metadata = {
@@ -32,6 +44,7 @@ export function StoreHomePage() {
       <FeaturedProducts />
       <WhyShop />
       <BulkPromo />
+      <RewardsBand />
       <BlogStrip />
     </>
   );
