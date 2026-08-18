@@ -104,6 +104,15 @@ function ReviewCard({ review }: { review: PublicReview }) {
 export interface ReviewsTabProps {
   productSlug: string;
   productName: string;
+  /**
+   * Whether the printing-parameters tab is actually on the page.
+   *
+   * The empty state used to send readers to it unconditionally, which became a
+   * dangling reference the moment `product.parameters` could be null: the tab is
+   * hidden when the catalogue has no figures for a product, and pointing at a
+   * tab that is not there is worse than not offering the consolation.
+   */
+  hasParameters: boolean;
   aggregate: ReviewAggregate;
   /** The first page, server-rendered. */
   initialReviews: PublicReview[];
@@ -114,6 +123,7 @@ export interface ReviewsTabProps {
 export function ReviewsTab({
   productSlug,
   productName,
+  hasParameters,
   aggregate,
   initialReviews,
   initialCursor,
@@ -147,7 +157,11 @@ export function ReviewsTab({
         <EmptyState
           icon={<MessageSquareText aria-hidden="true" className="h-6 w-6" />}
           title="No reviews yet"
-          body="Nobody has reviewed this spool. If you have printed with it, yours would be the first — the printing parameters tab has the temperatures and tolerance in the meantime."
+          body={
+            hasParameters
+              ? "Nobody has reviewed this spool. If you have printed with it, yours would be the first — the printing parameters tab has the temperatures and tolerance in the meantime."
+              : "Nobody has reviewed this spool. If you have printed with it, yours would be the first."
+          }
         />
       ) : (
         <>

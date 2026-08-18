@@ -95,6 +95,7 @@ export function ProductTabs({
         <ReviewsTab
           productSlug={product.slug}
           productName={product.name}
+          hasParameters={product.parameters !== null}
           aggregate={reviewAggregate}
           initialReviews={initialReviews}
           initialCursor={initialReviewCursor}
