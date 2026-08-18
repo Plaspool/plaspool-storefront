@@ -4,6 +4,7 @@ import * as React from "react";
 import { cn } from "@plaspool/ui";
 
 import type { Product } from "../data/types";
+import type { ReviewAggregate } from "../data/reviews";
 import { firstInStockColour, cheapestSize } from "../data/money";
 import { Gallery } from "./gallery";
 import { BuyBox } from "./buy-box";
@@ -21,10 +22,16 @@ import { StickyBuyBar } from "./sticky-buy-bar";
 
 export interface ProductBuySectionProps {
   product: Product;
+  /** Passed straight through to the buy box's stars — see `ProductPage`. */
+  reviewAggregate: ReviewAggregate;
   className?: string;
 }
 
-export function ProductBuySection({ product, className }: ProductBuySectionProps) {
+export function ProductBuySection({
+  product,
+  reviewAggregate,
+  className,
+}: ProductBuySectionProps) {
   const [colourId, setColourId] = React.useState(() => firstInStockColour(product).id);
   const [sizeId, setSizeId] = React.useState(() => cheapestSize(product).id);
   const [quantity, setQuantity] = React.useState(1);
@@ -65,6 +72,7 @@ export function ProductBuySection({ product, className }: ProductBuySectionProps
             colour={colour}
             size={size}
             quantity={quantity}
+            reviewAggregate={reviewAggregate}
             onColourChange={setColourId}
             onSizeChange={setSizeId}
             onQuantityChange={setQuantity}

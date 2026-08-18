@@ -1,42 +1,41 @@
-import { MessageSquareText, TriangleAlert } from "lucide-react";
+"use client";
+
+import * as React from "react";
+import { MessageSquareText } from "lucide-react";
 import { cn } from "@plaspool/ui";
 
-import type { Review } from "../data/types";
-import { ratingSummary } from "../data/money";
-import { SHOW_FIXTURE_REVIEWS } from "../data/config";
+import { REVIEWS_PER_PAGE } from "../data/config";
+import { listReviewsFromBrowser, starsFromAggregate } from "../data/reviews";
+import type { PublicReview, ReviewAggregate } from "../data/reviews";
 import { RatingStars } from "../components/rating-stars";
 import { EmptyState } from "../components/empty-state";
+import { ReviewForm } from "./review-form";
 
 /**
- * Rating summary, distribution bars, individual reviews — and, on day one, the
- * empty state, which is the state this tab is actually most likely to be in.
+ * Real customer reviews: the aggregate, the distribution, the approved
+ * reviews themselves, and the form for adding one.
  *
- * THE FIXTURE REVIEWS ARE INVENTED AND MUST NEVER BE PRESENTED AS REAL.
- * `SHOW_FIXTURE_REVIEWS` is the switch:
+ * THE FIXTURES ARE GONE. This tab used to render invented reviews behind a
+ * "sample data" notice, with `SHOW_FIXTURE_REVIEWS` as the switch that kept
+ * them off a live store. There is a real API now, so the switch and the
+ * notice have no job left — what renders here either came from a customer or
+ * is the honest empty state.
  *
- *   `false` → the empty state renders, whatever is in the fixtures. This is
- *             the shippable setting until real reviews exist.
- *   `true`  → the fixtures render behind an unmissable sample-data notice.
- *
- * The notice is not subtle and is not dismissible, deliberately. A tasteful
- * one is a notice someone ships past.
+ * The first page arrives as props, fetched on the server so the reviews are
+ * in the HTML for a crawler and cost the reader nothing. Everything past it
+ * is fetched in the browser on demand, which is also why this component is a
+ * client one.
  */
 
-/** Five down to one, matching `RatingSummary.distribution`'s own order. */
-const STAR_ROWS = [5, 4, 3, 2, 1] as const;
+/** Five down to one — the order a distribution is read in. */
+const STAR_ROWS = ["5", "4", "3", "2", "1"] as const;
 
-function DistributionBars({
-  distribution,
-  count,
-}: {
-  distribution: readonly number[];
-  count: number;
-}) {
+function DistributionBars({ aggregate }: { aggregate: ReviewAggregate }) {
   return (
     <ul className="flex w-full max-w-xs flex-col gap-1.5">
-      {STAR_ROWS.map((stars, index) => {
-        const n = distribution[index] ?? 0;
-        const pct = count > 0 ? Math.round((n / count) * 100) : 0;
+      {STAR_ROWS.map((stars) => {
+        const n = aggregate.distribution[stars] ?? 0;
+        const pct = aggregate.count > 0 ? Math.round((n / aggregate.count) * 100) : 0;
         return (
           <li key={stars} className="flex items-center gap-3 text-xs">
             <span className="w-10 shrink-0 font-mono tabular-nums text-muted-foreground">
@@ -60,89 +59,150 @@ function DistributionBars({
   );
 }
 
-function ReviewCard({ review }: { review: Review }) {
+/**
+ * `createdAt` is epoch milliseconds from the API, and this renders on both
+ * sides of hydration — so the format is pinned to `en-NG` and UTC rather than
+ * left to the runtime's locale and zone, which differ between the Worker and
+ * the reader's browser and would mismatch.
+ */
+const DATE_FORMAT = new Intl.DateTimeFormat("en-NG", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+function ReviewCard({ review }: { review: PublicReview }) {
+  const date = new Date(review.createdAt);
   return (
     <li className="border-b border-brand-line py-6 last:border-b-0">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <RatingStars rating={review.rating} />
-        <h4 className="font-sans text-sm font-semibold text-foreground">{review.title}</h4>
+        {review.title && (
+          <h4 className="font-sans text-sm font-semibold text-foreground">{review.title}</h4>
+        )}
       </div>
 
-      <p className="mt-3 text-sm leading-6 text-muted-foreground">{review.body}</p>
+      {/* Customer-written text, rendered as a text node. It never becomes
+          markup — see the blog's DocRenderer for the same rule stated at
+          length. */}
+      <p className="mt-3 whitespace-pre-line text-sm leading-6 text-muted-foreground">
+        {review.body}
+      </p>
 
       <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-        <span className="text-foreground">{review.author}</span>
+        <span className="text-foreground">{review.authorName}</span>
         <span aria-hidden="true">·</span>
-        {/* A literal ISO string from the fixtures, never `Date.now()` — it has
-            to render identically on the server and the client. */}
-        <time dateTime={review.publishedAt} className="font-mono tabular-nums">
-          {review.publishedAt}
+        <time dateTime={date.toISOString()} className="font-mono tabular-nums">
+          {DATE_FORMAT.format(date)}
         </time>
-        {review.verifiedPurchase && (
-          <>
-            <span aria-hidden="true">·</span>
-            <span className="text-foreground">Verified purchase</span>
-          </>
-        )}
       </p>
     </li>
   );
 }
 
 export interface ReviewsTabProps {
-  reviews: Review[];
+  productSlug: string;
+  productName: string;
+  aggregate: ReviewAggregate;
+  /** The first page, server-rendered. */
+  initialReviews: PublicReview[];
+  initialCursor: string | null;
   className?: string;
 }
 
-export function ReviewsTab({ reviews, className }: ReviewsTabProps) {
-  const suppressed = !SHOW_FIXTURE_REVIEWS;
-  const shown = suppressed ? [] : reviews;
+export function ReviewsTab({
+  productSlug,
+  productName,
+  aggregate,
+  initialReviews,
+  initialCursor,
+  className,
+}: ReviewsTabProps) {
+  const [extra, setExtra] = React.useState<PublicReview[]>([]);
+  const [cursor, setCursor] = React.useState(initialCursor);
+  const [loading, setLoading] = React.useState(false);
+  const [failed, setFailed] = React.useState(false);
 
-  if (shown.length === 0) {
-    return (
-      <div className={cn("max-w-3xl", className)}>
-        <EmptyState
-          icon={<MessageSquareText aria-hidden="true" className="h-6 w-6" />}
-          title="No reviews yet"
-          body="This spool has not been reviewed. The printing parameters tab has the temperatures, speeds and tolerance if you are deciding without them."
-        />
-      </div>
-    );
+  async function loadMore() {
+    if (!cursor || loading) return;
+    setLoading(true);
+    setFailed(false);
+    try {
+      const page = await listReviewsFromBrowser(productSlug, cursor, REVIEWS_PER_PAGE);
+      setExtra((prev) => [...prev, ...page.items]);
+      setCursor(page.nextCursor);
+    } catch {
+      setFailed(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  const summary = ratingSummary(shown);
+  const reviews = [...initialReviews, ...extra];
 
   return (
     <div className={cn("max-w-3xl", className)}>
-      <p className="mb-6 flex items-start gap-3 rounded-lg border border-brand-line bg-brand-soft p-4 text-sm leading-6 text-foreground">
-        <TriangleAlert aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-brand" />
-        <span>
-          <span className="font-semibold">Sample data.</span> These reviews are
-          invented, written to build this page against. They are not customer
-          reviews and will be replaced before the store takes orders.
-        </span>
-      </p>
+      {aggregate.count === 0 ? (
+        <EmptyState
+          icon={<MessageSquareText aria-hidden="true" className="h-6 w-6" />}
+          title="No reviews yet"
+          body="Nobody has reviewed this spool. If you have printed with it, yours would be the first — the printing parameters tab has the temperatures and tolerance in the meantime."
+        />
+      ) : (
+        <>
+          <div className="flex flex-col gap-6 border-b border-brand-line pb-8 sm:flex-row sm:items-center sm:gap-12">
+            <div className="flex flex-col gap-1">
+              <p className="font-mono text-4xl font-bold tabular-nums text-foreground">
+                {/* One decimal from the API's integer hundredths: `433` reads
+                    as `4.3`, never `4.33` and never `4.0`. */}
+                {Number(starsFromAggregate(aggregate).toFixed(1))}
+              </p>
+              <RatingStars rating={starsFromAggregate(aggregate)} size="md" />
+              <p className="mt-1 text-xs text-muted-foreground">
+                <span className="font-mono tabular-nums text-foreground">
+                  {aggregate.count}
+                </span>{" "}
+                {aggregate.count === 1 ? "review" : "reviews"}
+              </p>
+            </div>
 
-      <div className="flex flex-col gap-6 border-b border-brand-line pb-8 sm:flex-row sm:items-center sm:gap-12">
-        <div className="flex flex-col gap-1">
-          <p className="font-mono text-4xl font-bold tabular-nums text-foreground">
-            {summary.average}
-          </p>
-          <RatingStars rating={summary.average} size="md" />
-          <p className="mt-1 text-xs text-muted-foreground">
-            <span className="font-mono tabular-nums text-foreground">{summary.count}</span>{" "}
-            {summary.count === 1 ? "review" : "reviews"}
-          </p>
-        </div>
+            <DistributionBars aggregate={aggregate} />
+          </div>
 
-        <DistributionBars distribution={summary.distribution} count={summary.count} />
+          <ul className="flex flex-col">
+            {reviews.map((review) => (
+              <ReviewCard key={review.id} review={review} />
+            ))}
+          </ul>
+
+          {cursor && (
+            <div className="mt-6 flex flex-col items-center gap-2">
+              <button
+                type="button"
+                onClick={loadMore}
+                disabled={loading}
+                className={cn(
+                  "inline-flex h-10 items-center justify-center rounded-md border border-brand-line px-4 font-sans text-sm",
+                  "transition-colors hover:border-foreground motion-reduce:transition-none disabled:opacity-50",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                )}
+              >
+                {loading ? "Loading…" : "Load more reviews"}
+              </button>
+              {failed && (
+                <p role="alert" className="text-sm text-destructive">
+                  Could not load more reviews. Try again.
+                </p>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      <div className="mt-10 border-t border-brand-line pt-8">
+        <ReviewForm productSlug={productSlug} productName={productName} />
       </div>
-
-      <ul className="flex flex-col">
-        {shown.map((review) => (
-          <ReviewCard key={review.id} review={review} />
-        ))}
-      </ul>
     </div>
   );
 }

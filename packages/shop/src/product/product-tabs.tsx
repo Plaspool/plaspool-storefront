@@ -4,7 +4,7 @@ import * as React from "react";
 import { cn } from "@plaspool/ui";
 
 import type { Product } from "../data/types";
-import { SHOW_FIXTURE_REVIEWS } from "../data/config";
+import type { PublicReview, ReviewAggregate } from "../data/reviews";
 import { OverviewTab } from "./overview-tab";
 import { DescriptionTab } from "./description-tab";
 import { ParametersTab } from "./parameters-tab";
@@ -40,11 +40,23 @@ interface TabDef {
 
 export interface ProductTabsProps {
   product: Product;
+  /** Review data, fetched on the server by the page above. */
+  reviewAggregate: ReviewAggregate;
+  initialReviews: PublicReview[];
+  initialReviewCursor: string | null;
   className?: string;
 }
 
-export function ProductTabs({ product, className }: ProductTabsProps) {
-  const reviewCount = SHOW_FIXTURE_REVIEWS ? product.reviews.length : 0;
+export function ProductTabs({
+  product,
+  reviewAggregate,
+  initialReviews,
+  initialReviewCursor,
+  className,
+}: ProductTabsProps) {
+  /* The approved count from the API — the same number the panel shows, so the
+     tab label and its contents cannot disagree. */
+  const reviewCount = reviewAggregate.count;
 
   const tabs: TabDef[] = [
     {
@@ -68,7 +80,15 @@ export function ProductTabs({ product, className }: ProductTabsProps) {
       /* Zero is worth showing: it is the honest state, and hiding it would
          make an empty tab look like an unloaded one. */
       count: reviewCount,
-      panel: <ReviewsTab reviews={product.reviews} />,
+      panel: (
+        <ReviewsTab
+          productSlug={product.slug}
+          productName={product.name}
+          aggregate={reviewAggregate}
+          initialReviews={initialReviews}
+          initialCursor={initialReviewCursor}
+        />
+      ),
     },
   ];
 
