@@ -2,9 +2,10 @@ import type { BulkTier, Colour, SizeOption } from "../data/types";
 import type { CartCatalogEntry } from "./cart-context";
 
 /**
- * Cart types, split out from `cart-context.tsx` so `storage.ts` — a plain
- * module with no React and no `"use client"` — can import `CartLine` without
- * pulling the provider in with it.
+ * Cart types, split out from `cart-context.tsx` so `line-key.ts` — a plain
+ * module with no React and no `"use client"` — can import `CartLineKey` without
+ * pulling the provider in with it. (That file was `storage.ts` until the basket
+ * moved to the server; the split is still load-bearing for the same reason.)
  *
  * Ruling R3: the brief's Step 1 opens with
  * `import type { CartLine } from "./types-or-inline"`, which is not a module,
@@ -62,6 +63,19 @@ export interface CartApi {
   subtotal: number;
   savings: number;
   hydrated: boolean;
+  /**
+   * A write is in flight. The basket lives on the server now, so an edit is a
+   * round trip rather than a state update — controls disable against this
+   * instead of letting two edits race and land in whatever order the network
+   * chose.
+   */
+  pending: boolean;
+  /**
+   * What the SERVER changed without being asked: a line dropped because its
+   * variant vanished, a quantity clamped to what is left. Surfaced because a
+   * basket that silently edits itself is the failure this exists to prevent.
+   */
+  changes: { lineId?: string; reason?: string }[];
   add(key: CartLineKey, qty?: number): void;
   setQty(key: CartLineKey, qty: number): void;
   remove(key: CartLineKey): void;

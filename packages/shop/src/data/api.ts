@@ -268,7 +268,13 @@ export function coloursFrom(variants: ApiVariant[]): Colour[] {
     const name = (variant.optionValues.Colour ?? variant.optionValues.colour ?? "").trim();
     if (!name) continue;
     const key = idOf(name);
-    const sellable = (variant.available ?? 0) > 0 || variant.backorderable;
+    /* SELLABLE MEANS PRICED *AND* AVAILABLE, not just available. An unpriced
+       variant is absent from `variantIds`, so a swatch that looked in stock
+       would accept a click and then do nothing at all — the silent no-op is a
+       worse answer than a swatch that says it cannot be bought. `sizesFrom`
+       drops unpriced weights for the same reason. */
+    const sellable =
+      !!variant.price && ((variant.available ?? 0) > 0 || variant.backorderable);
     const existing = byName.get(key);
     if (existing) {
       existing.inStock = existing.inStock || sellable;
@@ -328,6 +334,39 @@ export function sizesFrom(variants: ApiVariant[]): SizeOption[] {
       compareAtNaira: null,
     }))
     .sort((a, b) => a.priceNaira - b.priceNaira);
+}
+
+
+/**
+ * `"<colourId>:<sizeId>"` → variant id, for the variants that are actually for
+ * sale.
+ *
+ * PRICED AND ACTIVE ONLY, matching `sizesFrom`: an unpriced variant is not a
+ * size the buy box offers, so a key pointing at one would let `add()` put a line
+ * in the cart the API then refuses to quote. A combination absent from this map
+ * is a combination that cannot be bought.
+ *
+ * The ids are derived by the same `idOf` the colour and size lists use, so a key
+ * built from a `Colour.id` and a `SizeOption.id` finds its variant by
+ * construction rather than by the two happening to agree.
+ */
+export function variantIdsFrom(variants: ApiVariant[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const variant of variants) {
+    if (!variant.price) continue;
+    const colour = (variant.optionValues.Colour ?? variant.optionValues.colour ?? "").trim();
+    const weight = (variant.optionValues.Weight ?? variant.optionValues.weight ?? "").trim();
+    if (!colour || !weight) continue;
+    const key = `${idOf(colour)}:${idOf(weight)}`;
+    /* First wins, which is `position` order — the same variant `sizesFrom`
+       quotes when two share a (colour, weight) pair. */
+    if (!(key in out)) out[key] = variant.id;
+  }
+  return out;
+}
+
+export function variantKey(colourId: string, sizeId: string): string {
+  return `${colourId}:${sizeId}`;
 }
 
 /** Thirty days. Long enough that a slow week still shows something new. */
@@ -424,6 +463,7 @@ export function toProduct(api: ApiProduct, ctx: AdaptContext): Product | null {
        than reading this, so nothing here claims an editorial choice nobody
        made. */
     featured: false,
+    variantIds: variantIdsFrom(variants),
   };
 }
 

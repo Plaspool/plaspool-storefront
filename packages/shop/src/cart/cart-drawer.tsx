@@ -126,7 +126,7 @@ export function CartDrawer() {
 
         {/* Anything derived from the cart renders nothing until hydrated —
             otherwise this would flash an empty cart before the real one
-            loads from storage. See cart-context.tsx. */}
+            loads from the server. See cart-context.tsx. */}
 
         {cart.hydrated && cart.resolved.length === 0 && (
           <div className="flex flex-1 items-center justify-center">

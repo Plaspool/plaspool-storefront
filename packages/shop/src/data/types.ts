@@ -106,6 +106,18 @@ export interface Product {
   parameters: PrintingParameters | null;
   reviews: Review[];
   featured: boolean;
+  /**
+   * `"<colourId>:<sizeId>"` → the API variant that pair names.
+   *
+   * THE TWO MODELS KEY A LINE DIFFERENTLY, and this is the bridge. A cart line
+   * here is a product, a colour and a size; a line in the commerce API is one
+   * VARIANT id. Without this map the storefront could render a buy box and had
+   * no way to say which of eight variants the customer had actually chosen.
+   *
+   * Empty for a fixture-free product with no variants, and a missing key is a
+   * combination that is not for sale — `add()` refuses rather than guessing.
+   */
+  variantIds: Record<string, string>;
 }
 
 export interface Category {

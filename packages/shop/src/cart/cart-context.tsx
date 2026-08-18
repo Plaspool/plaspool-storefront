@@ -2,58 +2,54 @@
 
 import * as React from "react";
 
-import { lineTotal, savingsFor, tierFor, unitPriceFor } from "../data/money";
-import { lineKey, readCart, writeCart } from "./storage";
+import { addLine, createCart, majorUnits, readCart, removeLine, setLineQty } from "../data/cart-api";
+import { lineKey } from "./line-key";
+import type { ApiCartView } from "../data/cart-api";
 import type { CartApi, CartLine, CartLineKey, ResolvedLine } from "./types";
 import type { BulkTier, Colour, SizeOption } from "../data/types";
 
 /**
- * The cart's state and derivations, as a single provider.
+ * The cart's state, now held by the SERVER.
  *
- * The hydration rule, which is the whole reason `hydrated` exists. The server
- * always renders an empty cart — it has no access to `localStorage`. If the
- * client's first render read storage instead, React would reconcile against a
- * tree that differs from the one the server sent, and throw a hydration error
- * on every page that shows a cart badge. So `lines` starts as `[]` on both
- * sides; a `useEffect` — client-only, and only running after the first commit
- * — loads the real cart and flips `hydrated`. Anything derived from the cart
- * (a nav badge, this drawer's own contents) must render nothing until
- * `hydrated` is true, or it flashes an empty cart before the real one lands.
+ * ═══════════════════════════════════════════════════════════════════════════
+ * WHAT CHANGED, AND WHAT DELIBERATELY DID NOT.
  *
- * A second effect writes `lines` back to storage on every change, but only
- * once hydrated: without that guard, the initial empty `lines` would fire on
- * mount and overwrite a real stored cart with `[]` before the load effect
- * even has a chance to run.
+ * This used to be `localStorage` plus arithmetic. The basket now lives in the
+ * commerce API, identified by a cookie, and every mutation here is a request
+ * whose response IS the new state — so this component stores what the server
+ * said and computes almost nothing.
+ *
+ * THE PRICES ARE THE SERVER'S, and that is the point of the move. `unit` is
+ * re-quoted from the live catalogue on every read rather than stored on the
+ * line, so a price change reaches an open basket, and the number shown in the
+ * drawer is the number checkout will charge. A cart that does its own
+ * arithmetic is a cart that can disagree with the till.
+ *
+ * THE HYDRATION RULE SURVIVES UNCHANGED, and for the same reason as before: the
+ * server rendering this page has no customer cookie, so it cannot know the
+ * basket and always renders an empty one. If the client's first render differed,
+ * React would reconcile against a tree the server never sent and throw on every
+ * page with a cart badge. So the view starts empty on both sides, and a
+ * client-only effect loads the real cart and flips `hydrated`. Anything derived
+ * from the cart must render nothing until then.
+ *
+ * WHAT WENT AWAY. `storage.ts` is deleted — a cart in `localStorage` and a cart
+ * on the server is two carts, and the one that takes the money has to win.
+ * Leaving its reader behind would have left something able to resurrect a
+ * basket the server had already changed. Only `lineKey` survived, in
+ * `line-key.ts`, because the UI still names a row by the three things a
+ * customer chose.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 
 const CartContext = React.createContext<CartApi | null>(null);
 
-function sameKey(a: CartLineKey, b: CartLineKey): boolean {
-  return lineKey(a) === lineKey(b);
-}
-
 /**
- * THE CATALOGUE ARRIVES AS A PROP, AND THIS IS THE ONE PLACE THE LIVE-DATA
- * SWITCH ACTUALLY CHANGED A DESIGN RATHER THAN A CALL.
+ * The cart-sized projection of a product, fed from the server.
  *
- * `storage.ts` persists identifiers and a quantity, NEVER a price, and
- * `resolved` below joins those identifiers against the catalogue on every render
- * so pricing is always computed fresh. That rule is worth keeping — a price in
- * localStorage is a price that goes stale silently — but it means this component
- * needs the catalogue, and it is a client component that cannot `await` one.
- *
- * Three options, and only one of them is any good:
- *
- *   - **fetch it in the browser** — a round trip the server already made, and it
- *     would need CORS on `/api/shop/products`, which has no reason to allow it
- *   - **denormalise price into `CartLine`** — exactly the rule above, broken
- *   - **pass it down from the server** — what this does
- *
- * IT IS A PROJECTION, NOT THE WHOLE CATALOGUE. `CartCatalogEntry` is the four
- * fields the drawer and the arithmetic actually read; the full `Product` carries
- * a description document per product, and shipping all of that into the client
- * bundle of every shop page to price a cart nobody has opened would be paying
- * for the catalogue on each navigation.
+ * `variantIds` IS THE BRIDGE BETWEEN THE TWO MODELS. A row in this UI is a
+ * product, a colour and a size; a line in the API is one variant id. Without
+ * this map the drawer could render a basket it had no way to modify.
  */
 export interface CartCatalogEntry {
   slug: string;
@@ -61,6 +57,8 @@ export interface CartCatalogEntry {
   colours: Colour[];
   sizes: SizeOption[];
   bulkTiers: BulkTier[];
+  /** `"<colourId>:<sizeId>"` → variant id, priced and active only. */
+  variantIds: Record<string, string>;
 }
 
 export interface CartProviderProps {
@@ -68,119 +66,221 @@ export interface CartProviderProps {
   catalog: CartCatalogEntry[];
 }
 
+const EMPTY: ApiCartView = { cart: null, lines: [], preview: null, changes: [] };
+
 export function CartProvider({ children, catalog }: CartProviderProps) {
-  const [lines, setLines] = React.useState<CartLine[]>([]);
+  const [view, setView] = React.useState<ApiCartView>(EMPTY);
   const [hydrated, setHydrated] = React.useState(false);
   const [isOpen, setIsOpen] = React.useState(false);
+  /** A write is in flight. The drawer disables its steppers rather than letting
+   *  two edits race and land in the order the network chose. */
+  const [pending, setPending] = React.useState(false);
 
   React.useEffect(() => {
-    setLines(readCart());
-    setHydrated(true);
+    let cancelled = false;
+    void readCart().then((next) => {
+      if (cancelled) return;
+      if (next) setView(next);
+      setHydrated(true);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
-
-  React.useEffect(() => {
-    if (!hydrated) return;
-    writeCart(lines);
-  }, [lines, hydrated]);
 
   const open = React.useCallback(() => setIsOpen(true), []);
   const close = React.useCallback(() => setIsOpen(false), []);
 
-  const add = React.useCallback(
-    (key: CartLineKey, qty: number = 1) => {
-      const amount = Math.max(1, Math.trunc(qty));
-      setLines((prev) => {
-        const index = prev.findIndex((line) => sameKey(line, key));
-        if (index === -1) return [...prev, { ...key, qty: amount }];
-        const next = [...prev];
-        next[index] = { ...next[index], qty: next[index].qty + amount };
-        return next;
-      });
-      open();
-    },
-    [open],
-  );
-
-  const setQty = React.useCallback((key: CartLineKey, qty: number) => {
-    setLines((prev) => {
-      // A quantity below 1 reads as "take it out" rather than an invalid
-      // state to reject — `QuantityStepper` never sends this in practice
-      // (its own `min` keeps it at 1+), but a future caller might, and this
-      // keeps `lines` free of the qty <= 0 entries `readCart` would strip on
-      // the next reload anyway.
-      if (qty < 1) return prev.filter((line) => !sameKey(line, key));
-      const amount = Math.trunc(qty);
-      return prev.map((line) => (sameKey(line, key) ? { ...line, qty: amount } : line));
-    });
-  }, []);
-
-  const remove = React.useCallback((key: CartLineKey) => {
-    setLines((prev) => prev.filter((line) => !sameKey(line, key)));
-  }, []);
-
-  const clear = React.useCallback(() => setLines([]), []);
-
-  /* By slug, rebuilt only when the catalogue itself changes — `resolved` runs
-     on every line edit and a linear scan per line would be quadratic in a big
-     cart. */
+  /**
+   * Two lookups over the catalogue, built once.
+   *
+   * `resolved` runs on every edit, and a linear scan per line would be
+   * quadratic in a basket somebody actually filled.
+   */
   const bySlug = React.useMemo(
     () => new Map(catalog.map((entry) => [entry.slug, entry])),
     [catalog],
   );
 
+  /** variant id → the (product, colour, size) triple the UI names it by. */
+  const byVariant = React.useMemo(() => {
+    const out = new Map<string, { entry: CartCatalogEntry; colourId: string; sizeId: string }>();
+    for (const entry of catalog) {
+      for (const [key, variantId] of Object.entries(entry.variantIds)) {
+        const [colourId, sizeId] = key.split(":");
+        out.set(variantId, { entry, colourId, sizeId });
+      }
+    }
+    return out;
+  }, [catalog]);
+
+  const variantFor = React.useCallback(
+    (key: CartLineKey): string | null =>
+      bySlug.get(key.productSlug)?.variantIds[`${key.colourId}:${key.sizeId}`] ?? null,
+    [bySlug],
+  );
+
+  /** The server line matching a UI key, or null if the basket has none. */
+  const lineIdFor = React.useCallback(
+    (key: CartLineKey): string | null => {
+      const variantId = variantFor(key);
+      if (!variantId) return null;
+      return view.lines.find((l) => l.variantId === variantId)?.id ?? null;
+    },
+    [variantFor, view.lines],
+  );
+
+  /**
+   * Every mutation goes through here.
+   *
+   * A NULL ANSWER LEAVES THE PREVIOUS VIEW ALONE rather than clearing it. The
+   * cart client returns null for any failure, and replacing a real basket with
+   * an empty one because a request timed out is the worst available outcome —
+   * it looks exactly like the customer's cart being thrown away.
+   */
+  const mutate = React.useCallback(async (run: () => Promise<ApiCartView | null>) => {
+    setPending(true);
+    try {
+      const next = await run();
+      if (next) setView(next);
+      return next;
+    } finally {
+      setPending(false);
+    }
+  }, []);
+
+  const add = React.useCallback(
+    (key: CartLineKey, qty: number = 1) => {
+      const variantId = variantFor(key);
+      /* A combination with no variant is one that is not for sale — the map only
+         holds priced, active variants. Opening the drawer on nothing would be a
+         worse answer than doing nothing. */
+      if (!variantId) return;
+      const amount = Math.max(1, Math.trunc(qty));
+      open();
+      void mutate(async () => {
+        /* LAZILY CREATED, on the first add rather than on page load: a cart per
+           visitor would set a cookie on people who never touch the shop. A
+           second create on an existing cookie is a 200 returning the same
+           basket, so this is safe to call whenever there is no cart yet. */
+        if (!view.cart) await createCart();
+        return addLine(variantId, amount);
+      });
+    },
+    [variantFor, open, mutate, view.cart],
+  );
+
+  const setQty = React.useCallback(
+    (key: CartLineKey, qty: number) => {
+      const lineId = lineIdFor(key);
+      if (!lineId) return;
+      /* Below one reads as "take it out" rather than an invalid state to
+         refuse — the same rule the local cart followed. */
+      if (qty < 1) {
+        void mutate(() => removeLine(lineId));
+        return;
+      }
+      void mutate(() => setLineQty(lineId, Math.trunc(qty)));
+    },
+    [lineIdFor, mutate],
+  );
+
+  const remove = React.useCallback(
+    (key: CartLineKey) => {
+      const lineId = lineIdFor(key);
+      if (!lineId) return;
+      void mutate(() => removeLine(lineId));
+    },
+    [lineIdFor, mutate],
+  );
+
+  /**
+   * Emptying the basket is N deletes, in sequence.
+   *
+   * THERE IS NO BULK DELETE ON THE API, and doing them in parallel would race
+   * the cart's own revision — each response is the whole new state, so the last
+   * one to land wins and an out-of-order pair leaves the view describing a
+   * basket that no longer exists.
+   */
+  const clear = React.useCallback(() => {
+    const ids = view.lines.map((l) => l.id);
+    void mutate(async () => {
+      let last: ApiCartView | null = null;
+      for (const id of ids) last = await removeLine(id);
+      return last;
+    });
+  }, [view.lines, mutate]);
+
+  /**
+   * Server lines, joined against the catalogue for the words and the swatch.
+   *
+   * A LINE THE CATALOGUE NO LONGER EXPLAINS IS DROPPED. The server still holds
+   * it — this does not delete anything — but the drawer cannot draw a row it
+   * has no name or colour for, and inventing them would be worse than a shorter
+   * basket. `changes` from the API is where a line the SERVER removed is
+   * reported.
+   */
   const resolved = React.useMemo<ResolvedLine[]>(() => {
     const out: ResolvedLine[] = [];
-    for (const line of lines) {
-      /* A line whose product has left the catalogue is DROPPED, not shown at a
-         stale price — the behaviour `types.ts` already documented for a product
-         pulled from sale, and now reachable for real rather than only imagined. */
-      const product = bySlug.get(line.productSlug);
-      if (!product) continue;
-      const colour = product.colours.find((c) => c.id === line.colourId);
-      if (!colour) continue;
-      const size = product.sizes.find((s) => s.id === line.sizeId);
-      if (!size) continue;
+    for (const line of view.lines) {
+      const match = byVariant.get(line.variantId);
+      if (!match) continue;
+      const colour = match.entry.colours.find((c) => c.id === match.colourId);
+      const size = match.entry.sizes.find((s) => s.id === match.sizeId);
+      if (!colour || !size) continue;
+      /* THE SERVER'S PRICE, not `size.priceNaira`. The two agree today, and when
+         they stop agreeing the server is the one that takes the money. */
+      const unitPrice = majorUnits(line.unit);
       out.push({
-        key: lineKey(line),
-        product,
+        key: lineKey({ productSlug: match.entry.slug, colourId: colour.id, sizeId: size.id }),
+        product: match.entry,
         colour,
         size,
         qty: line.qty,
-        unitPrice: unitPriceFor(size.priceNaira, product.bulkTiers, line.qty),
-        total: lineTotal(size.priceNaira, product.bulkTiers, line.qty),
-        tier: tierFor(product.bulkTiers, line.qty),
+        unitPrice,
+        total: unitPrice * line.qty,
+        /* No tier: bulk discounts are a storefront policy constant with nothing
+           behind them in the API (see `policy.ts`), so the cart cannot claim one
+           the till will not honour. The ladder stays on the product page as
+           information until it becomes a real API field. */
+        tier: null,
       });
     }
     return out;
-  }, [lines, bySlug]);
+  }, [view.lines, byVariant]);
 
-  const itemCount = React.useMemo(
-    () => resolved.reduce((sum, line) => sum + line.qty, 0),
-    [resolved],
-  );
-
-  const subtotal = React.useMemo(
-    () => resolved.reduce((sum, line) => sum + line.total, 0),
-    [resolved],
-  );
-
-  const savings = React.useMemo(
+  const lines = React.useMemo<CartLine[]>(
     () =>
-      resolved.reduce(
-        (sum, line) => sum + savingsFor(line.size.priceNaira, line.product.bulkTiers, line.qty),
-        0,
-      ),
+      resolved.map((r) => ({
+        productSlug: r.product.slug,
+        colourId: r.colour.id,
+        sizeId: r.size.id,
+        qty: r.qty,
+      })),
     [resolved],
   );
 
-  const value = React.useMemo<CartApi>(
-    () => ({
+  const value = React.useMemo<CartApi>(() => {
+    const itemCount = view.lines.reduce((sum, l) => sum + l.qty, 0);
+    /* THE SERVER'S SUBTOTAL where there is one. Falling back to the sum of the
+       resolved rows keeps the drawer honest if a preview is ever absent, and
+       the two agree by construction because both use the server's unit price. */
+    const subtotal = view.preview
+      ? majorUnits(view.preview.subtotal)
+      : resolved.reduce((sum, r) => sum + r.total, 0);
+    /* List price minus what is actually charged. Zero today, because nothing
+       discounts server-side — and it appears on its own the day something does,
+       rather than needing this file to learn about it. */
+    const list = resolved.reduce((sum, r) => sum + r.size.priceNaira * r.qty, 0);
+    return {
       lines,
       resolved,
       itemCount,
       subtotal,
-      savings,
+      savings: Math.max(0, list - subtotal),
       hydrated,
+      pending,
+      changes: view.changes,
       add,
       setQty,
       remove,
@@ -188,17 +288,29 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
       isOpen,
       open,
       close,
-    }),
-    [lines, resolved, itemCount, subtotal, savings, hydrated, add, setQty, remove, clear, isOpen, open, close],
-  );
+    };
+  }, [
+    view.lines,
+    view.preview,
+    view.changes,
+    resolved,
+    lines,
+    hydrated,
+    pending,
+    add,
+    setQty,
+    remove,
+    clear,
+    isOpen,
+    open,
+    close,
+  ]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
 
 export function useCart(): CartApi {
   const ctx = React.useContext(CartContext);
-  if (!ctx) {
-    throw new Error("useCart must be used within a CartProvider");
-  }
+  if (!ctx) throw new Error("useCart must be used within a CartProvider");
   return ctx;
 }
