@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cn } from "@plaspool/ui";
 
-import { listCategories, listProductsByCategory } from "../data/catalog";
+import { listCategories } from "../data/catalog";
 import { SpoolImage } from "../components/spool-image";
 
 /**
@@ -13,8 +13,8 @@ import { SpoolImage } from "../components/spool-image";
  * from the nav is worse than one that tells you it is empty.
  */
 
-export function CategoryTiles() {
-  const categories = listCategories();
+export async function CategoryTiles() {
+  const categories = await listCategories();
 
   return (
     <section aria-labelledby="shop-categories" className="border-b border-brand-line">
@@ -27,7 +27,11 @@ export function CategoryTiles() {
         </h2>
         <ul className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
           {categories.map((category) => {
-            const count = listProductsByCategory(category.slug).length;
+            /* Counted by the API, not by a fetch per tile. See
+               `Category.productCount` — the old `listProductsByCategory().length`
+               here became one subrequest per tile the moment this stopped being
+               a local array. */
+            const count = category.productCount;
             return (
               <li key={category.slug}>
                 <Link

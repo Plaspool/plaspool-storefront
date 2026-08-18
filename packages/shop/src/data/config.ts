@@ -28,6 +28,23 @@ export const SHOW_FIXTURE_REVIEWS = false;
 export const COMMERCE_API_BASE = "https://blog-admin-app-gold.vercel.app";
 
 /**
+ * Catalogue cache windows, matching the blog's two-tier shape next door
+ * (`LIST_REVALIDATE` / `DETAIL_REVALIDATE`) because the reasoning is identical.
+ *
+ * A LIST GOES STALE FASTER THAN A PAGE. Five minutes on the catalogue list is
+ * what decides how quickly a newly published product appears in the nav, on the
+ * home page and in a category grid — all of which are the same fetch. An hour on
+ * a product page is fine because the URL only exists once the product does, and
+ * a price change reaches it within that window.
+ *
+ * BOTH SIT BEHIND THE WORKER'S KV INCREMENTAL CACHE (storefront #9), so these
+ * are revalidation windows rather than a promise about how often the origin is
+ * actually hit.
+ */
+export const CATALOG_LIST_REVALIDATE = 300;
+export const CATALOG_DETAIL_REVALIDATE = 3600;
+
+/**
  * Reviews are cached for a minute at the API and revalidated here on the same
  * window. The product page's own hour-long ISR sits in front of both, so an
  * approval reaches a live page within that hour — the sum of the windows, as

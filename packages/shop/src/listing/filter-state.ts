@@ -123,9 +123,17 @@ export function applyFilters(products: Product[], f: Filters): Product[] {
   const query = f.query.toLowerCase();
 
   const filtered = products.filter((p) => {
-    if (f.materials.length && !f.materials.includes(p.material)) return false;
+    /* A NULL MATERIAL MATCHES NO MATERIAL FILTER, and that is the point of it
+       being nullable: the API has no material column, so `materialFrom` reads
+       one out of `tags` and answers null when no tag names one. Treating null as
+       a match would put an unclassified spool in every bucket; defaulting it to
+       a material upstream would put it in one wrong bucket. Excluded from the
+       filter, it is still reachable unfiltered, which is the honest state. */
+    if (f.materials.length && (p.material === null || !f.materials.includes(p.material)))
+      return false;
     if (f.colours.length && !p.colours.some((c) => f.colours.includes(c.id))) return false;
-    if (f.diameters.length && !f.diameters.includes(p.diameterMm)) return false;
+    if (f.diameters.length && (p.diameterMm === null || !f.diameters.includes(p.diameterMm)))
+      return false;
     if (f.weights.length && !p.sizes.some((s) => f.weights.includes(s.weightGrams))) return false;
 
     const price = priceFrom(p);
@@ -135,7 +143,10 @@ export function applyFilters(products: Product[], f: Filters): Product[] {
     if (f.inStockOnly && !p.colours.some((c) => c.inStock)) return false;
 
     if (query) {
-      const haystack = `${p.name} ${p.summary} ${p.material}`.toLowerCase();
+      /* `?? ""` and not template interpolation: a null material would stringify
+         to the literal "null" and make every unclassified product a hit for the
+         search term "null". */
+      const haystack = `${p.name} ${p.summary} ${p.material ?? ""}`.toLowerCase();
       if (!haystack.includes(query)) return false;
     }
     return true;
@@ -182,8 +193,12 @@ export function facetsFor(products: Product[]): Facets {
   const weights = new Map<number, number>();
 
   for (const p of products) {
-    materials.set(p.material, (materials.get(p.material) ?? 0) + 1);
-    diameters.set(p.diameterMm, (diameters.get(p.diameterMm) ?? 0) + 1);
+    /* Only counted when known. A `null` facet would render a checkbox with no
+       label that selects nothing, which is worse than the option being absent —
+       and `applyFilters` above cannot match it anyway. */
+    if (p.material !== null) materials.set(p.material, (materials.get(p.material) ?? 0) + 1);
+    if (p.diameterMm !== null)
+      diameters.set(p.diameterMm, (diameters.get(p.diameterMm) ?? 0) + 1);
 
     for (const colour of new Map(p.colours.map((c) => [c.id, c])).values()) {
       const existing = colours.get(colour.id);

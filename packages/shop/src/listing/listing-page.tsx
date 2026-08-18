@@ -43,8 +43,8 @@ import { SortSelect } from "./sort-select";
 
 const ALL_META = { name: "All filament", blurb: "Every spool we make." };
 
-function metaFor(category: string) {
-  return category === "all" ? ALL_META : getCategory(category);
+async function metaFor(category: string) {
+  return category === "all" ? ALL_META : await getCategory(category);
 }
 
 export async function categoryMetadata({
@@ -53,7 +53,7 @@ export async function categoryMetadata({
   params: Promise<{ category: string }>;
 }): Promise<Metadata> {
   const { category } = await params;
-  const meta = metaFor(category);
+  const meta = await metaFor(category);
   if (!meta) return {};
   return {
     /* Not "<name> filament": the category names already read as materials,
@@ -64,10 +64,10 @@ export async function categoryMetadata({
   };
 }
 
-export function categoryParams(): { category: string }[] {
+export async function categoryParams(): Promise<{ category: string }[]> {
   /* The pseudo-category is generated too, so `/store/all` is not a
      runtime-only route. */
-  return [...categoryPaths(), { category: "all" }];
+  return [...(await categoryPaths()), { category: "all" }];
 }
 
 export async function CategoryPage({
@@ -78,10 +78,15 @@ export async function CategoryPage({
   const { category } = await params;
 
   const isAll = category === "all";
-  const meta = metaFor(category);
+  /* Both reads at once: the category header and the grid are independent
+     fetches and serialising them would put one latency behind the other for no
+     reason. The blog's pages use the same `Promise.all` shape. */
+  const [meta, base] = await Promise.all([
+    metaFor(category),
+    isAll ? listProducts() : listProductsByCategory(category),
+  ]);
   if (!meta) notFound();
 
-  const base = isAll ? listProducts() : listProductsByCategory(category);
   const facets = facetsFor(base);
 
   /* The default presentation — featured first, catalog order after — is what

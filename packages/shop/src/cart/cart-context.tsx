@@ -2,10 +2,10 @@
 
 import * as React from "react";
 
-import { getProduct } from "../data/catalog";
 import { lineTotal, savingsFor, tierFor, unitPriceFor } from "../data/money";
 import { lineKey, readCart, writeCart } from "./storage";
 import type { CartApi, CartLine, CartLineKey, ResolvedLine } from "./types";
+import type { BulkTier, Colour, SizeOption } from "../data/types";
 
 /**
  * The cart's state and derivations, as a single provider.
@@ -32,7 +32,43 @@ function sameKey(a: CartLineKey, b: CartLineKey): boolean {
   return lineKey(a) === lineKey(b);
 }
 
-export function CartProvider({ children }: { children: React.ReactNode }) {
+/**
+ * THE CATALOGUE ARRIVES AS A PROP, AND THIS IS THE ONE PLACE THE LIVE-DATA
+ * SWITCH ACTUALLY CHANGED A DESIGN RATHER THAN A CALL.
+ *
+ * `storage.ts` persists identifiers and a quantity, NEVER a price, and
+ * `resolved` below joins those identifiers against the catalogue on every render
+ * so pricing is always computed fresh. That rule is worth keeping — a price in
+ * localStorage is a price that goes stale silently — but it means this component
+ * needs the catalogue, and it is a client component that cannot `await` one.
+ *
+ * Three options, and only one of them is any good:
+ *
+ *   - **fetch it in the browser** — a round trip the server already made, and it
+ *     would need CORS on `/api/shop/products`, which has no reason to allow it
+ *   - **denormalise price into `CartLine`** — exactly the rule above, broken
+ *   - **pass it down from the server** — what this does
+ *
+ * IT IS A PROJECTION, NOT THE WHOLE CATALOGUE. `CartCatalogEntry` is the four
+ * fields the drawer and the arithmetic actually read; the full `Product` carries
+ * a description document per product, and shipping all of that into the client
+ * bundle of every shop page to price a cart nobody has opened would be paying
+ * for the catalogue on each navigation.
+ */
+export interface CartCatalogEntry {
+  slug: string;
+  name: string;
+  colours: Colour[];
+  sizes: SizeOption[];
+  bulkTiers: BulkTier[];
+}
+
+export interface CartProviderProps {
+  children: React.ReactNode;
+  catalog: CartCatalogEntry[];
+}
+
+export function CartProvider({ children, catalog }: CartProviderProps) {
   const [lines, setLines] = React.useState<CartLine[]>([]);
   const [hydrated, setHydrated] = React.useState(false);
   const [isOpen, setIsOpen] = React.useState(false);
@@ -84,10 +120,21 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const clear = React.useCallback(() => setLines([]), []);
 
+  /* By slug, rebuilt only when the catalogue itself changes — `resolved` runs
+     on every line edit and a linear scan per line would be quadratic in a big
+     cart. */
+  const bySlug = React.useMemo(
+    () => new Map(catalog.map((entry) => [entry.slug, entry])),
+    [catalog],
+  );
+
   const resolved = React.useMemo<ResolvedLine[]>(() => {
     const out: ResolvedLine[] = [];
     for (const line of lines) {
-      const product = getProduct(line.productSlug);
+      /* A line whose product has left the catalogue is DROPPED, not shown at a
+         stale price — the behaviour `types.ts` already documented for a product
+         pulled from sale, and now reachable for real rather than only imagined. */
+      const product = bySlug.get(line.productSlug);
       if (!product) continue;
       const colour = product.colours.find((c) => c.id === line.colourId);
       if (!colour) continue;
@@ -105,7 +152,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       });
     }
     return out;
-  }, [lines]);
+  }, [lines, bySlug]);
 
   const itemCount = React.useMemo(
     () => resolved.reduce((sum, line) => sum + line.qty, 0),

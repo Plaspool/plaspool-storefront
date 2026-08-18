@@ -13,8 +13,8 @@ import { ProductGrid } from "../components/product-grid";
  * product. It is the same URL the nav's search submits to.
  */
 
-export function FeaturedProducts() {
-  const products = listFeaturedProducts();
+export async function FeaturedProducts() {
+  const products = await listFeaturedProducts();
 
   return (
     <section aria-labelledby="shop-featured" className="border-b border-brand-line">

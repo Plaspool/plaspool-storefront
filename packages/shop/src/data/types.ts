@@ -78,8 +78,16 @@ export interface Product {
   slug: string;
   name: string;
   categorySlug: string;
-  material: Material;
-  diameterMm: DiameterMm;
+  /**
+   * NULLABLE SINCE THE CATALOGUE WENT LIVE. The API has no material column —
+   * `materialFrom` in `api.ts` reads it out of `tags` — so a product nobody
+   * tagged has no material rather than a defaulted one. A default would put it
+   * in a filter bucket it does not belong to, and the material filter is a
+   * claim about what the product IS.
+   */
+  material: Material | null;
+  /** Nullable for the same reason: parsed from a free-text option value. */
+  diameterMm: DiameterMm | null;
   colours: Colour[];
   sizes: SizeOption[];
   bulkTiers: BulkTier[];
@@ -90,7 +98,12 @@ export interface Product {
   features: string[];
   overviewClaims: OverviewClaim[];
   description: DescriptionBlock[];
-  parameters: PrintingParameters;
+  /**
+   * NULL WHEN THERE IS NOTHING TO SHOW. Nine typed printing figures with no
+   * column behind any of them; the tab hides rather than rendering a table of
+   * plausible-looking numbers on a page somebody buys from.
+   */
+  parameters: PrintingParameters | null;
   reviews: Review[];
   featured: boolean;
 }
@@ -101,6 +114,16 @@ export interface Category {
   blurb: string;
   /** The tile's spool tint. A filament colour, per the design system. */
   accentHex: string;
+  /**
+   * Sellable products in this category, counted BY THE API.
+   *
+   * Here rather than derived by the caller because the alternative is a fetch
+   * per tile: `CategoryTiles` renders every category and used to call
+   * `listProductsByCategory(slug).length` inside its `.map()`, which against a
+   * real API is one subrequest per tile on a runtime with a 50-subrequest cap.
+   * `GET /api/shop/categories` already counts them in SQL.
+   */
+  productCount: number;
 }
 
 export interface RatingSummary {

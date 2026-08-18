@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cn } from "@plaspool/ui";
 
-import { getProduct, STANDARD_TIERS } from "../data/catalog";
+import { listProducts, STANDARD_TIERS } from "../data/catalog";
 import { formatNaira } from "../data/money";
 import { BulkTierTable } from "../components/bulk-tier-table";
 
@@ -19,10 +19,28 @@ import { BulkTierTable } from "../components/bulk-tier-table";
  * growing an `inverted` prop for its one dark usage.
  */
 
-/** A real catalogue price, so the ladder quotes a figure you can go and buy. */
-const REFERENCE = getProduct("pla-matte");
-const REFERENCE_SIZE = REFERENCE?.sizes.find((size) => size.weightGrams === 1000) ?? null;
-const REFERENCE_PRICE = REFERENCE_SIZE?.priceNaira ?? 18_500;
+/**
+ * A real catalogue price, so the ladder quotes a figure you can go and buy.
+ *
+ * THIS USED TO BE MODULE SCOPE — `getProduct("pla-matte")` evaluated once at
+ * import time against a local array. Neither half of that survives a live
+ * catalogue: the fetch is async, and no product is guaranteed to exist, let
+ * alone that one. So the reference is resolved per render, from whatever is
+ * actually on sale.
+ *
+ * A 1 kg SPOOL WHERE THERE IS ONE, because that is the unit the ladder is
+ * quoted in and the size a bulk buyer orders. Failing that, the cheapest size in
+ * the catalogue — still a figure somebody can go and buy, which is the whole
+ * promise of the band.
+ */
+async function referencePrice(): Promise<number | null> {
+  const products = await listProducts();
+  const sizes = products.flatMap((product) => product.sizes);
+  if (!sizes.length) return null;
+  const kilo = sizes.filter((size) => size.weightGrams === 1000);
+  const pool = kilo.length ? kilo : sizes;
+  return pool.reduce((min, size) => (size.priceNaira < min.priceNaira ? size : min)).priceNaira;
+}
 
 /* Descendant overrides, so each beats the table's own single-class utilities
    on specificity without an `!important` anywhere. */
@@ -35,7 +53,16 @@ const INVERTED_TABLE = cn(
   "[&_tr]:border-brand-ink/20",
 );
 
-export function BulkPromo() {
+export async function BulkPromo() {
+  const price = await referencePrice();
+  /*
+   * NOTHING TO QUOTE MEANS NOTHING TO SHOW. An empty catalogue makes this band a
+   * discount ladder over a price that does not exist — the table needs a base
+   * figure, and inventing one would advertise a spool nobody can buy. Rendering
+   * nothing is the honest empty state, and the home page reads fine without it.
+   */
+  if (price === null) return null;
+
   return (
     <section id="bulk" aria-labelledby="bulk-heading" className="bg-brand text-brand-ink">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 md:py-16 lg:px-8">
@@ -73,12 +100,12 @@ export function BulkPromo() {
               <span className="font-mono tabular-nums text-brand-ink">1 kg</span> spool of PLA
               Matte, listed at{" "}
               <span className="font-mono font-bold tabular-nums text-brand-ink">
-                {formatNaira(REFERENCE_PRICE)}
+                {formatNaira(price)}
               </span>
               .
             </p>
             <div className={cn("mt-4", INVERTED_TABLE)}>
-              <BulkTierTable tiers={STANDARD_TIERS} basePrice={REFERENCE_PRICE} />
+              <BulkTierTable tiers={STANDARD_TIERS} basePrice={price} />
             </div>
           </div>
         </div>

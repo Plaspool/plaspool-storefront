@@ -1,4 +1,5 @@
-import type { BulkTier, Colour, Product, SizeOption } from "../data/types";
+import type { BulkTier, Colour, SizeOption } from "../data/types";
+import type { CartCatalogEntry } from "./cart-context";
 
 /**
  * Cart types, split out from `cart-context.tsx` so `storage.ts` — a plain
@@ -32,7 +33,16 @@ export interface CartLine extends CartLineKey {
  *  shape — a product pulled from the catalog must not crash the drawer. */
 export interface ResolvedLine {
   key: string;
-  product: Product;
+  /**
+   * The CART-SIZED projection, not the full `Product`.
+   *
+   * Narrowed when the catalogue went live: the provider is a client component
+   * fed from the server, and shipping a description document per product into
+   * every shop page's bundle to price a cart nobody has opened is not worth it.
+   * `CartCatalogEntry` is what the drawer and the arithmetic actually read —
+   * widening this back means widening what crosses that boundary.
+   */
+  product: CartCatalogEntry;
   colour: Colour;
   size: SizeOption;
   qty: number;

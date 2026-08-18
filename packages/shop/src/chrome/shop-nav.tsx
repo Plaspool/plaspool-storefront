@@ -19,7 +19,6 @@ import {
 } from "@plaspool/ui";
 import { BrandLogo } from "@plaspool/brand";
 
-import { listCategories } from "../data/catalog";
 import { useCart } from "../cart/cart-context";
 import type { Category } from "../data/types";
 
@@ -194,8 +193,24 @@ function MobileMenu({ categories }: { categories: Category[] }) {
   );
 }
 
-export function ShopNav() {
-  const categories = listCategories();
+/**
+ * CATEGORIES ARRIVE AS A PROP, NOT FROM A FETCH IN HERE.
+ *
+ * This is a client component — it holds the mobile menu's open state and reads
+ * the live cart count — and a client component cannot `await` the catalogue. It
+ * used to call `listCategories()` directly, which worked only while that was a
+ * synchronous read of a local array.
+ *
+ * Fetching them in the browser instead would be worse in two ways: it would put
+ * the nav's contents behind a round trip the server had already made, and it
+ * would need CORS on an endpoint that has no reason to allow it. `ShopShell`
+ * fetches once on the server and passes them down.
+ */
+export interface ShopNavProps {
+  categories: Category[];
+}
+
+export function ShopNav({ categories }: ShopNavProps) {
   const [mobileSearchOpen, setMobileSearchOpen] = React.useState(false);
 
   return (
