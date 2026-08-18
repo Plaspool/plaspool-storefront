@@ -104,7 +104,21 @@ export interface Product {
    * plausible-looking numbers on a page somebody buys from.
    */
   parameters: PrintingParameters | null;
-  reviews: Review[];
+  /**
+   * The card's star line, and what "Best rated" sorts on.
+   *
+   * A SUMMARY RATHER THAN THE REVIEWS THEMSELVES. `reviews: Review[]` used to
+   * live here and was derived into this shape by `ratingSummary`; that only
+   * worked while the catalogue was a fixture carrying its own reviews. Reviews
+   * are their own API now, with their own cache window, and a listing needs one
+   * number per product rather than every paragraph — so the numbers arrive from
+   * `GET /api/public/reviews/aggregates` and the prose is fetched only by the
+   * product page that shows it.
+   *
+   * `count: 0` is the ordinary state and renders NOTHING. A card saying
+   * "0.0 (0)" is worse than silence.
+   */
+  rating: RatingSummary;
   featured: boolean;
   /**
    * `"<colourId>:<sizeId>"` → the API variant that pair names.

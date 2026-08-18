@@ -2,8 +2,7 @@ import Link from "next/link";
 import { Badge, cn } from "@plaspool/ui";
 
 import type { Product } from "../data/types";
-import { cheapestSize, firstInStockColour, priceFrom, ratingSummary } from "../data/money";
-import { SHOW_FIXTURE_REVIEWS } from "../data/config";
+import { cheapestSize, firstInStockColour, priceFrom } from "../data/money";
 import { CardAddButton } from "./card-add-button";
 import { SpoolImage } from "./spool-image";
 import { Price } from "./price";
@@ -38,7 +37,7 @@ export interface ProductCardProps {
 export function ProductCard({ product, className }: ProductCardProps) {
   const colour = firstInStockColour(product);
   const size = cheapestSize(product);
-  const rating = ratingSummary(product.reviews);
+  const rating = product.rating;
 
   return (
     <div className={cn("group relative flex flex-col", className)}>
@@ -100,11 +99,11 @@ export function ProductCard({ product, className }: ProductCardProps) {
       </Link>
 
       {/* Nothing at all when there are no reviews — "0.0 (0)" is worse than
-          silence on a card. With `SHOW_FIXTURE_REVIEWS` off every card takes
-          that same no-reviews path: invented stars must never ship looking
-          like genuine customer ratings, and an empty star row would still
-          claim a rating exists. */}
-      {SHOW_FIXTURE_REVIEWS && rating.count > 0 && (
+          silence on a card, and an empty star row would still claim a rating
+          exists. These are real customer ratings now, aggregated by the API in
+          one request for the whole grid; the flag that used to suppress
+          invented ones is gone with the fixtures that needed it. */}
+      {rating.count > 0 && (
         <RatingStars
           rating={rating.average}
           count={rating.count}

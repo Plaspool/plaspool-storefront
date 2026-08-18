@@ -16,10 +16,9 @@ import { ReviewForm } from "./review-form";
  * reviews themselves, and the form for adding one.
  *
  * THE FIXTURES ARE GONE. This tab used to render invented reviews behind a
- * "sample data" notice, with `SHOW_FIXTURE_REVIEWS` as the switch that kept
- * them off a live store. There is a real API now, so the switch and the
- * notice have no job left — what renders here either came from a customer or
- * is the honest empty state.
+ * "sample data" notice, kept off a live store by a flag. There is a real API
+ * now, so the flag, the fixtures and the notice are all deleted — what renders
+ * here either came from a customer or is the honest empty state.
  *
  * The first page arrives as props, fetched on the server so the reviews are
  * in the HTML for a crawler and cost the reader nothing. Everything past it

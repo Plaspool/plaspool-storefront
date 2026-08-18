@@ -9,19 +9,19 @@ import {
   cn,
 } from "@plaspool/ui";
 
-import { SHOW_FIXTURE_REVIEWS } from "../data/config";
 import { SORT_KEYS, SORT_LABELS, type SortKey } from "./filter-state";
 import { useListingUrl } from "./use-listing-url";
 
 /**
- * "Best rated" sorts by fixture reviews. With `SHOW_FIXTURE_REVIEWS` off no
- * rating is rendered anywhere, so the option would reorder the grid by a
- * number nobody can see — a dead control. `SORT_KEYS` keeps `rating-desc`, so
- * an old URL carrying it still parses and still sorts; it is only unoffered.
+ * EVERY SORT IS OFFERED AGAIN, INCLUDING "Best rated".
+ *
+ * It used to be filtered out, because no rating was rendered anywhere and the
+ * option would have reordered the grid by a number nobody could see — a dead
+ * control. The bulk aggregate endpoint (`Plaspool/plaspool-admin#12`) is what
+ * changed that: cards carry real customer ratings now, so the sort reorders by
+ * something visible.
  */
-const OFFERED_SORT_KEYS = SORT_KEYS.filter(
-  (key) => key !== "rating-desc" || SHOW_FIXTURE_REVIEWS,
-);
+const OFFERED_SORT_KEYS = SORT_KEYS;
 
 /** Writes `sort`. Its value is read straight off the URL, so the back button
  *  moves the trigger's label with it. */
