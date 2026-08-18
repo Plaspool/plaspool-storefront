@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { cn } from "@plaspool/ui";
 
-import { COLOURS } from "../data/catalog";
+import { HERO_COLOURS as COLOURS } from "../data/catalog";
 import { SpoolImage } from "../components/spool-image";
 
 /**

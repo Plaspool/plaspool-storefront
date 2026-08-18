@@ -23,7 +23,7 @@ export async function productMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const product = getProduct(slug);
+  const product = await getProduct(slug);
   if (!product) return {};
   return {
     title: `${product.name} — PlaSpool`,
@@ -32,17 +32,17 @@ export async function productMetadata({
   };
 }
 
-export function productParams(): { slug: string }[] {
+export async function productParams(): Promise<{ slug: string }[]> {
   return productPaths();
 }
 
 export async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
   // Next 15: page params are a promise.
   const { slug } = await params;
-  const product = getProduct(slug);
+  const product = await getProduct(slug);
   if (!product) notFound();
 
-  const category = getCategory(product.categorySlug);
+  const category = await getCategory(product.categorySlug);
 
   /* Reviews are fetched HERE, on the server, rather than in the tab that
      shows them: the approved reviews then arrive in the HTML — visible to a

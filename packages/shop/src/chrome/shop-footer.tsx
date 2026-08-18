@@ -54,8 +54,8 @@ function FooterLink({ href, children }: { href: string; children: ReactNode }) {
   );
 }
 
-export function ShopFooter() {
-  const categories = listCategories();
+export async function ShopFooter() {
+  const categories = await listCategories();
   const year = new Date().getFullYear();
 
   return (

@@ -69,11 +69,22 @@ export function ProductTabs({
       label: "Description",
       panel: <DescriptionTab blocks={product.description} />,
     },
-    {
-      id: "parameters",
-      label: "Printing parameters",
-      panel: <ParametersTab parameters={product.parameters} />,
-    },
+    /*
+     * ONLY WHEN THERE ARE PARAMETERS. `product.parameters` is null whenever the
+     * catalogue has no printing figures for a product — there is no column
+     * behind any of the nine — and a tab that opens onto an empty table reads as
+     * a broken page rather than as an absent one. Nine plausible-looking
+     * temperatures on a page somebody buys from would be worse than either.
+     */
+    ...(product.parameters
+      ? [
+          {
+            id: "parameters",
+            label: "Printing parameters",
+            panel: <ParametersTab parameters={product.parameters} />,
+          },
+        ]
+      : []),
     {
       id: "reviews",
       label: "Reviews",
