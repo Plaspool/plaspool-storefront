@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LifeBuoy, LogOut, Package, Settings, User } from "lucide-react";
-import { SheetClose, Skeleton, SkeletonRegion, cn } from "@plaspool/ui";
+import { SheetClose, cn } from "@plaspool/ui";
 
 import { Avatar } from "./avatar";
 import { readShopSession, signOutEverywhere, type ShopSession } from "../data/auth-api";
@@ -36,20 +36,24 @@ export function MobileAccountLinks({ linkClassName }: { linkClassName: string })
     };
   }, []);
 
-  /* The sheet unmounts when closed, so this remounts and re-probes on every
-     open. Rendering "Sign in" while it does would flash the wrong state at a
-     signed-in shopper each time — so until the answer arrives, it draws the
-     shape of the answer instead of guessing at it. */
+  /*
+   * The sheet unmounts when closed, so this remounts and re-probes on every
+   * open — and rendering "Sign in" while it does would flash the wrong state at
+   * a signed-in shopper each time.
+   *
+   * BUT A SKELETON HERE WAS A DEAD END. The probe never retries, so on a failed
+   * one it shimmered forever: a loading state that cannot finish is worse than
+   * an honest neutral control. "Account" points at `/sign-in`, which resolves
+   * the session itself, so it is correct whichever the answer turns out to be.
+   */
   if (session.kind === "unknown") {
     return (
-      <SkeletonRegion label="Checking your account" className="flex flex-col gap-3 px-1 py-2">
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-7 w-7 rounded-full" />
-          <Skeleton className="h-4 w-32" />
-        </div>
-        <Skeleton className="h-4 w-20" />
-        <Skeleton className="h-4 w-28" />
-      </SkeletonRegion>
+      <SheetClose asChild>
+        <Link href="/sign-in" className={linkClassName}>
+          <User aria-hidden="true" className="h-4 w-4" />
+          Account
+        </Link>
+      </SheetClose>
     );
   }
 

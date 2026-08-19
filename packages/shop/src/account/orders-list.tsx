@@ -8,7 +8,7 @@ import { Button, Skeleton, SkeletonRegion } from "@plaspool/ui";
 
 import { EmptyState } from "../components/empty-state";
 import { shortStatusFor } from "./order-progress";
-import { getShopCustomer } from "../data/auth-api";
+import { readShopSession } from "../data/auth-api";
 import { listOrders } from "../data/orders-api";
 import type { OrderListItem } from "../data/orders-api";
 import { majorUnits } from "../data/cart-api";
@@ -52,11 +52,24 @@ export function OrdersListPage() {
 
   React.useEffect(() => {
     let cancelled = false;
-    getShopCustomer().then((customer) => {
+    readShopSession().then((result) => {
       if (cancelled) return;
-      if (!customer) {
+      /* ═══ ONLY A CONFIRMED GUEST IS SENT TO SIGN IN ═══
+         This read `getShopCustomer`, which collapses a transport failure into
+         `null` — so one timed-out request bounced a signed-in customer to a
+         login screen and told them, in effect, that they were not signed in.
+         An unreachable API is an error to report on the page they asked for.
+         `?next=` so signing in returns them here rather than stranding them on
+         a generic sign-in page. */
+      if (result.kind === "unknown") {
+        setStatus("ready");
+        setInitialFailed(true);
+        setFirstPage("done");
+        return;
+      }
+      if (result.kind === "guest") {
         setStatus("guest");
-        router.replace("/sign-in");
+        router.replace(`/sign-in?next=${encodeURIComponent("/account/orders")}`);
         return;
       }
       setStatus("ready");

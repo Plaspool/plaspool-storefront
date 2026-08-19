@@ -30,7 +30,15 @@
     --secondary-foreground: 0 0% 9%;
 
     --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
+  /* 40.8%, NOT 45.1%. Secondary text lands on tinted surfaces as well as on
+     white — a preselected address card, an orders row on hover, the selected
+     size chip — and at 45.1% it cleared white by only 4.74:1, so ANY tint under
+     it dropped below AA: 4.38:1 on `brand-soft/40`, 3.88:1 on full `brand-soft`.
+     That is the text that distinguishes one saved address from another, in the
+     state the checkout opens in. Darkening the token fixes every such pair at
+     once; patching each site would leave the next tinted surface to rediscover
+     it. 40.8% clears 4.5:1 against the full tint, and 5.57:1 against white. */
+    --muted-foreground: 0 0% 40.8%;
 
     --accent: 0 0% 96.1%;
     --accent-foreground: 0 0% 9%;

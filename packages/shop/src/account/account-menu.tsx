@@ -87,16 +87,33 @@ export function AccountMenu({ className }: { className?: string }) {
     router.push("/");
   }, [router]);
 
-  /* NOT YET KNOWN. Same box, same place, no claim — and no link, because a link
-     to `/sign-in` is exactly the claim being avoided. */
+  /*
+   * NOT YET KNOWN — OR NOT KNOWABLE, since a failed probe never retries.
+   *
+   * The first version rendered a non-interactive, `aria-hidden` box: no false
+   * claim, but also no control. On a failed probe that is permanent, so the
+   * shop had no route to sign in at all and assistive tech could not see the
+   * slot existed. Avoiding a lie is not worth removing the door.
+   *
+   * "Account" pointing at `/sign-in` claims nothing either way — that page
+   * resolves the session itself and shows a signed-in visitor their account
+   * rather than a form. The label is the neutral one; only the resolved states
+   * say "Sign in" or name a person.
+   */
   if (session.kind === "unknown") {
     return (
-      <span
-        aria-hidden="true"
-        className={cn(ACCOUNT_SLOT, "inline-flex items-center justify-center", className)}
+      <Button
+        asChild
+        variant="ghost"
+        size="icon"
+        aria-label="Account"
+        className={cn(ACCOUNT_SLOT, "focus-visible:ring-brand focus-visible:ring-offset-background", className)}
       >
-        <User className="h-4 w-4 text-muted-foreground opacity-40" />
-      </span>
+        <Link href="/sign-in">
+          <User aria-hidden="true" className="h-4 w-4" />
+          <span className="hidden xl:inline">Account</span>
+        </Link>
+      </Button>
     );
   }
 

@@ -7,7 +7,7 @@ import { Button, Input, Label, NEO_SURFACE, Skeleton, SkeletonRegion, cn } from 
 
 import { EmptyState } from "../components/empty-state";
 import { formatNaira } from "../data/money";
-import { getShopCustomer } from "../data/auth-api";
+import { readShopSession } from "../data/auth-api";
 import { listSavedAddresses, type SavedAddress } from "../data/orders-api";
 import { BLANK_ADDRESS, NEW_ADDRESS, keyOfSaved, readSavedAddress } from "./saved-address";
 import { getPointsBalance } from "../data/points-api";
@@ -301,8 +301,13 @@ export function CheckoutFlow() {
 
   React.useEffect(() => {
     let cancelled = false;
-    void getShopCustomer().then((customer) => {
+    void readShopSession().then((result) => {
       if (cancelled) return;
+      /* `readShopSession` rather than `getShopCustomer`: the latter collapses a
+         transport failure into "guest", which here silently costs a signed-in
+         shopper their saved addresses and their points balance and makes them
+         retype an address the shop already holds. */
+      const customer = result.kind === "customer" ? result.customer : null;
       setCustomerEmail(customer?.email ?? null);
       setCheckingSession(false);
       /*
@@ -486,6 +491,30 @@ export function CheckoutFlow() {
   }
 
   if (!cart.hydrated) return null;
+
+  /* The same guard the drawer and /cart carry: an unreadable basket is not an
+     empty one, and "there is nothing to check out" is the wrong thing to tell
+     somebody whose basket is full. */
+  if (cart.problem && cart.resolved.length === 0 && step !== "review") {
+    return (
+      <div className="mx-auto max-w-xl px-4 py-16 sm:px-6">
+        <EmptyState
+          icon={<ShieldAlert aria-hidden="true" />}
+          title="We couldn't load your cart"
+          body={cart.problem}
+          action={
+            <Button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="focus-visible:ring-brand focus-visible:ring-offset-background"
+            >
+              Try again
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
 
   if (cart.hydrated && cart.resolved.length === 0 && step !== "review") {
     return (
