@@ -2,7 +2,7 @@ import { CreditCard, PackageCheck, Truck } from "lucide-react";
 import { cn } from "@plaspool/ui";
 
 import { DELIVERY, PAYMENT_METHODS } from "../data/config";
-import { formatNaira } from "../data/money";
+import { getRewardsProgram, pointsLabel, unitLabel } from "../data/marketing";
 
 /**
  * Delivery timelines, returns, and the payment methods the store takes —
@@ -15,13 +15,22 @@ import { formatNaira } from "../data/money";
  * Payment methods are named, not shown as card-brand logos: "Bank transfer"
  * and "USSD" have no logo, and a row of Visa and Mastercard marks would imply
  * they are the only two ways to pay.
+ *
+ * THE RETURNS COLUMN NAMES THE SPOOL RETURNS PROGRAMME, not a free-delivery
+ * threshold — there is no such threshold. The figures come from
+ * `getRewardsProgram()`, the rule every surface that mentions the programme
+ * follows (see `RewardsBand`'s note), and the line is omitted entirely when
+ * no programme is configured or it is paused, same as there.
  */
 
 export interface OrderInfoProps {
   className?: string;
 }
 
-export function OrderInfo({ className }: OrderInfoProps) {
+export async function OrderInfo({ className }: OrderInfoProps) {
+  const program = await getRewardsProgram();
+  const perReturn = program ? program.minUnitsPerReturn * program.pointsPerUnit : 0;
+
   return (
     <section
       aria-labelledby="order-info-heading"
@@ -38,12 +47,6 @@ export function OrderInfo({ className }: OrderInfoProps) {
           <ul className="flex flex-col gap-1.5 text-sm leading-6 text-muted-foreground">
             <li>{DELIVERY.lagos}</li>
             <li>{DELIVERY.nationwide}</li>
-            <li>
-              Free over{" "}
-              <span className="font-mono font-bold tabular-nums text-foreground">
-                {formatNaira(DELIVERY.freeOver)}
-              </span>
-            </li>
           </ul>
         </div>
 
@@ -51,6 +54,19 @@ export function OrderInfo({ className }: OrderInfoProps) {
           <PackageCheck aria-hidden="true" className="h-5 w-5 text-brand" />
           <h3 className="font-sans text-sm font-semibold text-foreground">Returns</h3>
           <p className="text-sm leading-6 text-muted-foreground">{DELIVERY.returns}</p>
+          {program && (
+            <p className="text-sm leading-6 text-muted-foreground">
+              {"Return "}
+              <span className="font-mono font-bold tabular-nums text-foreground">
+                {program.minUnitsPerReturn}
+              </span>
+              {` ${unitLabel(program.minUnitsPerReturn, program)}, earn `}
+              <span className="font-mono font-bold tabular-nums text-foreground">
+                {perReturn}
+              </span>
+              {` ${pointsLabel(perReturn, program)}.`}
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col gap-2">

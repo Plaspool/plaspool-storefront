@@ -5,7 +5,7 @@ import { Check, Truck } from "lucide-react";
 import { Button, cn, NEO_SURFACE } from "@plaspool/ui";
 
 import type { Colour, Product, SizeOption } from "../data/types";
-import { formatNaira, unitPriceFor } from "../data/money";
+import { unitPriceFor } from "../data/money";
 import { DELIVERY } from "../data/config";
 import { starsFromAggregate } from "../data/reviews";
 import type { ReviewAggregate } from "../data/reviews";
@@ -219,12 +219,6 @@ export function BuyBox({
         <ul className="flex flex-col gap-1 text-sm leading-6 text-muted-foreground">
           <li>{DELIVERY.lagos}</li>
           <li>{DELIVERY.nationwide}</li>
-          <li>
-            Free delivery over{" "}
-            <span className="font-mono tabular-nums text-foreground">
-              {formatNaira(DELIVERY.freeOver)}
-            </span>
-          </li>
         </ul>
       </div>
 

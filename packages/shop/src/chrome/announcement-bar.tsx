@@ -1,8 +1,7 @@
 import Link from "next/link";
 
 import { DELIVERY } from "../data/config";
-import { formatNaira } from "../data/money";
-import { listBanners } from "../data/marketing";
+import { getRewardsProgram, listBanners, pointsLabel, unitLabel } from "../data/marketing";
 
 /**
  * One line above the nav.
@@ -14,11 +13,18 @@ import { listBanners } from "../data/marketing";
  * banners from the marketing API, which is what an operator actually uses to say
  * something time-bound — a sale, a public holiday, a delivery pause.
  *
- * THE FALLBACK IS NOT A PLACEHOLDER. `DELIVERY.freeOver` is real policy, read
- * from the same constant the cart and the product page read, so the figure can
- * only ever say one thing across the store. "No banner is live" is therefore a
- * defined state that renders something true, not an empty bar — which matters
- * because no banner is live today and that is the ordinary case, not an outage.
+ * THE FALLBACK IS NOT A PLACEHOLDER. The Spool Returns half is built from
+ * `getRewardsProgram()` — the same live rewards programme `RewardsBand` reads
+ * on the home page — so the figures can only ever say one thing across the
+ * store. "No banner is live" is therefore a defined state that renders
+ * something true, not an empty bar — which matters because no banner is live
+ * today and that is the ordinary case, not an outage.
+ *
+ * NOT ONE NOUN IN THIS FILE IS SPELLED BY THIS FILE. The programme's name,
+ * what a point is called, and what a unit is called all come from the API, on
+ * the same rule `RewardsBand` follows — see its own note on why. When the
+ * programme is absent or paused, the bar falls back to the delivery-speed
+ * line alone rather than promise a scheme that is not running.
  *
  * ONE BANNER, HIGHEST PRIORITY. The bar is one line; `listBanners` sorts by
  * priority so the choice is the operator's rather than the database's insertion
@@ -30,7 +36,13 @@ import { listBanners } from "../data/marketing";
  * for one sentence, and a banner an operator scheduled is one they want seen.
  */
 export async function AnnouncementBar() {
-  const [banner] = await listBanners("top_bar");
+  const [banners, program] = await Promise.all([
+    listBanners("top_bar"),
+    getRewardsProgram(),
+  ]);
+  const [banner] = banners;
+
+  const perReturn = program ? program.minUnitsPerReturn * program.pointsPerUnit : 0;
 
   return (
     <p className="m-0 bg-brand px-4 py-2 text-center text-xs text-brand-ink">
@@ -53,12 +65,21 @@ export async function AnnouncementBar() {
             </>
           ) : null}
         </>
-      ) : (
+      ) : program ? (
         <>
-          {"Free delivery on orders over "}
-          <span className="font-mono tabular-nums">{formatNaira(DELIVERY.freeOver)}</span>
-          {" · Next day in Lagos"}
+          {/* "Return 5 spools · earn 50 Spool Points" — the shortest true
+              sentence the arithmetic supports. It leads with the action, not
+              the programme name, because an operator can rename "Spool
+              Returns" but the verb "return" still has to make sense next to
+              whatever unit noun they pick. */}
+          {"Return "}
+          <span className="font-mono tabular-nums">{program.minUnitsPerReturn}</span>
+          {` ${unitLabel(program.minUnitsPerReturn, program)} · earn `}
+          <span className="font-mono tabular-nums">{perReturn}</span>
+          {` ${pointsLabel(perReturn, program)}`}
         </>
+      ) : (
+        DELIVERY.lagos
       )}
     </p>
   );

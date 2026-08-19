@@ -104,7 +104,6 @@ export const REVIEWS_PER_PAGE = 10;
 export const DELIVERY = {
   lagos: "Next day in Lagos on orders placed before 2pm",
   nationwide: "2–4 working days nationwide",
-  freeOver: 50_000,
   returns: "Unopened spools can be returned within 7 days",
 } as const;
 
