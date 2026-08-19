@@ -8,6 +8,9 @@ export * from "./data/reviews";
 export * from "./data/catalog";
 export * from "./data/auth-api";
 export * from "./data/checkout-api";
+/* A signed-in customer's points balance and history (admin#2). The checkout's
+   offer and the account summary both read it; neither spells a points noun. */
+export * from "./data/points-api";
 
 // Presentational primitives. Every later surface — cards, listings, the
 // product page, the cart — composes from these.

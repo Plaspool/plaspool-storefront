@@ -13,6 +13,7 @@ import { listOrders } from "../data/orders-api";
 import type { OrderListItem } from "../data/orders-api";
 import { majorUnits } from "../data/cart-api";
 import { formatNaira } from "../data/money";
+import { PointsSummary } from "./points-summary";
 
 const PAGE_SIZE = 20;
 
@@ -121,6 +122,10 @@ export function OrdersListPage() {
       <h1 className="font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
         Your orders
       </h1>
+
+      {/* Absent for most accounts, and absent rather than zero — see the
+          component's own header. */}
+      <PointsSummary />
 
       {items.length === 0 ? (
         <div className="mt-8">
