@@ -12,6 +12,14 @@ const WAITLISTER = "https://waitlister.me";
 const GTM = "https://www.googletagmanager.com";
 const GA = ["https://www.google-analytics.com", "https://*.analytics.google.com"];
 const VERCEL_INSIGHTS = "https://vitals.vercel-insights.com";
+/**
+ * Neon Auth's hosted endpoint — the origin `lib/auth/config.ts` names as
+ * `NEON_AUTH_BASE_URL`. The browser talks to it directly for the
+ * `/api/auth/*` calls Neon's own client makes, so it belongs in `connect-src`
+ * the same way `BLOG_API` does. Google's own OAuth redirect happens as a
+ * top-level navigation, not a `fetch`, so it needs nothing here.
+ */
+const NEON_AUTH = "https://ep-late-math-ayvz1kdi.neonauth.c-5.us-east-2.aws.neon.tech";
 
 /**
  * Content-Security-Policy — REPORT-ONLY for now.
@@ -50,7 +58,7 @@ const CSP = [
   `img-src 'self' data: blob: ${BLOG_API} ${R2} ${GTM} ${GA[0]}`,
   // next/font self-hosts Inter at build time, so no external font origin.
   "font-src 'self' data:",
-  `connect-src 'self' ${BLOG_API} ${R2} ${WAITLISTER} ${GTM} ${GA.join(" ")} ${VERCEL_INSIGHTS}`,
+  `connect-src 'self' ${BLOG_API} ${R2} ${WAITLISTER} ${GTM} ${GA.join(" ")} ${VERCEL_INSIGHTS} ${NEON_AUTH}`,
   // The /shop waitlist is an iframe embed.
   `frame-src 'self' ${WAITLISTER}`,
   "object-src 'none'",
@@ -73,19 +81,20 @@ const SECURITY_HEADERS = [
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
   /**
-   * One day, deliberately.
+   * A year, now that logins are live.
    *
    * HSTS is a promise the browser holds you to: it will refuse plain HTTP to
    * this host for the whole `max-age` and there is no way to reach the people
-   * already carrying the header to retract it early. A day is long enough to
-   * be a real protection and short enough that a certificate or custom-domain
-   * mistake ages out over a lunch break rather than a year.
+   * already carrying the header to retract it early. The short `max-age=86400`
+   * stood until sign-in and checkout carried real credentials and payment
+   * detail across this origin — logins are that trigger, and a year is the
+   * standard duration once a domain is serving HTTPS cleanly and staying that
+   * way is worth committing to.
    *
-   * Raise to `max-age=31536000; includeSubDomains` once the custom domain has
-   * been serving HTTPS cleanly for a while. Do NOT add `preload` — that ships
-   * the domain into a browser-baked list and is effectively irreversible.
+   * Do NOT add `preload` — that ships the domain into a browser-baked list and
+   * is effectively irreversible.
    */
-  { key: "Strict-Transport-Security", value: "max-age=86400" },
+  { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
   { key: "Content-Security-Policy-Report-Only", value: CSP },
 ];
 

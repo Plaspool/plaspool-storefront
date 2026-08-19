@@ -6,6 +6,7 @@ export * from "./data/money";
 export * from "./data/config";
 export * from "./data/reviews";
 export * from "./data/catalog";
+export * from "./data/auth-api";
 
 // Presentational primitives. Every later surface — cards, listings, the
 // product page, the cart — composes from these.

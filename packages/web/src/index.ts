@@ -7,6 +7,7 @@ export { default as BackButton } from "./chrome/back";
 export { default as ContactPage } from "./pages/contact";
 export { default as ShippingPolicy } from "./pages/shipping";
 export { default as PlaspoolLanding } from "./pages/landing";
+export { default as SignInPage } from "./pages/sign-in";
 export * from "./menu";
 export * from "./consent";
 // `./mail` is deliberately NOT re-exported here. The sendmail route handler is
