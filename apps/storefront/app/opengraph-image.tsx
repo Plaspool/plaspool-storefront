@@ -36,7 +36,7 @@ export default async function Image() {
           Buy 3D printing filament in Nigeria
         </div>
         <div style={{ marginTop: 20, fontSize: 30, color: "#b8b2d6" }}>
-          Tolerance-tested PLA · Nationwide delivery · Bulk pricing
+          Tolerance-tested PLA · Nationwide delivery · By the spool or by the box
         </div>
       </div>
     ),
