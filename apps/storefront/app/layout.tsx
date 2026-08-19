@@ -110,7 +110,8 @@ export default function RootLayout({
      * DOING FOR US.
      *
      * `globals.css` sets `html { scroll-behavior: smooth }`, which is wanted for
-     * in-page anchors — the hero's "Bulk pricing" jump, the product tab strip.
+     * in-page anchors — the product tab strip, and the hero's second CTA
+     * whenever the bulk band has a ladder to show again.
      * Through Next 15, Next overrode it during SPA route transitions so a
      * navigation still landed at the top instantly instead of animating the
      * whole page up.

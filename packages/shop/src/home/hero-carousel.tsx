@@ -118,15 +118,21 @@ export function HeroCarousel() {
               >
                 Shop PLA
               </Link>
+              {/* WAS `#bulk`, LABELLED "Bulk pricing". That anchor was the bulk
+                  band, which now renders nothing because there is no discount
+                  ladder to show — so the link both advertised a price the till
+                  will not honour and jumped to a section that no longer exists.
+                  Points at the full catalogue instead: true, useful, and it
+                  keeps the second CTA the layout is built around. */}
               <Link
-                href="#bulk"
+                href="/store/all"
                 className={cn(
                   "inline-flex h-11 items-center justify-center rounded-md border border-brand-line bg-background px-6 font-sans text-sm font-medium text-foreground",
                   "transition-colors hover:bg-brand-soft motion-reduce:transition-none",
                   BUTTON_FOCUS,
                 )}
               >
-                Bulk pricing
+                Browse all filament
               </Link>
             </div>
           </div>
