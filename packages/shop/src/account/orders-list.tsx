@@ -144,12 +144,12 @@ export function OrdersListPage() {
                     Order {order.orderNumber}
                   </p>
                   <p className="mt-1 font-sans text-xs text-muted-foreground">
-                    {formatDate(order.createdAt)} · {lines.length} item
+                    {formatDate(order.placedAt)} · {lines.length} item
                     {lines.length === 1 ? "" : "s"} · {order.status}
                   </p>
                 </div>
                 <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-foreground">
-                  {formatNaira(majorUnits(order.grandTotal))}
+                  {formatNaira(majorUnits({ amount: order.grandTotal, currency: order.currency }))}
                 </span>
               </Link>
             </li>
@@ -173,8 +173,9 @@ export function OrdersListPage() {
   );
 }
 
-function formatDate(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
+/** `placedAt` is epoch ms, not an ISO string. */
+function formatDate(epochMs: number): string {
+  const date = new Date(epochMs);
+  if (Number.isNaN(date.getTime())) return "";
   return date.toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" });
 }

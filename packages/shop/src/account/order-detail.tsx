@@ -27,6 +27,11 @@ import { formatNaira } from "../data/money";
  * expired token — is the SAME 404, and this page renders exactly one honest
  * "couldn't find that order" for all of them. Do not add copy here that
  * tries to guess which case happened; the API collapsed them on purpose.
+ *
+ * MONEY IS A PLAIN NUMBER IN MINOR UNITS ON AN ORDER, not `ApiMoney` — one
+ * `order.currency` covers every amount on it. `naira()` below wraps each
+ * field through `majorUnits({amount, currency})` so the /100 stays in the
+ * one place that owns it, rather than being hand-rolled here.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 export function OrderDetailPage() {
@@ -120,6 +125,9 @@ export function OrderDetailPage() {
   }
 
   const { order, lines, events } = state;
+  const naira = (minorUnits: number) =>
+    formatNaira(majorUnits({ amount: minorUnits, currency: order.currency }));
+  const address = readAddress(order.shippingAddress);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6">
@@ -128,20 +136,32 @@ export function OrderDetailPage() {
           Order {order.orderNumber}
         </h1>
         <p className="font-sans text-sm text-muted-foreground">
-          {formatDate(order.createdAt)} · {order.status}
+          {formatDate(order.placedAt)} · {order.status}
         </p>
       </div>
+
+      {order.refundedTotal > 0 && (
+        <p className="mt-4 border-2 border-foreground bg-brand-soft px-4 py-3 font-sans text-sm text-foreground">
+          {naira(order.refundedTotal)} refunded on this order.
+        </p>
+      )}
 
       <div className="mt-6 border-2 border-foreground p-4">
         <p className="font-sans text-sm font-semibold text-foreground">Items</p>
         <ul className="mt-3 flex flex-col gap-3">
-          {lines.map((line, i) => (
-            <li key={`${line.variantId}-${i}`} className="flex justify-between gap-3 text-sm">
+          {lines.map((line) => (
+            <li key={line.id} className="flex justify-between gap-3 text-sm">
               <span className="min-w-0 flex-1 font-sans text-muted-foreground">
-                {line.title ?? line.sku ?? line.variantId} × {line.qty}
+                {line.title} × {line.qty}
+                {line.fulfilledQty > 0 && line.fulfilledQty < line.qty && (
+                  <span className="block text-xs">{line.fulfilledQty} of {line.qty} shipped</span>
+                )}
+                {line.fulfilledQty >= line.qty && line.qty > 0 && (
+                  <span className="block text-xs">Shipped</span>
+                )}
               </span>
               <span className="shrink-0 font-mono tabular-nums text-foreground">
-                {formatNaira(majorUnits(line.lineTotal))}
+                {naira(line.lineTotal)}
               </span>
             </li>
           ))}
@@ -149,27 +169,24 @@ export function OrderDetailPage() {
       </div>
 
       <div className="mt-4 border-2 border-foreground p-4">
-        <TotalRow label="Subtotal" amount={order.subtotal} />
-        {order.shippingTotal && <TotalRow label="Delivery" amount={order.shippingTotal} />}
-        {order.taxTotal && order.taxTotal.amount > 0 && (
-          <TotalRow label="Tax" amount={order.taxTotal} />
-        )}
+        <TotalRow label="Subtotal" value={naira(order.subtotal)} />
+        <TotalRow label="Delivery" value={naira(order.shippingTotal)} />
+        {order.taxTotal > 0 && <TotalRow label="Tax" value={naira(order.taxTotal)} />}
         <div className="mt-1 flex items-center justify-between border-t border-brand-line pt-2">
           <span className="font-sans text-base font-semibold text-foreground">Total</span>
           <span className="font-mono text-base font-bold tabular-nums text-foreground">
-            {formatNaira(majorUnits(order.grandTotal))}
+            {naira(order.grandTotal)}
           </span>
         </div>
       </div>
 
-      {order.shippingAddress && (
+      {address && (
         <div className="mt-4 border-2 border-foreground p-4">
           <p className="font-sans text-sm font-semibold text-foreground">Delivered to</p>
           <p className="mt-1 font-sans text-sm text-muted-foreground">
-            {order.shippingAddress.name}, {order.shippingAddress.line1}
-            {order.shippingAddress.line2 ? `, ${order.shippingAddress.line2}` : ""},{" "}
-            {order.shippingAddress.city}
-            {order.shippingAddress.region ? `, ${order.shippingAddress.region}` : ""}
+            {[address.name, address.line1, address.line2, address.city, address.region]
+              .filter(Boolean)
+              .join(", ")}
           </p>
         </div>
       )}
@@ -182,11 +199,9 @@ export function OrderDetailPage() {
               <li key={event.id} className="flex items-start gap-2 text-sm">
                 <CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
                 <span className="min-w-0 flex-1">
-                  <span className="block font-sans text-foreground">
-                    {event.detail ?? event.type}
-                  </span>
+                  <span className="block font-sans text-foreground">{event.message}</span>
                   <span className="block font-sans text-xs text-muted-foreground">
-                    {formatDate(event.createdAt)}
+                    {formatDate(event.occurredAt)}
                   </span>
                 </span>
               </li>
@@ -198,20 +213,36 @@ export function OrderDetailPage() {
   );
 }
 
-function TotalRow({ label, amount }: { label: string; amount: { amount: number; currency: string } }) {
+function TotalRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between py-1">
       <span className="font-sans text-sm text-muted-foreground">{label}</span>
-      <span className="font-mono text-sm tabular-nums text-foreground">
-        {formatNaira(majorUnits(amount))}
-      </span>
+      <span className="font-mono text-sm tabular-nums text-foreground">{value}</span>
     </div>
   );
 }
 
-function formatDate(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
+/** `shippingAddress` is an untyped `Record<string, unknown>` on the wire —
+ *  read the handful of string fields a receipt needs, defensively, rather
+ *  than assuming a shape the order type does not actually promise. */
+function readAddress(
+  raw: Record<string, unknown>,
+): { name?: string; line1?: string; line2?: string; city?: string; region?: string } | null {
+  if (!raw || Object.keys(raw).length === 0) return null;
+  const str = (key: string) => (typeof raw[key] === "string" ? (raw[key] as string) : undefined);
+  return {
+    name: str("name"),
+    line1: str("line1"),
+    line2: str("line2"),
+    city: str("city"),
+    region: str("region"),
+  };
+}
+
+/** `placedAt`/`occurredAt` are epoch ms, not ISO strings. */
+function formatDate(epochMs: number): string {
+  const date = new Date(epochMs);
+  if (Number.isNaN(date.getTime())) return "";
   return date.toLocaleDateString("en-NG", {
     day: "numeric",
     month: "short",

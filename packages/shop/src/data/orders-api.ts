@@ -1,6 +1,4 @@
 import { COMMERCE_API_BASE } from "./config";
-import type { ApiMoney } from "./cart-api";
-import type { Address, ShippingOption } from "./checkout-api";
 
 /**
  * The order-history client — the storefront's half of the commerce API's
@@ -27,44 +25,69 @@ import type { Address, ShippingOption } from "./checkout-api";
  *
  * The response omits `checkoutId` and `paymentIntentId` on purpose — nothing
  * here tries to read either.
+ *
+ * MONEY IS A PLAIN NUMBER IN MINOR UNITS HERE, NOT `ApiMoney`. Unlike the
+ * cart and checkout responses, an order carries no `{amount, currency}`
+ * pair per field — one `currency` on the order applies to every amount on
+ * it. Read these fields against the server's own type
+ * (`server/shop/orders/repo/orders.ts` in plaspool-admin) rather than the
+ * cart/checkout shape; the two were confused once already and it rendered
+ * `[object Object]`.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-export interface OrderLine {
-  variantId: string;
-  sku?: string | null;
-  title?: string | null;
-  optionValues?: Record<string, string>;
-  qty: number;
-  unit: ApiMoney;
-  lineTotal: ApiMoney;
-}
+export type OrderStatus = string;
 
-/** The order itself, as `/orders` and `/orders/:orderNumber` both describe
- *  it. Optional fields are read defensively — the exact set the API sends
- *  beyond `orderNumber`, `status`, `createdAt` and the totals was not pinned
- *  down for this change, so nothing here assumes a field is present. */
+/** The order itself, exactly as the admin's `Order` type describes it minus
+ *  `checkoutId`/`paymentIntentId`, which `customerView` strips before this
+ *  ever reaches the browser. */
 export interface Order {
   id: string;
   orderNumber: string;
-  status: string;
+  customerId: string | null;
+  email: string;
   currency: string;
-  createdAt: string;
-  email?: string | null;
-  shippingAddress?: Address | null;
-  shipping?: ShippingOption | null;
-  subtotal: ApiMoney;
-  shippingTotal?: ApiMoney | null;
-  taxTotal?: ApiMoney | null;
-  adjustmentTotal?: ApiMoney | null;
-  grandTotal: ApiMoney;
+  /** Minor units. Render through `majorUnits({amount, currency})` +
+   *  `formatNaira` — never divide by 100 directly. */
+  subtotal: number;
+  shippingTotal: number;
+  taxTotal: number;
+  grandTotal: number;
+  refundedTotal: number;
+  status: OrderStatus;
+  shippingAddress: Record<string, unknown>;
+  billingAddress: Record<string, unknown>;
+  /** Epoch ms, not an ISO string. */
+  placedAt: number;
+  paidAt: number | null;
+  fulfilledAt: number | null;
+  cancelledAt: number | null;
+  revision: number;
+}
+
+export interface OrderLine {
+  id: string;
+  lineNo: number;
+  variantId: string;
+  sku: string;
+  title: string;
+  optionValues: Record<string, string>;
+  qty: number;
+  /** Minor units. */
+  unitAmount: number;
+  /** Minor units. */
+  lineTotal: number;
+  /** How much of `qty` is covered by a non-cancelled fulfilment. */
+  fulfilledQty: number;
 }
 
 export interface OrderEvent {
   id: string;
   type: string;
-  createdAt: string;
-  detail?: string | null;
+  message: string;
+  /** Epoch ms, not an ISO string. */
+  occurredAt: number;
+  actorId: string | null;
 }
 
 export interface OrderListItem {
