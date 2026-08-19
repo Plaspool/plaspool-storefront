@@ -131,7 +131,34 @@ Command                               Effect
 ``npm run dev``                       Development server with Turbopack
 ``npm run build``                     Production build of the storefront
 ``npm run lint``                      Lint the app and the packages
+``npm run typecheck``                 ``tsc --noEmit`` over every project
+``npm test``                          Run the test suite once (Vitest)
+``npm run test:watch``                Re-run affected tests as files change
 ====================================  ==============================================
+
+
+Tests
+-----
+
+Vitest, configured once at the root in ``vitest.config.mts`` — one runner for
+the app and every package, for the same reason ``eslint.config.mjs`` is one
+flat config. Tests live beside the code they cover as ``*.test.ts`` /
+``*.test.tsx``.
+
+Narrow a run by path rather than by workspace::
+
+   npm test -- packages/shop
+   npm test -- packages/blog/src/data/client.test.ts
+
+The suite is deliberately small and aimed at logic where a bug is silent and
+expensive: money arithmetic and the two minor-unit conventions
+(``packages/shop/src/data``), the listing's URL filter contract
+(``packages/shop/src/listing``), the blog API client's retry and error mapping
+(``packages/blog/src/data``), the ProseMirror renderer's node and href
+allow-list (``packages/blog/src/components``) and the JSON-LD escaping
+(``packages/ui/src``). It runs in Node with no jsdom; the one component test
+renders through ``react-dom/server``, which is how those components actually
+run.
 
 
 Deployment
