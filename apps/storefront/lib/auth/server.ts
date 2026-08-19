@@ -1,11 +1,12 @@
 import { createNeonAuth, type NeonAuth } from '@neondatabase/auth/next/server';
+import { NEON_AUTH_BASE_URL, NEON_AUTH_COOKIE_SECRET } from './config';
 
 /**
  * Neon Auth, server side.
  *
- * `NEON_AUTH_BASE_URL` is the project's own auth endpoint and is NOT a secret —
- * the browser talks to it directly. `NEON_AUTH_COOKIE_SECRET` is, and encrypts
- * the first-party session cookie this sets on the storefront's own origin.
+ * Both values come from `./config`, which is env-first with a committed
+ * fallback — read that file for why they live in the repository at all, and
+ * for what the bridge secret costs if this repository ever stops being private.
  *
  * THIS COOKIE IS NOT `__Host-shop_session`. It is Neon's, it is first-party
  * here, and it never reaches the admin API. The bridge route translates it.
@@ -28,7 +29,7 @@ let cached: NeonAuth | null = null;
 export function getAuth(): NeonAuth {
   if (cached) return cached;
   return (cached = createNeonAuth({
-    baseUrl: process.env.NEON_AUTH_BASE_URL!,
-    cookies: { secret: process.env.NEON_AUTH_COOKIE_SECRET! },
+    baseUrl: NEON_AUTH_BASE_URL,
+    cookies: { secret: NEON_AUTH_COOKIE_SECRET },
   }));
 }
