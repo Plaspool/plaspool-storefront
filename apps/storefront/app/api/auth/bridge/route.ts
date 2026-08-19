@@ -1,5 +1,6 @@
 import { createHmac, randomBytes } from 'node:crypto';
 import { getAuth } from '@/lib/auth/server';
+import { AUTH_BRIDGE_SECRET } from '@/lib/auth/config';
 
 /**
  * Mint a short-lived assertion that the BROWSER carries to the admin API.
@@ -20,7 +21,7 @@ export const runtime = 'nodejs';
 const TTL_MS = 60_000;
 
 export async function POST(): Promise<Response> {
-  const secret = process.env.SHOP_AUTH_BRIDGE_SECRET;
+  const secret = AUTH_BRIDGE_SECRET;
   if (!secret) {
     return Response.json({ error: 'not_implemented', feature: 'identity-bridge' }, { status: 501 });
   }
