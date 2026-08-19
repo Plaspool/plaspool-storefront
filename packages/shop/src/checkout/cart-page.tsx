@@ -54,7 +54,10 @@ export function CartPage() {
             <li key={line.key} className="flex gap-4 py-5">
               <ProductPhoto
                 src={line.colour.imageUrl ?? line.product.coverImageUrl}
-                alt={`${line.colour.name} filament spool, ${line.size.label}`}
+                /* Decorative, like the drawer's row: the product, colour and
+                   size are already stated in text beside it. */
+                alt=""
+
                 colourHex={line.colour.hex}
                 weightGrams={line.size.weightGrams}
                 className="aspect-square w-20 shrink-0"

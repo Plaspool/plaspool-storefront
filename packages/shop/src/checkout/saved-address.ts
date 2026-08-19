@@ -37,10 +37,19 @@ export const BLANK_ADDRESS: Address = {
  * untyped jsonb the order detail page reads — so every field is checked rather
  * than assumed.
  *
- * AN ENTRY MISSING WHAT THE API REQUIRES IS DROPPED, NOT OFFERED. A selectable
- * address that fails validation the moment it is submitted is worse than one
- * fewer choice: the shopper picked the thing the shop showed them, and the
- * error that follows is the shop's fault and reads as their mistake.
+ * AN ENTRY MISSING WHAT THIS FORM REQUIRES IS DROPPED, NOT OFFERED. A
+ * selectable address that fails validation the moment it is submitted is worse
+ * than one fewer choice: the shopper picked the thing the shop showed them, and
+ * the error that follows is the shop's fault and reads as their mistake.
+ *
+ * ═══ "WHAT THIS FORM REQUIRES", NOT "WHAT THE API REQUIRES" ═══
+ * These were different, and the gap was a live defect. The API's `assertAddress`
+ * wants name, line1, city and countryCode; the checkout ALSO marks State
+ * (`co-region`) required, and `shop_addresses.region` is nullable — so a
+ * snapshot from a checkout that predates that field passed this reader, was
+ * offered, was preselected, filled the form, and then refused to submit with a
+ * native "Please fill out this field" on a field the shopper never touched.
+ * The stricter of the two rules is the one that decides what may be offered.
  */
 export function readSavedAddress(saved: SavedAddress): Address | null {
   const raw = saved.address ?? {};
@@ -50,14 +59,15 @@ export function readSavedAddress(saved: SavedAddress): Address | null {
   const name = str("name");
   const line1 = str("line1");
   const city = str("city");
-  if (!name || !line1 || !city) return null;
+  const region = str("region");
+  if (!name || !line1 || !city || !region) return null;
 
   return {
     name,
     line1,
     line2: str("line2") ?? "",
     city,
-    region: str("region") ?? "",
+    region,
     postalCode: str("postalCode") ?? "",
     /* THE COUNTRY CODE IS NOT COSMETIC. The API derives the shipping zone — and
        therefore the tax rate — from it, and refuses anything that is not an

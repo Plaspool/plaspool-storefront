@@ -4,10 +4,10 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LifeBuoy, LogOut, Package, Settings, User } from "lucide-react";
-import { SheetClose, cn } from "@plaspool/ui";
+import { SheetClose, Skeleton, SkeletonRegion, cn } from "@plaspool/ui";
 
 import { Avatar } from "./avatar";
-import { getShopCustomer, signOutEverywhere, type ShopCustomer } from "../data/auth-api";
+import { readShopSession, signOutEverywhere, type ShopSession } from "../data/auth-api";
 
 /**
  * The account actions inside the mobile menu.
@@ -22,18 +22,36 @@ import { getShopCustomer, signOutEverywhere, type ShopCustomer } from "../data/a
  */
 export function MobileAccountLinks({ linkClassName }: { linkClassName: string }) {
   const router = useRouter();
-  const [customer, setCustomer] = React.useState<ShopCustomer | null>(null);
+  const [session, setSession] = React.useState<ShopSession>({ kind: "unknown" });
   const [signingOut, setSigningOut] = React.useState(false);
+  const customer = session.kind === "customer" ? session.customer : null;
 
   React.useEffect(() => {
     let cancelled = false;
-    void getShopCustomer().then((next) => {
-      if (!cancelled) setCustomer(next);
+    void readShopSession().then((next) => {
+      if (!cancelled) setSession(next);
     });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  /* The sheet unmounts when closed, so this remounts and re-probes on every
+     open. Rendering "Sign in" while it does would flash the wrong state at a
+     signed-in shopper each time — so until the answer arrives, it draws the
+     shape of the answer instead of guessing at it. */
+  if (session.kind === "unknown") {
+    return (
+      <SkeletonRegion label="Checking your account" className="flex flex-col gap-3 px-1 py-2">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-7 w-7 rounded-full" />
+          <Skeleton className="h-4 w-32" />
+        </div>
+        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-4 w-28" />
+      </SkeletonRegion>
+    );
+  }
 
   if (!customer) {
     return (
@@ -85,21 +103,28 @@ export function MobileAccountLinks({ linkClassName }: { linkClassName: string })
         </Link>
       </SheetClose>
 
-      <button
-        type="button"
-        disabled={signingOut}
-        onClick={async () => {
-          setSigningOut(true);
-          await signOutEverywhere();
-          setCustomer(null);
-          router.refresh();
-          router.push("/");
-        }}
-        className={cn(linkClassName, "w-full text-left disabled:opacity-60")}
-      >
-        <LogOut aria-hidden="true" className="h-4 w-4" />
-        {signingOut ? "Signing out…" : "Sign out"}
-      </button>
+      {/* WRAPPED LIKE EVERY SIBLING. It was the one row not inside a
+          `SheetClose`, and Radix's uncontrolled Sheet does not close on a route
+          change — so signing out left the menu open, scroll-locked and
+          focus-trapped over the page it had just pushed you to, now offering
+          "Sign in". */}
+      <SheetClose asChild>
+        <button
+          type="button"
+          disabled={signingOut}
+          onClick={async () => {
+            setSigningOut(true);
+            await signOutEverywhere();
+            setSession({ kind: "guest" });
+            router.refresh();
+            router.push("/");
+          }}
+          className={cn(linkClassName, "w-full text-left disabled:opacity-60")}
+        >
+          <LogOut aria-hidden="true" className="h-4 w-4" />
+          {signingOut ? "Signing out…" : "Sign out"}
+        </button>
+      </SheetClose>
     </div>
   );
 }

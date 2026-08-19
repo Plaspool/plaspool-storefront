@@ -37,16 +37,16 @@ describe("a complete address", () => {
     expect(readSavedAddress(saved(COMPLETE))).toEqual(COMPLETE);
   });
 
-  it("fills the optional fields with empty strings, not undefined", () => {
+  it("fills the genuinely optional fields with empty strings, not undefined", () => {
     // The form binds these to controlled inputs; `undefined` would make React
     // switch the field to uncontrolled and warn.
-    const out = readSavedAddress(saved({ name: "A", line1: "B", city: "C" }));
+    const out = readSavedAddress(saved({ name: "A", line1: "B", city: "C", region: "Lagos" }));
     expect(out).toEqual({
       name: "A",
       line1: "B",
       city: "C",
+      region: "Lagos",
       line2: "",
-      region: "",
       postalCode: "",
       countryCode: "NG",
       phone: "",
@@ -56,11 +56,20 @@ describe("a complete address", () => {
 
 describe("an address the API would refuse", () => {
   it.each([
-    ["no name", { line1: "B", city: "C" }],
-    ["no line1", { name: "A", city: "C" }],
-    ["no city", { name: "A", line1: "B" }],
-    ["an empty string where a value is required", { name: "", line1: "B", city: "C" }],
-    ["a non-string in a required field", { name: 42, line1: "B", city: "C" }],
+    ["no name", { line1: "B", city: "C", region: "Lagos" }],
+    ["no line1", { name: "A", city: "C", region: "Lagos" }],
+    ["no city", { name: "A", line1: "B", region: "Lagos" }],
+    /* ═══ REGION, WHICH THE API DOES NOT REQUIRE BUT THIS FORM DOES ═══
+       `assertAddress` wants name/line1/city/countryCode and `shop_addresses.region`
+       is nullable, but the checkout marks State required — so a snapshot from a
+       checkout that predates that field used to be offered, preselected, filled
+       into the form, and then refused to submit with a native "Please fill out
+       this field" on a field the shopper never touched. What may be offered is
+       decided by the STRICTER of the two rules. */
+    ["no region, which the form requires even though the API does not", { name: "A", line1: "B", city: "C" }],
+    ["a region that is only whitespace", { name: "A", line1: "B", city: "C", region: "" }],
+    ["an empty string where a value is required", { name: "", line1: "B", city: "C", region: "Lagos" }],
+    ["a non-string in a required field", { name: 42, line1: "B", city: "C", region: "Lagos" }],
     ["nothing at all", {}],
   ])("is dropped rather than offered: %s", (_label, address) => {
     expect(readSavedAddress(saved(address))).toBeNull();

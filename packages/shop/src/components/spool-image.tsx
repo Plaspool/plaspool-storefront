@@ -119,8 +119,17 @@ export function SpoolImage({
   const sy = CY - fillRy * Math.sin(angle);
   const strand = `M ${sx.toFixed(2)} ${sy.toFixed(2)} C ${(sx + 8).toFixed(2)} ${(sy - 21).toFixed(2)}, 152 22, 174 34`;
 
+  /* ═══ AN EMPTY LABEL MEANS DECORATIVE, NOT "NAME IT YOURSELF" ═══
+     `label ?? default` treated `""` as a supplied name, because an empty string
+     is not nullish — so a caller passing `alt=""` for a thumbnail whose button
+     already carries the colour's name got `role="img" aria-label=""` and an
+     empty `<title>`, which is an unnamed image rather than a hidden one. Seven
+     of them on every product page. `alt=""` is the HTML idiom for "this adds
+     nothing"; it has to mean the same thing here. */
+  const decorative = label === "";
+
   const title =
-    label ??
+    label ||
     (empty
       ? "Empty filament spool"
       : `Filament spool, ${formatWeight(weightGrams)}, colour ${colourHex.toUpperCase()}`);
@@ -155,11 +164,12 @@ export function SpoolImage({
   return (
     <svg
       viewBox="0 0 200 200"
-      role="img"
-      aria-label={title}
+      {...(decorative
+        ? { "aria-hidden": true as const }
+        : { role: "img" as const, "aria-label": title })}
       className={cn("block h-auto w-full", className)}
     >
-      <title>{title}</title>
+      {!decorative && <title>{title}</title>}
 
       {/* Far flange — the sliver of it that shows past the near flange is the
           whole of the spool's depth, so it is the darker of the two. */}

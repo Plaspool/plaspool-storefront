@@ -534,8 +534,33 @@ export function toCategory(api: ApiCategory): Category {
   };
 }
 
-/** Relative on the wire, because the API serves images from its own origin. */
+/**
+ * `/api/public/images/<id>` on the wire → `/images/shop/<id>` in the page.
+ *
+ * ═══ SAME-ORIGIN, AND THAT IS THE WHOLE POINT ═══
+ * This used to prefix `COMMERCE_API_BASE` and point an `<img>` straight at the
+ * commerce API. That endpoint answers a 302 to a presigned R2 URL: the redirect
+ * carries `private, no-store` because a cached 302 would outlive the credential
+ * inside it, and the R2 URL differs on every presign — so NEITHER leg could be
+ * cached by the browser or by an edge. The blog measured exactly this in
+ * production and built `app/images/blog/[id]` to fix it; the shop kept paying
+ * two uncacheable cross-origin round trips per picture, per view, on a shop
+ * that sells to mobile connections.
+ *
+ * `app/images/shop/[id]` follows the redirect server-side and serves the bytes
+ * under a URL that never changes, so the response can carry `immutable`.
+ *
+ * ANYTHING THAT IS NOT THAT PATH IS LEFT ALONE. An absolute URL is already
+ * somewhere else's problem, and an unrecognised shape is passed through
+ * prefixed rather than mangled into a proxy path that would 404 — the API
+ * gaining a second image route should degrade to "works, uncached", not to
+ * "broken".
+ */
+const IMAGE_PATH = /^\/api\/public\/images\/([A-Za-z0-9_-]+)$/;
+
 export function imageUrl(path: string | null): string | null {
   if (!path) return null;
-  return path.startsWith("http") ? path : `${COMMERCE_API_BASE}${path}`;
+  if (path.startsWith("http")) return path;
+  const id = IMAGE_PATH.exec(path)?.[1];
+  return id ? `/images/shop/${id}` : `${COMMERCE_API_BASE}${path}`;
 }

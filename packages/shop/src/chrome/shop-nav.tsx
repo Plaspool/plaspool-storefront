@@ -236,7 +236,14 @@ export function ShopNav({ categories }: ShopNavProps) {
           </Button>
 
           <CartButton />
-          <AccountMenu className="hidden md:inline-flex" />
+          {/* AT EVERY WIDTH. It was `hidden md:inline-flex`, so below 768px a shopper
+            could not tell whether they were signed in without opening a
+            hamburger shared with category browsing — and the sheet re-probed
+            the session on every open, flashing "Sign in" at somebody who was
+            not. Identity belongs in the header on a phone exactly as it does on
+            a desktop; the slot is icon-width until `xl`, so it costs one 40px
+            control. */}
+          <AccountMenu />
         </div>
       </div>
 

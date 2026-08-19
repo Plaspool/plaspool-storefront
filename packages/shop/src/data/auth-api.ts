@@ -94,17 +94,45 @@ export interface ShopCustomer {
  * The current shop session, if any. Never 401s — a guest answers
  * `{ customer: null }` — so this answers `null` for a guest and for any
  * transport failure alike, the same "never throw" rule `cart-api.ts` follows.
+ *
+ * KEPT AS-IS for the callers that only need "who, if anyone". Anything that
+ * renders a DIFFERENT CONTROL for a guest should use `readShopSession` below,
+ * because for those "we could not ask" is not the same as "nobody".
  */
 export async function getShopCustomer(): Promise<ShopCustomer | null> {
+  const result = await readShopSession();
+  return result.kind === "customer" ? result.customer : null;
+}
+
+/**
+ * The session, with "we could not ask" kept distinct from "nobody is signed in".
+ *
+ * ═══ WHY THE DISTINCTION HAS TO EXIST ═══
+ * `getShopCustomer` collapses a network failure into `null`, and the nav used
+ * that `null` to render its signed-out control. So a flaky connection did not
+ * merely delay the account menu — it told a signed-in shopper they were signed
+ * out, permanently, with no retry, and sent them to a sign-in page if they
+ * tapped it. `unknown` is the state a header needs in order to say nothing
+ * rather than to say something false.
+ */
+export type ShopSession =
+  | { kind: "customer"; customer: ShopCustomer }
+  | { kind: "guest" }
+  | { kind: "unknown" };
+
+export async function readShopSession(): Promise<ShopSession> {
   try {
     const res = await fetch(`${COMMERCE_API_BASE}/api/shop/customer/me`, {
       credentials: "include",
     });
-    if (!res.ok) return null;
+    /* A non-2xx is the API answering badly, not the browser answering for it —
+       so it is unknown rather than guest. The route does not 401 a guest; it
+       answers 200 with `customer: null`. */
+    if (!res.ok) return { kind: "unknown" };
     const body = (await res.json()) as { customer: ShopCustomer | null };
-    return body.customer;
+    return body.customer ? { kind: "customer", customer: body.customer } : { kind: "guest" };
   } catch {
-    return null;
+    return { kind: "unknown" };
   }
 }
 

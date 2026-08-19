@@ -51,6 +51,27 @@ type FormState =
 
 export default function SignInPage() {
   const session = authClient.useSession();
+  /**
+   * Where to go back to after signing in.
+   *
+   * ═══ A DESTINATION THAT SURVIVES THE DETOUR ═══
+   * Both callbacks used to be the literal string `/sign-in`, so a shopper
+   * bounced here from `/account/settings` by an expired session signed in and
+   * landed... back on `/sign-in`. The page they asked for was forgotten at the
+   * moment they were redirected, and nothing carried it.
+   *
+   * READ FROM `location` RATHER THAN `useSearchParams` so this component does
+   * not need a Suspense boundary it did not previously have, and RESTRICTED TO
+   * A SAME-SITE PATH: `next` arrives in a URL anybody can hand somebody else,
+   * and a value like `https://evil.example` would turn this page into an open
+   * redirect off the back of a real sign-in. Only a path beginning with a
+   * single `/` is honoured — `//host` is a protocol-relative URL, not a path.
+   */
+  const returnTo = React.useMemo(() => {
+    if (typeof window === "undefined") return "/sign-in";
+    const next = new URLSearchParams(window.location.search).get("next");
+    return next && /^\/(?!\/)/.test(next) ? next : "/sign-in";
+  }, []);
   const [customer, setCustomer] = React.useState<ShopCustomer | null | undefined>(undefined);
   const [form, setForm] = React.useState<FormState>({ kind: "idle" });
   const [email, setEmail] = React.useState("");
@@ -86,8 +107,8 @@ export default function SignInPage() {
   }, [customer, session.data, session.isPending]);
 
   const handleGoogle = React.useCallback(() => {
-    void authClient.signIn.social({ provider: "google", callbackURL: "/sign-in" });
-  }, []);
+    void authClient.signIn.social({ provider: "google", callbackURL: returnTo });
+  }, [returnTo]);
 
   const handleSendLink = React.useCallback(
     async (e: React.FormEvent<HTMLFormElement>) => {
@@ -99,7 +120,7 @@ export default function SignInPage() {
       try {
         const { error } = await authClient.signIn.magicLink({
           email: address,
-          callbackURL: "/sign-in",
+          callbackURL: returnTo,
         });
         if (error) {
           setForm({ kind: "failed", reason: "network" });
@@ -110,7 +131,7 @@ export default function SignInPage() {
         setForm({ kind: "failed", reason: "network" });
       }
     },
-    [email],
+    [email, returnTo],
   );
 
   const handleSignOut = React.useCallback(async () => {

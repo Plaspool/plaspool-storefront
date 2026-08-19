@@ -47,7 +47,14 @@ export function ProductCard({ product, className }: ProductCardProps) {
         <div className="aspect-square p-3">
           <ProductPhoto
             src={colour.imageUrl ?? product.coverImageUrl}
-            alt={`${product.name} spool in ${colour.name}`}
+            /* THE NAME FOLLOWS THE PICTURE. Only a photograph of this colour —
+               or the drawing, which is tinted to it — may be called by it; the
+               product cover standing in is a picture of the product. */
+            alt={
+              colour.imageUrl || !product.coverImageUrl
+                ? `${product.name} spool in ${colour.name}`
+                : product.name
+            }
             colourHex={colour.hex}
             weightGrams={size.weightGrams}
             className="h-full w-full"
