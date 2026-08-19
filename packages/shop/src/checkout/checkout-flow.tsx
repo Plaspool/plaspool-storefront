@@ -8,6 +8,8 @@ import { Button, Input, Label, NEO_SURFACE, Skeleton, SkeletonRegion, cn } from 
 import { EmptyState } from "../components/empty-state";
 import { formatNaira } from "../data/money";
 import { getShopCustomer } from "../data/auth-api";
+import { listSavedAddresses, type SavedAddress } from "../data/orders-api";
+import { BLANK_ADDRESS, NEW_ADDRESS, keyOfSaved, readSavedAddress } from "./saved-address";
 import { getPointsBalance } from "../data/points-api";
 import type { PointsBalance } from "../data/points-api";
 import { PointsOffer } from "./points-offer";
@@ -150,7 +152,6 @@ function Field({
   );
 }
 
-const NIGERIA = "NG";
 
 export function CheckoutFlow() {
   const cart = useCart();
@@ -159,16 +160,7 @@ export function CheckoutFlow() {
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<CheckoutError | null>(null);
 
-  const [address, setAddress] = React.useState<Address>({
-    name: "",
-    line1: "",
-    line2: "",
-    city: "",
-    region: "",
-    postalCode: "",
-    countryCode: NIGERIA,
-    phone: "",
-  });
+  const [address, setAddress] = React.useState<Address>(BLANK_ADDRESS);
 
   const [shippingOptions, setShippingOptions] = React.useState<ShippingOption[]>([]);
   const [selectedShippingId, setSelectedShippingId] = React.useState<string | null>(null);
@@ -176,6 +168,23 @@ export function CheckoutFlow() {
   const [customerEmail, setCustomerEmail] = React.useState<string | null>(null);
   const [guestEmail, setGuestEmail] = React.useState("");
   const [checkingSession, setCheckingSession] = React.useState(true);
+
+  /**
+   * Addresses this customer has already had something delivered to.
+   *
+   * ═══ THE ADDRESS STEP USED TO OPEN ON AN EMPTY FORM, EVERY TIME ═══
+   * `shop_addresses` is keyed on the cart and snapshotted onto the order, so
+   * nothing survived a checkout that a later one could offer — a returning
+   * shopper retyped name, phone, two lines, city and state on every order, even
+   * signed in and shipping to the same place as last time.
+   *
+   * EMPTY FOR A GUEST, and the form below is unchanged for them. Guest checkout
+   * is this shop's default path and must not turn into an account wall: an
+   * empty list renders exactly what was there before.
+   */
+  const [savedAddresses, setSavedAddresses] = React.useState<SavedAddress[]>([]);
+  /** Which saved address is selected, or `NEW_ADDRESS` for the blank form. */
+  const [chosenAddress, setChosenAddress] = React.useState<string>(NEW_ADDRESS);
 
   /**
    * The customer's points balance, and how many of them they have chosen to
@@ -272,6 +281,19 @@ export function CheckoutFlow() {
       if (!customer?.email) return;
       void getPointsBalance().then((balance) => {
         if (!cancelled) setPointsBalance(balance);
+      });
+      void listSavedAddresses().then((saved) => {
+        if (cancelled || saved.length === 0) return;
+        setSavedAddresses(saved);
+        /* PRESELECTED, because the commonest thing a returning shopper wants is
+           the address they used last — and a list where nothing is chosen makes
+           them do the work of choosing before they can do the work of checking
+           out. Selecting also fills the form, so "continue" is one click. */
+        const first = readSavedAddress(saved[0]);
+        if (first) {
+          setChosenAddress(keyOfSaved(0));
+          setAddress(first);
+        }
       });
     });
     return () => {
@@ -472,6 +494,75 @@ export function CheckoutFlow() {
 
         {step === "address" && (
           <form onSubmit={submitAddress} className="flex flex-col gap-4">
+            {savedAddresses.length > 0 && (
+              <fieldset className="flex flex-col gap-2">
+                <legend className="mb-2 font-sans text-sm font-semibold text-foreground">
+                  Deliver to
+                </legend>
+                {savedAddresses.map((saved, i) => {
+                  const key = keyOfSaved(i);
+                  const parsed = readSavedAddress(saved);
+                  if (!parsed) return null;
+                  return (
+                    <label
+                      key={key}
+                      className={cn(
+                        "flex cursor-pointer items-start gap-3 border px-3 py-2.5 transition-colors",
+                        chosenAddress === key
+                          ? "border-foreground bg-brand-soft/40"
+                          : "border-brand-line hover:border-foreground",
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="saved-address"
+                        className="mt-1 accent-brand"
+                        checked={chosenAddress === key}
+                        onChange={() => {
+                          setChosenAddress(key);
+                          setAddress(parsed);
+                        }}
+                      />
+                      <span className="min-w-0 font-sans text-sm">
+                        <span className="block font-medium text-foreground">{parsed.name}</span>
+                        <span className="block text-muted-foreground">
+                          {[parsed.line1, parsed.line2, parsed.city, parsed.region]
+                            .filter(Boolean)
+                            .join(", ")}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+
+                <label
+                  className={cn(
+                    "flex cursor-pointer items-center gap-3 border px-3 py-2.5 transition-colors",
+                    chosenAddress === NEW_ADDRESS
+                      ? "border-foreground bg-brand-soft/40"
+                      : "border-brand-line hover:border-foreground",
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="saved-address"
+                    className="accent-brand"
+                    checked={chosenAddress === NEW_ADDRESS}
+                    onChange={() => {
+                      setChosenAddress(NEW_ADDRESS);
+                      /* CLEARED, not left holding the last selection. Picking
+                         "somewhere else" and finding the previous address still
+                         in the fields is how a parcel goes to the wrong place. */
+                      setAddress(BLANK_ADDRESS);
+                    }}
+                  />
+                  <span className="font-sans text-sm font-medium text-foreground">
+                    Somewhere else
+                  </span>
+                </label>
+              </fieldset>
+            )}
+
             <Field id="co-name" label="Full name" required>
               <Input
                 id="co-name"

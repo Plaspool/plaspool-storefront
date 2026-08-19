@@ -136,6 +136,39 @@ export async function listOrders(
   return { ok: true, items: body.items, nextCursor: body.nextCursor };
 }
 
+/**
+ * The addresses this customer has shipped to before, most recent first.
+ *
+ * FOR THE CHECKOUT'S ADDRESS STEP, which used to open on an empty form every
+ * time. The API derives these from the customer's own orders rather than from an
+ * address book (`Plaspool/plaspool-admin#40`), so an address appears here once
+ * something has actually been delivered to it.
+ *
+ * ANSWERS AN EMPTY LIST FOR A GUEST rather than an error. Guest checkout is the
+ * default path in this shop and it must not become an account wall — a caller
+ * that has nothing to offer should render the plain form, which is exactly what
+ * an empty list produces.
+ */
+export async function listSavedAddresses(): Promise<SavedAddress[]> {
+  try {
+    const res = await fetch(`${COMMERCE_API_BASE}/api/shop/orders/addresses`, {
+      credentials: "include",
+    });
+    if (!res.ok) return [];
+    const body = (await res.json()) as { addresses?: SavedAddress[] } | null;
+    return body?.addresses ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export interface SavedAddress {
+  /** The order's snapshot, so every field is `unknown` until it is read. */
+  address: Record<string, unknown>;
+  /** Epoch ms of the most recent order sent here. */
+  lastUsedAt: number;
+}
+
 /** One order, by number. `token` is the signed guest link's query param —
  *  pass it when the visitor arrived with one; a signed-in customer reading
  *  their own order needs none. */
