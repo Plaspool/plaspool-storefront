@@ -10,6 +10,7 @@ export * from "./primitives/card";
 export * from "./primitives/input";
 export * from "./primitives/label";
 export * from "./primitives/select";
+export * from "./primitives/skeleton";
 export * from "./primitives/separator";
 export * from "./primitives/sheet";
 export * from "./primitives/textarea";

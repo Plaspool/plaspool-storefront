@@ -170,6 +170,57 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
     [variantFor, open, mutate, view.cart],
   );
 
+  /**
+   * "Order it again", from an order's lines.
+   *
+   * BY VARIANT ID, because that is what an order line carries — the triple this
+   * file keys on does not survive onto an order, and reconstructing it from the
+   * stored option values would be guessing at strings the catalogue owns.
+   * `byVariant` is the same map the drawer resolves rows through, so a variant
+   * it does not know is one this storefront cannot draw or price: those are
+   * SKIPPED and counted rather than sent, since a 404 per line would leave the
+   * shopper with a half-filled basket and no explanation.
+   *
+   * SEQUENTIAL, for the reason `clear` is: each response is the whole new cart,
+   * so parallel adds race the revision and the last one to land wins.
+   */
+  const addVariants = React.useCallback(
+    async (items: { variantId: string; qty: number }[]) => {
+      const known = items.filter((i) => byVariant.has(i.variantId) && i.qty > 0);
+      const skippedVariantIds = items
+        .filter((i) => !byVariant.has(i.variantId) || i.qty <= 0)
+        .map((i) => i.variantId);
+      if (known.length === 0) return { added: 0, failed: 0, skippedVariantIds };
+      open();
+      /* COUNTED IN UNITS, NOT LINES, because that is what the cart counts. The
+         first cut returned `known.length`, so reordering two lines of qty 2 and
+         1 announced "2 items added" beside a badge reading 3 — with the drawer
+         open and both numbers on screen at once. */
+      let added = 0;
+      let failed = 0;
+      await mutate(async () => {
+        if (!view.cart) await createCart();
+        let last: ApiCartView | null = null;
+        for (const item of known) {
+          const next = await addLine(item.variantId, Math.trunc(item.qty));
+          /* THE RESULT, NOT THE INTENTION. `addLine` answers null for any
+             failure and `mutate` deliberately keeps the previous view on null,
+             so a cart write that never landed used to leave the basket
+             untouched, open the drawer on it, and still report success. */
+          if (next) {
+            added += Math.trunc(item.qty);
+            last = next;
+          } else {
+            failed += 1;
+          }
+        }
+        return last;
+      });
+      return { added, failed, skippedVariantIds };
+    },
+    [byVariant, open, mutate, view.cart],
+  );
+
   const setQty = React.useCallback(
     (key: CartLineKey, qty: number) => {
       const lineId = lineIdFor(key);
@@ -282,6 +333,7 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
       pending,
       changes: view.changes,
       add,
+      addVariants,
       setQty,
       remove,
       clear,
@@ -298,6 +350,7 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
     hydrated,
     pending,
     add,
+    addVariants,
     setQty,
     remove,
     clear,

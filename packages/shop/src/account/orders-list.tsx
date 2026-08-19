@@ -4,9 +4,10 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PackageSearch, ShoppingBag } from "lucide-react";
-import { Button } from "@plaspool/ui";
+import { Button, Skeleton, SkeletonRegion } from "@plaspool/ui";
 
 import { EmptyState } from "../components/empty-state";
+import { shortStatusFor } from "./order-progress";
 import { getShopCustomer } from "../data/auth-api";
 import { listOrders } from "../data/orders-api";
 import type { OrderListItem } from "../data/orders-api";
@@ -42,6 +43,11 @@ export function OrdersListPage() {
   const [loading, setLoading] = React.useState(false);
   const [failed, setFailed] = React.useState(false);
   const [initialFailed, setInitialFailed] = React.useState(false);
+  /* SEPARATE FROM `status`, and load-bearing. The session check resolving does
+     not mean the orders have arrived, and `items.length === 0` is also what an
+     empty account looks like — so without this the list flashed "No orders yet"
+     at every customer who had some, for as long as the first page took. */
+  const [firstPage, setFirstPage] = React.useState<"loading" | "done">("loading");
 
   React.useEffect(() => {
     let cancelled = false;
@@ -61,10 +67,12 @@ export function OrdersListPage() {
             return;
           }
           setInitialFailed(true);
+          setFirstPage("done");
           return;
         }
         setItems(result.items);
         setCursor(result.nextCursor);
+        setFirstPage("done");
       });
     });
     return () => {
@@ -87,12 +95,8 @@ export function OrdersListPage() {
     setLoading(false);
   }
 
-  if (status !== "ready") {
-    return (
-      <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
-        <p className="font-sans text-sm text-muted-foreground">Checking your account…</p>
-      </div>
-    );
+  if (status !== "ready" || (firstPage === "loading" && !initialFailed)) {
+    return <OrdersListSkeleton />;
   }
 
   if (initialFailed) {
@@ -137,7 +141,7 @@ export function OrdersListPage() {
             <li key={order.orderNumber}>
               <Link
                 href={`/account/orders/${encodeURIComponent(order.orderNumber)}`}
-                className="flex items-center justify-between gap-4 border-2 border-foreground px-4 py-4 transition-colors hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="flex items-center justify-between gap-4 border border-brand-line px-4 py-4 transition-colors hover:border-foreground hover:bg-brand-soft/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 <div className="min-w-0">
                   <p className="font-sans text-sm font-semibold text-foreground">
@@ -145,7 +149,7 @@ export function OrdersListPage() {
                   </p>
                   <p className="mt-1 font-sans text-xs text-muted-foreground">
                     {formatDate(order.placedAt)} · {lines.length} item
-                    {lines.length === 1 ? "" : "s"} · {order.status}
+                    {lines.length === 1 ? "" : "s"} · {shortStatusFor(order)}
                   </p>
                 </div>
                 <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-foreground">
@@ -169,6 +173,37 @@ export function OrdersListPage() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * The wait, shaped like the list.
+ *
+ * `CLAUDE.md`, "Loading states — skeletons, never prose". Four rows: enough to
+ * read as a list, few enough that a customer with two orders does not watch
+ * half the page collapse when the data lands.
+ */
+function OrdersListSkeleton() {
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
+      <SkeletonRegion label="Loading your orders">
+        <Skeleton className="h-8 w-48 sm:h-9" />
+        <ul className="mt-8 flex flex-col gap-3">
+          {Array.from({ length: 4 }, (_, i) => (
+            <li
+              key={i}
+              className="flex items-center justify-between gap-4 border border-brand-line px-4 py-4"
+            >
+              <div className="flex min-w-0 flex-col gap-2">
+                <Skeleton className="h-4 w-36" />
+                <Skeleton className="h-3 w-48" />
+              </div>
+              <Skeleton className="h-4 w-20 shrink-0" />
+            </li>
+          ))}
+        </ul>
+      </SkeletonRegion>
     </div>
   );
 }

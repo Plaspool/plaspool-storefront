@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowLeft, Loader2, ShieldAlert } from "lucide-react";
-import { Button, Input, Label, NEO_SURFACE, cn } from "@plaspool/ui";
+import { Button, Input, Label, NEO_SURFACE, Skeleton, SkeletonRegion, cn } from "@plaspool/ui";
 
 import { EmptyState } from "../components/empty-state";
 import { formatNaira } from "../data/money";
@@ -559,7 +559,14 @@ export function CheckoutFlow() {
         {step === "contact" && (
           <form onSubmit={submitContact} className="flex flex-col gap-4">
             {checkingSession ? (
-              <p className="font-sans text-sm text-muted-foreground">Checking your account…</p>
+              /* The signed-in box is what usually resolves here, so the wait is
+                 drawn as that box rather than as a sentence — the field swaps in
+                 at the same height when the session comes back a guest. See
+                 `CLAUDE.md`, "Loading states — skeletons, never prose". */
+              <SkeletonRegion label="Checking your account" className="border border-brand-line px-4 py-3">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="mt-1.5 h-4 w-48" />
+              </SkeletonRegion>
             ) : customerEmail ? (
               <div className="border-2 border-foreground bg-brand-soft px-4 py-3">
                 <p className="font-sans text-xs text-muted-foreground">Signed in as</p>
