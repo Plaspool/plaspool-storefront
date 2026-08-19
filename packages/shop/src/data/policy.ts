@@ -14,32 +14,23 @@ import type { BulkTier, Colour } from "./types";
  * The bulk discount ladder.
  *
  * ═══════════════════════════════════════════════════════════════════════════
- * ⚠️  A STATED ASSUMPTION, NOT A MEASUREMENT. Every product currently gets this
- *     same ladder, because the API has no per-product discount data at all.
+ * EMPTY ON PURPOSE. The shop does not currently offer bulk discounts — that is
+ * an owner decision, not a gap. The API has no per-product discount data to
+ * drive one either: `shop_prices` carries amount, currency and an effective
+ * window, nothing else.
  *
- *     The fixtures distinguished a STANDARD ladder from a shallower PREMIUM one
- *     for three materials, and that distinction is GONE rather than guessed:
- *     re-deriving it from a material name would be this file inventing pricing
- *     for products it knows nothing about, which is worse than one honest
- *     ladder applied evenly.
+ *     `unitPriceFor` with no tiers returns the base price, so an empty array is
+ *     arithmetically safe. The surfaces that used to render this ladder — the
+ *     home page's bulk band and the buy box's tier table — self-hide rather
+ *     than advertise a scheme that does not exist.
  *
- *     WHY NOT AN EMPTY LADDER INSTEAD. `unitPriceFor` with no tiers returns the
- *     base price, so an empty array is arithmetically safe — but the home page's
- *     bulk band and the buy box's tier table would then advertise nothing while
- *     the store's whole positioning is bulk filament. Removing the feature is a
- *     bigger and more surprising change than keeping the ladder it already
- *     shipped with.
- *
- *     Nothing takes money yet — `Buy Now` opens the cart drawer — so no customer
- *     has been charged against this. It must become a real API field before
- *     checkout lands. Tracked on Plaspool/plaspool-admin#1.
+ *     Nothing takes money yet — `Buy Now` opens the cart drawer — so no
+ *     customer has been charged against this. If the owner sets real numbers
+ *     later, populating this array is a one-line change that brings the whole
+ *     feature back. Tracked on Plaspool/plaspool-admin#1.
  * ═══════════════════════════════════════════════════════════════════════════
  */
-export const STANDARD_TIERS: BulkTier[] = [
-  { minQty: 4, discountPct: 10 },
-  { minQty: 6, discountPct: 15 },
-  { minQty: 10, discountPct: 22 },
-];
+export const STANDARD_TIERS: BulkTier[] = [];
 
 /**
  * The hero carousel's spool palette.

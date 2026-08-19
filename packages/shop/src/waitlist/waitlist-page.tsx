@@ -26,8 +26,8 @@ export function WaitlistPage() {
         </h1>
         <p className="max-w-xl text-base leading-7 text-muted-foreground">
           We make 3D printing filament in Nigeria and ship nationwide and
-          worldwide, with discounts when you order in bulk. Add your email and
-          we will tell you the day the shop opens.
+          worldwide. Add your email and we will tell you the day the shop
+          opens.
         </p>
       </div>
 

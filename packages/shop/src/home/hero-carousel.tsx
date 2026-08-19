@@ -8,7 +8,7 @@ import { HERO_COLOURS as COLOURS } from "../data/catalog";
 import { SpoolImage } from "../components/spool-image";
 
 /**
- * The shop home's first screen. Three slides, each a two-column split: copy on
+ * The shop home's first screen. Two slides, each a two-column split: copy on
  * the left, a large spool on the right.
  *
  * The spool is the hero image, per design system rule 3. There is no
@@ -41,13 +41,6 @@ const SLIDES: Slide[] = [
     body: "Diameter is laser-checked along the whole spool, so your first layer behaves the same on the last hundred metres as the first.",
     colourHex: COLOURS["signal-red"].hex,
     colourName: COLOURS["signal-red"].name,
-  },
-  {
-    eyebrow: "Buy by the box",
-    heading: "Print farm pricing",
-    body: "Quantity discounts start at four spools and reach 22% at ten, on the same line, with no account or quote to wait for.",
-    colourHex: COLOURS["palm-green"].hex,
-    colourName: COLOURS["palm-green"].name,
   },
 ];
 

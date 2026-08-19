@@ -239,10 +239,10 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
         qty: line.qty,
         unitPrice,
         total: unitPrice * line.qty,
-        /* No tier: bulk discounts are a storefront policy constant with nothing
-           behind them in the API (see `policy.ts`), so the cart cannot claim one
-           the till will not honour. The ladder stays on the product page as
-           information until it becomes a real API field. */
+        /* No tier: the shop currently offers no bulk discounts (see
+           `policy.ts`), and even if it did, that would be a storefront policy
+           constant with nothing behind it in the API, so the cart could not
+           claim one the till will not honour. */
         tier: null,
       });
     }
