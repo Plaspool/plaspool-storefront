@@ -163,13 +163,41 @@ export function OrdersListPage() {
               </Link>
             </li>
           ))}
+          {/* THE NEXT PAGE, WHILE IT IS COMING. The button's label changing is
+              the CONTROL's pending state; this is the CONTENT's. A list that
+              only dims its button leaves the shopper watching nothing happen
+              until the rows appear all at once — and the rows' shape is known,
+              so `CLAUDE.md`'s rule applies to a second page exactly as it does
+              to the first. Two rows, because the page is 20 but the wait is
+              short and a screenful of grey would overstate it. */}
+          {loading &&
+            Array.from({ length: 2 }, (_, i) => (
+              <li key={`pending-${i}`} aria-hidden="true">
+                <div className="flex items-center justify-between gap-4 border border-brand-line px-4 py-4">
+                  <div className="flex min-w-0 flex-col gap-2">
+                    <Skeleton className="h-4 w-36" />
+                    <Skeleton className="h-3 w-48" />
+                  </div>
+                  <Skeleton className="h-4 w-20 shrink-0" />
+                </div>
+              </li>
+            ))}
         </ul>
       )}
 
       {cursor && (
         <div className="mt-6 flex flex-col items-center gap-2">
-          <Button type="button" variant="outline" onClick={loadMore} disabled={loading}>
-            {loading ? "Loading…" : "Load more orders"}
+          {/* `aria-busy` rather than a changed label: the rows above are
+              already announcing the wait, and a button that renames itself
+              mid-press is read out as a different control. */}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={loadMore}
+            disabled={loading}
+            aria-busy={loading}
+          >
+            Load more orders
           </Button>
           {failed && (
             <p role="alert" className="font-sans text-sm text-destructive">
