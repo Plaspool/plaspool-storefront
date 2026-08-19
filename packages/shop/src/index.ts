@@ -15,6 +15,7 @@ export * from "./data/points-api";
 // Presentational primitives. Every later surface — cards, listings, the
 // product page, the cart — composes from these.
 export * from "./components/spool-image";
+export * from "./components/product-photo";
 export * from "./components/price";
 export * from "./components/colour-swatches";
 export * from "./components/rating-stars";

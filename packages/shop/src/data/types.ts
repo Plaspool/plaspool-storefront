@@ -8,6 +8,11 @@ export interface Colour {
   name: string;
   hex: string;
   inStock: boolean;
+  /**
+   * The photograph of THIS colour, absolute, or null when nobody has uploaded
+   * one. `hex` still drives the swatch and the generated spool either way.
+   */
+  imageUrl: string | null;
 }
 
 export interface SizeOption {
@@ -91,6 +96,19 @@ export interface Product {
   colours: Colour[];
   sizes: SizeOption[];
   bulkTiers: BulkTier[];
+  /**
+   * The product's own photographs, absolute and ready to render.
+   *
+   * ADDED LATE, AND THAT IS THE BUG THEY FIX. The API has sent these since the
+   * catalogue went live; this type had no field for them, so `toProduct` threw
+   * them away and every surface fell through to the generated `SpoolImage` —
+   * meaning a photograph uploaded in the admin was never seen by anybody.
+   *
+   * `SpoolImage` REMAINS, as the fallback for a product nobody has photographed
+   * yet. A shop with a half-filled catalogue should not show holes.
+   */
+  coverImageUrl: string | null;
+  imageUrls: string[];
   badges: Badge[];
   /** One line under the title. Not marketing — what the material is for. */
   summary: string;

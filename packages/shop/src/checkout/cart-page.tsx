@@ -7,7 +7,7 @@ import { Button, NEO_SURFACE, cn } from "@plaspool/ui";
 import { EmptyState } from "../components/empty-state";
 import { Price } from "../components/price";
 import { QuantityStepper } from "../components/quantity-stepper";
-import { SpoolImage } from "../components/spool-image";
+import { ProductPhoto } from "../components/product-photo";
 import { formatNaira } from "../data/money";
 import { useCart } from "../cart/cart-context";
 import type { CartLineKey, ResolvedLine } from "../cart/types";
@@ -52,11 +52,12 @@ export function CartPage() {
         <ul className="flex flex-col divide-y divide-brand-line border-y border-brand-line">
           {cart.resolved.map((line) => (
             <li key={line.key} className="flex gap-4 py-5">
-              <SpoolImage
+              <ProductPhoto
+                src={line.colour.imageUrl ?? line.product.coverImageUrl}
+                alt={`${line.colour.name} filament spool, ${line.size.label}`}
                 colourHex={line.colour.hex}
                 weightGrams={line.size.weightGrams}
-                label={`${line.colour.name} filament spool, ${line.size.label}`}
-                className="w-20 shrink-0"
+                className="aspect-square w-20 shrink-0"
               />
               <div className="flex min-w-0 flex-1 flex-col gap-2">
                 <div className="flex items-start justify-between gap-3">

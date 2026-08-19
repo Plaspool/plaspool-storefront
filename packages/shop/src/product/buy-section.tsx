@@ -63,6 +63,7 @@ export function ProductBuySection({
           selectedId={colour.id}
           onSelect={setColourId}
           weightGrams={size.weightGrams}
+          productCoverUrl={product.coverImageUrl}
           className="lg:sticky lg:top-20"
         />
 

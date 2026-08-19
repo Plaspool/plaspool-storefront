@@ -18,7 +18,7 @@ import {
 import { EmptyState } from "../components/empty-state";
 import { Price } from "../components/price";
 import { QuantityStepper } from "../components/quantity-stepper";
-import { SpoolImage } from "../components/spool-image";
+import { ProductPhoto } from "../components/product-photo";
 import { formatNaira } from "../data/money";
 import { useCart } from "./cart-context";
 import type { CartLineKey, ResolvedLine } from "./types";
@@ -52,11 +52,12 @@ function CartLineRow({
 
   return (
     <li className="flex gap-3 py-4">
-      <SpoolImage
+      <ProductPhoto
+        src={colour.imageUrl ?? product.coverImageUrl}
+        alt={`${colour.name} filament spool, ${size.label}`}
         colourHex={colour.hex}
         weightGrams={size.weightGrams}
-        label={`${colour.name} filament spool, ${size.label}`}
-        className="w-16 shrink-0"
+        className="aspect-square w-16 shrink-0"
       />
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div className="flex min-w-0 items-start justify-between gap-3">

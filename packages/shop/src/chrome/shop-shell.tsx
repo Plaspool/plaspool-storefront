@@ -57,6 +57,10 @@ export async function ShopShell({ children }: ShopShellProps) {
     colours: product.colours,
     sizes: product.sizes,
     bulkTiers: product.bulkTiers,
+    /* So a basket row can show the photograph the shop uploaded rather than a
+       drawing of it. Per-colour pictures ride on `colours`; this backs up a
+       colour nobody has photographed. */
+    coverImageUrl: product.coverImageUrl,
     /* The bridge between the two models: a UI row is (product, colour, size),
        an API line is one variant id. Without this the drawer could render a
        basket it had no way to modify. */

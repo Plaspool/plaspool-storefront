@@ -59,6 +59,8 @@ export interface CartCatalogEntry {
   bulkTiers: BulkTier[];
   /** `"<colourId>:<sizeId>"` → variant id, priced and active only. */
   variantIds: Record<string, string>;
+  /** The product's own photograph, for a basket row whose colour has none. */
+  coverImageUrl: string | null;
 }
 
 export interface CartProviderProps {
