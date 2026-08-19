@@ -34,6 +34,12 @@ import { SpoolImage } from "./spool-image";
  * products, so this needs an asset to be deleted out from under a live product.
  * If that turns out to happen, the fix is a client wrapper used only on the
  * surfaces that are already client components — not hooks in here.
+ *
+ * ═══ `priority` FOR THE ONE IMAGE THAT IS THE LCP ═══
+ * Everything here was `loading="lazy"`, including the product page's main
+ * image — the largest element above the fold, deferred behind layout for no
+ * reason. Lazy is right for a thumbnail rail and a grid's third row; it is
+ * wrong for the picture somebody came to look at.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 export interface ProductPhotoProps {
@@ -45,7 +51,23 @@ export interface ProductPhotoProps {
   colourHex: string;
   /** The drawn spool's fill level. Ignored when a photograph is shown. */
   weightGrams: number;
+  /** Set on the one image that is the page's LCP — the product page's stage.
+   *  Never on a rail, a grid's later rows, or anything below the fold. */
+  priority?: boolean;
   className?: string;
+}
+
+/**
+ * `fetchpriority` as an attribute rather than a prop.
+ *
+ * React 19 passes unknown lowercase attributes straight through, which is
+ * exactly what this needs — the DOM property is camelCase, the ATTRIBUTE is
+ * all-lowercase, and React's typings do not carry it yet. Spread from a helper
+ * so the cast lives in one named place instead of inline in the markup, and so
+ * the attribute is ABSENT rather than `undefined` when it does not apply.
+ */
+function priorityAttrs(priority: boolean): Record<string, string> {
+  return priority ? { fetchpriority: "high" } : {};
 }
 
 export function ProductPhoto({
@@ -53,6 +75,7 @@ export function ProductPhoto({
   alt,
   colourHex,
   weightGrams,
+  priority = false,
   className,
 }: ProductPhotoProps) {
   if (!src) {
@@ -78,8 +101,9 @@ export function ProductPhoto({
     <img
       src={src}
       alt={alt}
-      loading="lazy"
-      decoding="async"
+      loading={priority ? "eager" : "lazy"}
+      {...priorityAttrs(priority)}
+      decoding={priority ? "sync" : "async"}
       className={cn("h-full w-full object-contain", className)}
     />
   );

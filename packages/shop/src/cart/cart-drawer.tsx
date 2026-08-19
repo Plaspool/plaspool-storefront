@@ -54,7 +54,12 @@ function CartLineRow({
     <li className="flex gap-3 py-4">
       <ProductPhoto
         src={colour.imageUrl ?? product.coverImageUrl}
-        alt={`${colour.name} filament spool, ${size.label}`}
+        /* Decorative: the row states the product, the colour and the size in
+           text right beside it, so naming the picture too is a second reading
+           of the same line — and naming it by a colour the product cover is not
+           a picture of would be worse than redundant. */
+        alt=""
+
         colourHex={colour.hex}
         weightGrams={size.weightGrams}
         className="aspect-square w-16 shrink-0"

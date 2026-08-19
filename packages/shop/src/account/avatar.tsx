@@ -16,11 +16,19 @@ import { cn } from "@plaspool/ui";
  * would change on every render and re-mount; a stored colour would be a column
  * and a migration for something entirely derivable.
  *
- * EVERY PAIR IN THE PALETTE CLEARS WCAG AA (≥4.5:1) AGAINST ITS OWN FOREGROUND,
- * and that is a property of the list rather than a hope — `avatar.test.ts`
- * computes the ratios and fails the build if a colour is ever added that does
- * not. An avatar is text on a coloured field; if the contrast is left to taste,
- * one of these eventually becomes unreadable and nobody notices.
+ * THE PALETTE HAS TO SATISFY TWO PROPERTIES, AND THE FIRST CUT ENFORCED ONLY
+ * ONE. Every colour clears WCAG AA (≥4.5:1) against white type — that was
+ * tested. Every colour must ALSO be distinguishable from every other, and that
+ * was not: "deep teal" and "pine" sat 5.5 apart in CIEDE2000, which at 28px is
+ * not a difference anybody can see, so two of eight identities were one. A
+ * colour that cannot be told from another colour does not identify anything,
+ * which is the whole job. `avatar.test.ts` now computes both — the contrast
+ * ratios and the pairwise ΔE — so the build fails rather than a person having
+ * to notice.
+ *
+ * THE BRAND NAVY IS DELIBERATELY ABSENT. It is `--brand-accent` and the focus
+ * ring, so one shopper in eight would have carried an avatar the same colour as
+ * the chrome around it.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
@@ -30,14 +38,14 @@ import { cn } from "@plaspool/ui";
  * restrained would read as somebody else's component.
  */
 export const AVATAR_COLOURS = [
-  "#231C50", // brand navy
   "#1B4FA8", // cobalt
-  "#12626B", // deep teal
-  "#1F7A4C", // palm green
+  "#0F766E", // teal
+  "#4D7C0F", // olive
   "#7A4B2A", // clay
-  "#A32C2C", // signal red, darkened for AA on white type
-  "#5B2E86", // violet
-  "#0F5257", // pine
+  "#A32C2C", // signal red
+  "#6D28A8", // violet
+  "#831843", // wine
+  "#3F3F46", // graphite
 ] as const;
 
 /** White on every one of them. Kept as a constant so the test has one pair to
@@ -58,7 +66,13 @@ export function avatarColourFor(key: string): string {
     hash ^= key.charCodeAt(i);
     hash = Math.imul(hash, 0x01000193) >>> 0;
   }
-  return AVATAR_COLOURS[hash % AVATAR_COLOURS.length];
+  /* XOR-FOLDED BEFORE THE MODULO. `hash % 8` reads only the low three bits, so
+     the index depended on the last few bits of the last few characters — every
+     pair of single-character codes differing by 8 collided. Folding the high
+     half down first makes the whole hash contribute. It measured uniform on
+     real ids either way; this removes the sharp edge rather than a live bug. */
+  const folded = (hash ^ (hash >>> 16)) >>> 0;
+  return AVATAR_COLOURS[folded % AVATAR_COLOURS.length];
 }
 
 /**

@@ -1,13 +1,15 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LifeBuoy, LogOut, Package } from "lucide-react";
-import { Button, Skeleton, SkeletonRegion, cn } from "@plaspool/ui";
+import { LogOut, MapPin } from "lucide-react";
+import { Button, Skeleton, SkeletonRegion } from "@plaspool/ui";
 
 import { Avatar } from "./avatar";
 import { getShopCustomer, signOutEverywhere, type ShopCustomer } from "../data/auth-api";
+import { listSavedAddresses } from "../data/orders-api";
+import { readSavedAddress } from "../checkout/saved-address";
+import type { Address } from "../data/checkout-api";
 
 /**
  * `/account/settings` — who you are signed in as, and the things that can
@@ -25,6 +27,16 @@ import { getShopCustomer, signOutEverywhere, type ShopCustomer } from "../data/a
  * So this states the account plainly, says where the parts of it are changed
  * that CAN be changed, and offers the one action that is genuinely here —
  * signing out. When a profile endpoint exists, this is where it goes.
+ *
+ * ═══ AND IT SHOWS THE ADDRESSES, WHICH IS WHAT MAKES IT A PAGE ═══
+ * The first cut listed Orders, Help & support and Sign out — every one of which
+ * is in the menu you clicked "Account settings" from, so the page was a second
+ * copy of its own entry point. Meanwhile the shop knows every address the
+ * shopper has shipped to and surfaced them nowhere but inside a checkout, while
+ * the sign-in page promises "your basket, addresses and order history follow
+ * you". This is where the addresses live. They are read-only for the same
+ * reason the email is: they are derived from orders, so there is nothing to
+ * edit — an order is a record of something that happened.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 export function AccountSettingsPage() {
@@ -33,6 +45,7 @@ export function AccountSettingsPage() {
     { kind: "loading" } | { kind: "guest" } | { kind: "ready"; customer: ShopCustomer }
   >({ kind: "loading" });
   const [signingOut, setSigningOut] = React.useState(false);
+  const [addresses, setAddresses] = React.useState<Address[]>([]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -40,10 +53,17 @@ export function AccountSettingsPage() {
       if (cancelled) return;
       if (!customer) {
         setState({ kind: "guest" });
-        router.replace("/sign-in");
+        /* `?next=` SO SIGNING IN RETURNS YOU HERE. Without it a shopper whose
+           session expired was bounced to a generic sign-in page and then
+           abandoned on it — the destination they asked for forgotten. */
+        router.replace(`/sign-in?next=${encodeURIComponent("/account/settings")}`);
         return;
       }
       setState({ kind: "ready", customer });
+      void listSavedAddresses().then((saved) => {
+        if (cancelled) return;
+        setAddresses(saved.map(readSavedAddress).filter((a): a is Address => a !== null));
+      });
     });
     return () => {
       cancelled = true;
@@ -104,20 +124,41 @@ export function AccountSettingsPage() {
         address.
       </p>
 
-      <div className="mt-8 flex flex-col divide-y divide-brand-line border-y border-brand-line">
-        <Row href="/account/orders" icon={<Package aria-hidden="true" className="h-4 w-4" />}>
-          Orders
-          <span className="block font-sans text-xs text-muted-foreground">
-            Everything you&apos;ve bought, and where it is
-          </span>
-        </Row>
-        <Row href="/contact" icon={<LifeBuoy aria-hidden="true" className="h-4 w-4" />}>
-          Help &amp; support
-          <span className="block font-sans text-xs text-muted-foreground">
-            Ask about an order, a delivery or a refund
-          </span>
-        </Row>
-      </div>
+      <section aria-labelledby="account-addresses" className="mt-10">
+        <h2
+          id="account-addresses"
+          className="border-b border-brand-line pb-2 font-sans text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+        >
+          Delivery addresses
+        </h2>
+        {addresses.length === 0 ? (
+          <p className="mt-4 font-sans text-sm text-muted-foreground">
+            Nowhere yet. Addresses appear here once something has been delivered to them, and
+            they&apos;re offered at checkout so you don&apos;t retype them.
+          </p>
+        ) : (
+          <>
+            <ul className="mt-4 flex flex-col divide-y divide-brand-line border-b border-brand-line">
+              {addresses.map((a, i) => (
+                <li key={`${a.line1}-${i}`} className="flex items-start gap-3 py-3">
+                  <MapPin aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                  <address className="min-w-0 font-sans text-sm not-italic">
+                    <span className="block font-medium text-foreground">{a.name}</span>
+                    <span className="block text-muted-foreground">
+                      {[a.line1, a.line2, a.city, a.region, a.postalCode].filter(Boolean).join(", ")}
+                    </span>
+                    {a.phone && <span className="block text-muted-foreground">{a.phone}</span>}
+                  </address>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 font-sans text-xs text-muted-foreground">
+              These are the addresses your orders went to, so there is nothing to edit here —
+              checkout offers them, and a new one is saved by using it.
+            </p>
+          </>
+        )}
+      </section>
 
       <Button
         type="button"
@@ -135,29 +176,6 @@ export function AccountSettingsPage() {
         {signingOut ? "Signing out…" : "Sign out"}
       </Button>
     </Shell>
-  );
-}
-
-function Row({
-  href,
-  icon,
-  children,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className={cn(
-        "flex items-start gap-3 py-4 font-sans text-sm font-medium text-foreground",
-        "transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-      )}
-    >
-      <span className="mt-0.5 shrink-0">{icon}</span>
-      <span className="min-w-0">{children}</span>
-    </Link>
   );
 }
 

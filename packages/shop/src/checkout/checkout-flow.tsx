@@ -182,9 +182,43 @@ export function CheckoutFlow() {
    * is this shop's default path and must not turn into an account wall: an
    * empty list renders exactly what was there before.
    */
-  const [savedAddresses, setSavedAddresses] = React.useState<SavedAddress[]>([]);
+  /* PARSED, NOT RAW. The list was gated and preselected off the raw array but
+     rendered off the readable subset, so the three disagreed: an unreadable
+     most-recent entry preselected nothing while readable older ones sat listed
+     below it, and a list where every entry was unreadable rendered a "Deliver
+     to" group whose only member was "Somewhere else" — an alternative to
+     nothing. One array, already filtered, decides all three. */
+  const [savedAddresses, setSavedAddresses] = React.useState<Address[]>([]);
   /** Which saved address is selected, or `NEW_ADDRESS` for the blank form. */
   const [chosenAddress, setChosenAddress] = React.useState<string>(NEW_ADDRESS);
+  /**
+   * Whether the shopper has typed into the address form.
+   *
+   * ═══ THE PRESELECTION MUST NEVER OVERWRITE WHAT SOMEBODY IS TYPING ═══
+   * The form is interactive on first paint; the saved list is two sequential
+   * round trips behind it (`/customer/me`, then `/orders/addresses`). Filling
+   * it unconditionally meant that on a slow connection the fields a shopper had
+   * already filled in were silently replaced — and, if the response landed
+   * during `submitAddress`'s awaits, the API received the TYPED address while
+   * the review panel went on to display the SAVED one. The parcel and the page
+   * would have disagreed about where it was going.
+   */
+  const [addressTouched, setAddressTouched] = React.useState(false);
+  /* The fetch callback closes over its render's state, and the shopper types
+     after that render — so the guard has to read a live value. */
+  const touchedRef = React.useRef(false);
+  const touchAddress = React.useCallback(() => {
+    touchedRef.current = true;
+    setAddressTouched(true);
+  }, []);
+
+  /** Every field edit goes through here: it merges the change, marks the form
+   *  touched, and drops any claim that this is still a saved address. */
+  const editAddress = React.useCallback((patch: Partial<Address>) => {
+    touchAddress();
+    setChosenAddress(NEW_ADDRESS);
+    setAddress((current) => ({ ...current, ...patch }));
+  }, [touchAddress]);
 
   /**
    * The customer's points balance, and how many of them they have chosen to
@@ -283,17 +317,25 @@ export function CheckoutFlow() {
         if (!cancelled) setPointsBalance(balance);
       });
       void listSavedAddresses().then((saved) => {
-        if (cancelled || saved.length === 0) return;
-        setSavedAddresses(saved);
+        if (cancelled) return;
+        const usable = saved
+          .map(readSavedAddress)
+          .filter((a): a is Address => a !== null);
+        if (usable.length === 0) return;
+        setSavedAddresses(usable);
         /* PRESELECTED, because the commonest thing a returning shopper wants is
            the address they used last — and a list where nothing is chosen makes
            them do the work of choosing before they can do the work of checking
-           out. Selecting also fills the form, so "continue" is one click. */
-        const first = readSavedAddress(saved[0]);
-        if (first) {
+           out. Selecting also fills the form, so "continue" is one click.
+
+           ONLY INTO A FORM NOBODY HAS TOUCHED. `setAddressTouched` is the guard;
+           a shopper who started typing before this landed keeps what they typed
+           and the list stays available above it, unselected. */
+        setAddress((current) => {
+          if (touchedRef.current) return current;
           setChosenAddress(keyOfSaved(0));
-          setAddress(first);
-        }
+          return usable[0];
+        });
       });
     });
     return () => {
@@ -499,10 +541,8 @@ export function CheckoutFlow() {
                 <legend className="mb-2 font-sans text-sm font-semibold text-foreground">
                   Deliver to
                 </legend>
-                {savedAddresses.map((saved, i) => {
+                {savedAddresses.map((parsed, i) => {
                   const key = keyOfSaved(i);
-                  const parsed = readSavedAddress(saved);
-                  if (!parsed) return null;
                   return (
                     <label
                       key={key}
@@ -521,15 +561,27 @@ export function CheckoutFlow() {
                         onChange={() => {
                           setChosenAddress(key);
                           setAddress(parsed);
+                          /* Choosing from the list is a deliberate act, so the
+                             async prefill must not overwrite it either. */
+                          touchAddress();
                         }}
                       />
                       <span className="min-w-0 font-sans text-sm">
                         <span className="block font-medium text-foreground">{parsed.name}</span>
+                        {/* EVERY FIELD THAT DISTINGUISHES ONE FROM ANOTHER.
+                            The API dedupes on the whole snapshot, so two orders
+                            to the same house differing only in phone or postcode
+                            come back as two entries — and with those two fields
+                            omitted they rendered as identical rows the shopper
+                            had to choose between blind. */}
                         <span className="block text-muted-foreground">
-                          {[parsed.line1, parsed.line2, parsed.city, parsed.region]
+                          {[parsed.line1, parsed.line2, parsed.city, parsed.region, parsed.postalCode]
                             .filter(Boolean)
                             .join(", ")}
                         </span>
+                        {parsed.phone && (
+                          <span className="block text-muted-foreground">{parsed.phone}</span>
+                        )}
                       </span>
                     </label>
                   );
@@ -554,6 +606,7 @@ export function CheckoutFlow() {
                          "somewhere else" and finding the previous address still
                          in the fields is how a parcel goes to the wrong place. */
                       setAddress(BLANK_ADDRESS);
+                      touchAddress();
                     }}
                   />
                   <span className="font-sans text-sm font-medium text-foreground">
@@ -563,12 +616,19 @@ export function CheckoutFlow() {
               </fieldset>
             )}
 
+            {/* ═══ EDITING A FIELD DETACHES THE SELECTION ═══
+                The card renders the immutable snapshot while the fields edit
+                state, so with the radio left checked the step displayed one
+                address and submitted another — the highlighted card still
+                reading "14 Bourdillon Road" over fields saying something else.
+                Any edit means this is no longer that saved address, and the
+                selection has to say so. */}
             <Field id="co-name" label="Full name" required>
               <Input
                 id="co-name"
                 required
                 value={address.name}
-                onChange={(e) => setAddress({ ...address, name: e.target.value })}
+                onChange={(e) => editAddress({ name: e.target.value })}
               />
             </Field>
             <Field id="co-phone" label="Phone">
@@ -576,7 +636,7 @@ export function CheckoutFlow() {
                 id="co-phone"
                 type="tel"
                 value={address.phone ?? ""}
-                onChange={(e) => setAddress({ ...address, phone: e.target.value })}
+                onChange={(e) => editAddress({ phone: e.target.value })}
               />
             </Field>
             <Field id="co-line1" label="Address" required>
@@ -584,14 +644,14 @@ export function CheckoutFlow() {
                 id="co-line1"
                 required
                 value={address.line1}
-                onChange={(e) => setAddress({ ...address, line1: e.target.value })}
+                onChange={(e) => editAddress({ line1: e.target.value })}
               />
             </Field>
             <Field id="co-line2" label="Apartment, suite, etc.">
               <Input
                 id="co-line2"
                 value={address.line2 ?? ""}
-                onChange={(e) => setAddress({ ...address, line2: e.target.value })}
+                onChange={(e) => editAddress({ line2: e.target.value })}
               />
             </Field>
             <div className="grid grid-cols-2 gap-4">
@@ -600,7 +660,7 @@ export function CheckoutFlow() {
                   id="co-city"
                   required
                   value={address.city}
-                  onChange={(e) => setAddress({ ...address, city: e.target.value })}
+                  onChange={(e) => editAddress({ city: e.target.value })}
                 />
               </Field>
               <Field id="co-region" label="State" required>
@@ -608,7 +668,7 @@ export function CheckoutFlow() {
                   id="co-region"
                   required
                   value={address.region ?? ""}
-                  onChange={(e) => setAddress({ ...address, region: e.target.value })}
+                  onChange={(e) => editAddress({ region: e.target.value })}
                 />
               </Field>
             </div>
@@ -616,7 +676,7 @@ export function CheckoutFlow() {
               <Input
                 id="co-postal"
                 value={address.postalCode ?? ""}
-                onChange={(e) => setAddress({ ...address, postalCode: e.target.value })}
+                onChange={(e) => editAddress({ postalCode: e.target.value })}
               />
             </Field>
 
@@ -733,7 +793,25 @@ export function CheckoutFlow() {
             {totals && (
               <>
                 <div className="border-2 border-foreground p-4">
-                  <p className="font-sans text-sm font-semibold text-foreground">Deliver to</p>
+                  {/* ═══ THE LAST PLACE A CORRECTION HAS TO BE ONE CLICK AWAY ═══
+                      This panel showed the address with no way to change it, and
+                      no step in the flow had a back control — `setStep` was only
+                      ever called forward. A shopper who reached the payment step
+                      and saw the wrong address had to leave for /cart and come
+                      back, which remounts the flow and preselects the same
+                      address again. This is the screen somebody is about to pay
+                      from; it is the worst possible place to make "that's wrong"
+                      a dead end. */}
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="font-sans text-sm font-semibold text-foreground">Deliver to</p>
+                    <button
+                      type="button"
+                      onClick={() => setStep("address")}
+                      className="shrink-0 font-sans text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    >
+                      Change
+                    </button>
+                  </div>
                   <p className="mt-1 font-sans text-sm text-muted-foreground">
                     {address.name}, {address.line1}
                     {address.line2 ? `, ${address.line2}` : ""}, {address.city}, {address.region}{" "}

@@ -15,7 +15,7 @@ import {
 } from "@plaspool/ui";
 
 import { Avatar } from "./avatar";
-import { getShopCustomer, signOutEverywhere, type ShopCustomer } from "../data/auth-api";
+import { readShopSession, signOutEverywhere, type ShopSession } from "../data/auth-api";
 
 /**
  * The header's account control.
@@ -36,21 +36,40 @@ import { getShopCustomer, signOutEverywhere, type ShopCustomer } from "../data/a
  * Escape handling and `aria-expanded`; what does not come free is the trigger's
  * accessible name, so it says who it belongs to rather than "Account".
  *
- * THE SIZE IS FIXED BEFORE THE PROBE RESOLVES. The session check is async and
- * the control is in the header, so anything that changed size on resolve would
- * shift the whole nav a beat after paint. The glyph and the avatar are both
- * 28px inside the same button.
+ * ═══ IT DOES NOT CLAIM YOU ARE SIGNED OUT UNTIL IT KNOWS ═══
+ * The first cut initialised to `null` — the same value as confirmed-guest — so
+ * the server HTML and every frame before the probe landed rendered "Sign in" to
+ * a signed-in shopper, and a transport failure left it there permanently
+ * because `getShopCustomer` collapsed a network error into `null` too.
+ * `readShopSession` keeps `unknown` separate, and this renders a control with
+ * no claim in it until the answer arrives. It cannot be server-rendered — the
+ * session cookie is on the API's registrable domain, not this one — but "not
+ * yet known" and "definitely nobody" are different, and only one of them is
+ * safe to assert.
+ *
+ * THE SIZE IS FIXED ACROSS ALL THREE STATES, so the header does not shift a
+ * beat after paint. That means a fixed width at `xl` too: the glyph branch and
+ * the avatar-plus-name branch measured up to 39px apart, and the whole cluster
+ * is `ml-auto`, so search and cart slid sideways when the probe landed.
  * ═══════════════════════════════════════════════════════════════════════════
  */
+/**
+ * ONE WIDTH FOR ALL THREE STATES. `w-10` below `xl` and a fixed `9rem` at `xl`,
+ * so the unknown, guest and signed-in controls occupy the same box and the
+ * header's right cluster never moves when the probe resolves.
+ */
+const ACCOUNT_SLOT = "h-10 w-10 shrink-0 xl:w-36 xl:justify-start xl:gap-2 xl:px-3";
+
 export function AccountMenu({ className }: { className?: string }) {
   const router = useRouter();
-  const [customer, setCustomer] = React.useState<ShopCustomer | null>(null);
+  const [session, setSession] = React.useState<ShopSession>({ kind: "unknown" });
   const [signingOut, setSigningOut] = React.useState(false);
+  const customer = session.kind === "customer" ? session.customer : null;
 
   React.useEffect(() => {
     let cancelled = false;
-    void getShopCustomer().then((next) => {
-      if (!cancelled) setCustomer(next);
+    void readShopSession().then((next) => {
+      if (!cancelled) setSession(next);
     });
     return () => {
       cancelled = true;
@@ -63,10 +82,23 @@ export function AccountMenu({ className }: { className?: string }) {
     /* BOTH, and in this order. `refresh()` re-runs the server components that
        may have rendered something identity-shaped; `setCustomer(null)` flips
        this control immediately rather than waiting for that round trip. */
-    setCustomer(null);
+    setSession({ kind: "guest" });
     router.refresh();
     router.push("/");
   }, [router]);
+
+  /* NOT YET KNOWN. Same box, same place, no claim — and no link, because a link
+     to `/sign-in` is exactly the claim being avoided. */
+  if (session.kind === "unknown") {
+    return (
+      <span
+        aria-hidden="true"
+        className={cn(ACCOUNT_SLOT, "inline-flex items-center justify-center", className)}
+      >
+        <User className="h-4 w-4 text-muted-foreground opacity-40" />
+      </span>
+    );
+  }
 
   if (!customer) {
     return (
@@ -75,10 +107,7 @@ export function AccountMenu({ className }: { className?: string }) {
         variant="ghost"
         size="icon"
         aria-label="Sign in"
-        className={cn(
-          "xl:h-10 xl:w-auto xl:gap-2 xl:px-4 focus-visible:ring-brand focus-visible:ring-offset-background",
-          className,
-        )}
+        className={cn(ACCOUNT_SLOT, "focus-visible:ring-brand focus-visible:ring-offset-background", className)}
       >
         <Link href="/sign-in">
           <User aria-hidden="true" className="h-4 w-4" />
@@ -97,16 +126,14 @@ export function AccountMenu({ className }: { className?: string }) {
           variant="ghost"
           size="icon"
           aria-label={`Account: ${label}`}
-          className={cn(
-            "xl:h-10 xl:w-auto xl:gap-2 xl:px-3 focus-visible:ring-brand focus-visible:ring-offset-background",
-            className,
-          )}
+          className={cn(ACCOUNT_SLOT, "focus-visible:ring-brand focus-visible:ring-offset-background", className)}
         >
           <Avatar name={customer.name} email={customer.email} colourKey={customer.id} />
           {/* The name is a nicety at the widest breakpoint only; the avatar is
-              the control at every other one. `max-w` so a long name cannot
-              stretch the header. */}
-          <span className="hidden max-w-[10ch] truncate xl:inline">{label}</span>
+              the control at every other one. `truncate` inside a FIXED slot
+              rather than `max-w` inside an auto one — the slot's width is the
+              same in all three states, so nothing beside it can move. */}
+          <span className="hidden min-w-0 truncate xl:inline">{label}</span>
         </Button>
       </DropdownMenuTrigger>
 
