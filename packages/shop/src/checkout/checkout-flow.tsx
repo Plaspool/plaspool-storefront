@@ -189,16 +189,24 @@ export function CheckoutFlow() {
    * `checkout-api.ts`'s own header already promised "reusing one on a genuine
    * retry is what stops a double charge" — this is what makes that true.
    *
-   * Derived from `checkoutId` (the cart id) rather than random, so it is
-   * reproducible without being stored anywhere beyond this component's state:
-   * a double-click, or a Back-then-retry into a bfcache-restored review step,
-   * replays the same key and gets back the SAME intent (200, same
-   * `authorizationUrl`) rather than minting a second one. It is not reused
-   * across a different checkout — a new freeze (new `checkoutId`) derives a
-   * new key — and the server's own replay fingerprint is `(checkoutId,
-   * amount, currency)`, which deliberately excludes email, so correcting a
-   * refused email and retrying still reaches the provider rather than
-   * replaying a request the provider rejected for an unrelated reason.
+   * `ckout_<cartId>_<revision>`, NOT JUST `ckout_<cartId>`. The cart id alone
+   * is stable for the cart's WHOLE LIFE, but the server's replay fingerprint
+   * is `(checkoutId, amount, currency)` (admin `payments/intents.ts`) and a
+   * mismatch is a 400, not a replay. A customer who freezes, abandons the
+   * review step, comes back, changes the delivery option and re-freezes at a
+   * different total would resend the OLD key against a NEW amount — a
+   * fingerprint mismatch that leaves them unable to pay at all. The freeze's
+   * own revision is what ties the key to the total it was minted for: within
+   * one freeze a double-click or a Back-then-retry into a bfcache-restored
+   * review step replays the same key and gets back the SAME intent (200,
+   * same `authorizationUrl`); a genuinely different amount comes from a new
+   * freeze, and therefore a new revision, and therefore a new key the server
+   * accepts as a new intent. A stable key stops a double charge; a key that
+   * outlives the amount it was minted for would stop a legitimate one.
+   *
+   * Email stays out of the key on purpose — the server's own fingerprint
+   * excludes it, so correcting a refused email and retrying still reaches the
+   * provider rather than replaying a request it already rejected.
    */
   const [idempotencyKey, setIdempotencyKey] = React.useState<string | null>(null);
   /** A `useState` guard is not enough on its own — two clicks inside one
@@ -206,6 +214,30 @@ export function CheckoutFlow() {
    *  lands. This ref is set synchronously, inside the click handler, before
    *  anything is awaited. */
   const payingRef = React.useRef(false);
+
+  /**
+   * Clears the guard on a bfcache restore, e.g. pressing Back from Paystack
+   * onto this exact review step.
+   *
+   * THIS IS SAFE NOW, AND WAS NOT BEFORE. With the idempotency key stable for
+   * this freeze (see `idempotencyKey` above), a Pay now click after a
+   * bfcache restore replays the same intent rather than opening a second one
+   * — which is the entire point of tying the key to the freeze instead of the
+   * click. Leaving the guard permanently set after hand-off would trade a
+   * fixed double-charge for a Pay now button that silently does nothing on
+   * return, which is a worse failure for being quieter. `event.persisted` is
+   * what distinguishes an actual bfcache restore from an ordinary re-render.
+   */
+  React.useEffect(() => {
+    function onPageShow(event: PageTransitionEvent) {
+      if (event.persisted) {
+        payingRef.current = false;
+        setRedirecting(false);
+      }
+    }
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -310,7 +342,10 @@ export function CheckoutFlow() {
       setCheckoutId(rev.cartId);
       /* Minted here, once, from the id that will not change for the rest of
          this checkout attempt — see the field's own doc comment. */
-      setIdempotencyKey(`ckout_${rev.cartId}`);
+      /* `rev.revision` is the base revision this freeze was submitted
+         against — the revision that produced THIS total. See the field's own
+         doc comment for why the revision has to be part of the key. */
+      setIdempotencyKey(`ckout_${rev.cartId}_${rev.revision}`);
       setStep("review");
     } finally {
       setBusy(false);
@@ -347,12 +382,13 @@ export function CheckoutFlow() {
       window.location.href = result.data.authorizationUrl;
     } finally {
       setBusy(false);
-      /* NOT reset once the hand-off has started. `window.location.href`
-         begins an unload; anything that runs before the browser actually
-         navigates away — a second click, or a bfcache restore landing back on
-         this exact JS state — must still see `payingRef.current === true`.
-         The reset only happens on a genuine failure, so the customer can
-         retry with the same key. */
+      /* NOT reset here once the hand-off has started — `window.location.href`
+         begins an unload, and anything that runs before the browser actually
+         navigates away (a second click landing before the navigation commits)
+         must still see `payingRef.current === true`. A genuine failure clears
+         it immediately so the customer can retry; a bfcache restore clears it
+         via the `pageshow` listener above, once the browser is actually back
+         on this page rather than mid-navigation away from it. */
       if (!handingOff) payingRef.current = false;
     }
   }

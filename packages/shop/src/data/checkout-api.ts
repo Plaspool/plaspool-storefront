@@ -237,10 +237,3 @@ export function confirmPaymentIntent(id: string): Promise<CheckoutResult<Payment
   return request(`/payments/intents/${encodeURIComponent(id)}/confirm`, { method: "POST" });
 }
 
-/** A random, sufficiently long idempotency key. Paystack's own idempotency is
- *  keyed on this — reusing one on a genuine retry is what stops a double
- *  charge; a fresh one per checkout attempt is what starts a new one. */
-export function newIdempotencyKey(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
-  return `idem_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-}
