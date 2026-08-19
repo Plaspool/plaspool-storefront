@@ -8,6 +8,9 @@ import { Button, Input, Label, NEO_SURFACE, Skeleton, SkeletonRegion, cn } from 
 import { EmptyState } from "../components/empty-state";
 import { formatNaira } from "../data/money";
 import { getShopCustomer } from "../data/auth-api";
+import { getPointsBalance } from "../data/points-api";
+import type { PointsBalance } from "../data/points-api";
+import { PointsOffer } from "./points-offer";
 import { majorUnits } from "../data/cart-api";
 import { useCart } from "../cart/cart-context";
 import {
@@ -174,6 +177,20 @@ export function CheckoutFlow() {
   const [guestEmail, setGuestEmail] = React.useState("");
   const [checkingSession, setCheckingSession] = React.useState(true);
 
+  /**
+   * The customer's points balance, and how many of them they have chosen to
+   * spend. Both null/0 for a guest, for a shop with redemption switched off,
+   * and for a points service having a bad day — `getPointsBalance()` answers
+   * null for every one of those, and the widget simply does not appear.
+   *
+   * `redeemPoints` IS THE OPT-IN. It starts at 0 and only a deliberate act
+   * moves it: the API reads an absent value as "spend as much as the rules
+   * allow", so a widget that pre-filled the maximum would spend a balance the
+   * customer never agreed to spend.
+   */
+  const [pointsBalance, setPointsBalance] = React.useState<PointsBalance | null>(null);
+  const [redeemPoints, setRedeemPoints] = React.useState(0);
+
   const [totals, setTotals] = React.useState<FrozenTotals | null>(null);
   const [checkoutId, setCheckoutId] = React.useState<string | null>(null);
   const [redirecting, setRedirecting] = React.useState(false);
@@ -245,6 +262,17 @@ export function CheckoutFlow() {
       if (cancelled) return;
       setCustomerEmail(customer?.email ?? null);
       setCheckingSession(false);
+      /*
+       * ONLY FOR A SIGNED-IN CUSTOMER, and that is a constraint rather than a
+       * choice. Balances are keyed by email address, and the API cannot look one
+       * up for a guest at the moment the total is frozen — the cart's email is
+       * not written until the payment step, which runs after the freeze. So a
+       * guest has no balance to offer, and asking would be a guaranteed 401.
+       */
+      if (!customer?.email) return;
+      void getPointsBalance().then((balance) => {
+        if (!cancelled) setPointsBalance(balance);
+      });
     });
     return () => {
       cancelled = true;
@@ -333,7 +361,7 @@ export function CheckoutFlow() {
         setError({ code: "gone" });
         return;
       }
-      const result = await freezeCheckout(rev.revision);
+      const result = await freezeCheckout(rev.revision, redeemPoints);
       if (!result.ok) {
         setError(result.error);
         return;
@@ -587,6 +615,12 @@ export function CheckoutFlow() {
                 </p>
               </Field>
             )}
+            <PointsOffer
+              balance={pointsBalance}
+              chosen={redeemPoints}
+              onChange={setRedeemPoints}
+              disabled={busy}
+            />
             <Button
               type="submit"
               disabled={busy || !email}
@@ -638,6 +672,29 @@ export function CheckoutFlow() {
                       </span>
                     </div>
                   )}
+                  {/*
+                    * THE API'S OWN LABEL, RENDERED VERBATIM, and no sign added.
+                    * The amount is already negative — a discount is a negative
+                    * adjustment — so prefixing a minus renders "-−₦500". The
+                    * label is where the programme's nouns legitimately reach
+                    * this package: the admin composed the string from the
+                    * operator's configuration at the instant the total froze, so
+                    * it still describes what the customer agreed to even if the
+                    * programme is renamed tomorrow.
+                    */}
+                  {totals.adjustments.map((adjustment) => (
+                    <div
+                      key={adjustment.code}
+                      className="flex items-center justify-between py-1"
+                    >
+                      <span className="font-sans text-sm text-muted-foreground">
+                        {adjustment.label}
+                      </span>
+                      <span className="font-mono text-sm tabular-nums text-foreground">
+                        {formatNaira(majorUnits(adjustment.amount))}
+                      </span>
+                    </div>
+                  ))}
                   <div className="mt-1 flex items-center justify-between border-t border-brand-line pt-2">
                     <span className="font-sans text-base font-semibold text-foreground">
                       Total

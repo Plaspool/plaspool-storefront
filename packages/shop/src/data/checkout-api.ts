@@ -59,10 +59,32 @@ export interface TotalsLine {
   taxAmount: ApiMoney;
 }
 
+/**
+ * A line that moves the total and must appear on the invoice. Today the only
+ * one is a points redemption; the shape is the API's generic extension point.
+ *
+ * `amount` IS NEGATIVE FOR A DISCOUNT, which is why the review step renders it
+ * without a sign of its own — the number already carries one, and adding a
+ * second is how a discount renders as "-−₦500".
+ *
+ * `label` IS THE API'S OWN WORDING and is rendered verbatim. It is where the
+ * programme's nouns legitimately reach the storefront: the admin composed the
+ * string from the operator's configuration at the instant the total was frozen,
+ * so it says what the customer agreed to even if the programme is renamed
+ * afterwards. This package still spells no such noun itself.
+ */
+export interface Adjustment {
+  code: string;
+  label: string;
+  amount: ApiMoney;
+}
+
 export interface FrozenTotals {
   currency: string;
   lines: TotalsLine[];
   shipping: ShippingOption | null;
+  /** Empty for almost every order. See `Adjustment`. */
+  adjustments: Adjustment[];
   subtotal: ApiMoney;
   adjustmentTotal: ApiMoney;
   shippingTotal: ApiMoney;
@@ -193,10 +215,27 @@ export function setCheckoutShipping(
  *  cart that was never frozen but is a needless round trip for one that was. */
 export function freezeCheckout(
   baseRevision: number,
+  /**
+   * How many points to spend, if the customer chose to spend any.
+   *
+   * OMITTED MEANS SPEND NOTHING, and that is the API's contract rather than
+   * this client's caution: its `quote()` reads an absent value as "as much as
+   * the rules allow", so the route declines to quote at all unless a number
+   * arrives. Sending `0` and sending nothing both end at no discount, so this
+   * omits the field entirely when there is nothing to spend rather than relying
+   * on the two being equivalent.
+   *
+   * The API RE-DECIDES the amount against the balance at this instant and
+   * against its own cap. A number here is a request, not an instruction, and
+   * the returned totals are what the customer is charged.
+   */
+  redeemPoints?: number,
 ): Promise<CheckoutResult<{ totals: FrozenTotals }>> {
   return request("/checkout/freeze", {
     method: "POST",
-    body: JSON.stringify({ baseRevision }),
+    body: JSON.stringify(
+      redeemPoints && redeemPoints > 0 ? { baseRevision, redeemPoints } : { baseRevision },
+    ),
   });
 }
 
