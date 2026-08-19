@@ -1,10 +1,11 @@
 import type { LucideIcon } from "lucide-react";
-import { Factory, Package, Ruler, Truck } from "lucide-react";
+import { Factory, Ruler, Truck } from "lucide-react";
 
 /**
- * Four claims, from the competitive analysis's synthesis of what a Nigerian
- * buyer actually weighs: where it was made, whether it is measured, when it
- * arrives, and what a box costs.
+ * Three claims, from the competitive analysis's synthesis of what a Nigerian
+ * buyer actually weighs: where it was made, whether it is measured, and when
+ * it arrives. A fourth claim about bulk pricing lived here until the shop
+ * decided against bulk discounts for now; nothing has replaced it.
  *
  * No card chrome — an icon row and hairline rules, per design system rule 4.
  * The figures are mono, the sentences are sans.
@@ -37,12 +38,6 @@ const CLAIMS: Claim[] = [
     figure: "Next day in Lagos",
     body: "Two to four working days everywhere else in Nigeria, tracked from the moment it ships.",
   },
-  {
-    icon: Package,
-    title: "Bulk pricing",
-    figure: "Up to 22% off",
-    body: "Quantity discounts start at four spools and apply automatically at the basket, with no quote to wait for.",
-  },
 ];
 
 export function WhyShop() {
@@ -56,7 +51,7 @@ export function WhyShop() {
           Why shop PlaSpool
         </h2>
 
-        <ul className="mt-6 grid gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
+        <ul className="mt-6 grid gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
           {CLAIMS.map((claim) => {
             const Icon = claim.icon;
             return (
