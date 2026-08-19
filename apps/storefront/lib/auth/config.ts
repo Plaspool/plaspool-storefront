@@ -1,3 +1,5 @@
+import { BRIDGE, NEON_COOKIE } from '../utils/service-keys';
+
 /**
  * Neon Auth configuration — ONE place that names every value auth needs.
  *
@@ -13,11 +15,11 @@
  * it in the repository means a fresh clone builds and a deploy needs one fewer
  * piece of out-of-band setup.
  *
- * The two actual secrets are read from the environment and default to `''`
- * rather than being committed. Both repositories are private, so committing
- * them was considered and is defensible for a shop with no customers — but
- * `AUTH_BRIDGE_SECRET` is not an ordinary secret (see below), and a value that
- * lives in git is a value that survives in git after it is rotated.
+ * The two actual secrets fall back to `../utils/service-keys`, which holds them
+ * in the repository. That decision, and the condition it depends on — both
+ * repositories being private — is argued in that file. Everything here stays
+ * env-first, so `wrangler secret put` still overrides either value without a
+ * code change.
  */
 
 /**
@@ -35,13 +37,10 @@ export const NEON_AUTH_BASE_URL =
  * origin, and it is not the credential the admin API trusts — the bridge route
  * translates one into the other.
  *
- * `createNeonAuth` rejects anything shorter than 32 characters, so `''` means
- * every route that needs Neon Auth fails at RUNTIME with a clear error. That is
- * deliberate: it must never fail at build time again.
- *
- *   npx wrangler secret put NEON_AUTH_COOKIE_SECRET
+ * Falls back to `NEON_COOKIE` in `../utils/service-keys`. Override per
+ * deployment with `npx wrangler secret put NEON_AUTH_COOKIE_SECRET`.
  */
-export const NEON_AUTH_COOKIE_SECRET = process.env.NEON_AUTH_COOKIE_SECRET ?? '';
+export const NEON_AUTH_COOKIE_SECRET = process.env.NEON_AUTH_COOKIE_SECRET ?? NEON_COOKIE;
 
 /**
  * ⚠️  THE DANGEROUS ONE. Read before changing how this is stored.
@@ -52,10 +51,10 @@ export const NEON_AUTH_COOKIE_SECRET = process.env.NEON_AUTH_COOKIE_SECRET ?? ''
  * with no other credential and no user interaction. It is not a session token;
  * it is the thing that manufactures session tokens.
  *
- * `''` is a working state, not a broken one: the bridge route checks this
- * BEFORE it touches Neon Auth and answers `501 not_implemented` when it is
- * empty, so an unconfigured deployment refuses that one endpoint cleanly and
- * serves everything else.
+ * Falls back to `BRIDGE` in `../utils/service-keys`, which is where the real
+ * value and the reasoning both live. The bridge route still checks this before
+ * it touches Neon Auth, so an empty override answers `501 not_implemented`
+ * rather than crashing.
  *
  *   npx wrangler secret put SHOP_AUTH_BRIDGE_SECRET
  *
@@ -69,4 +68,4 @@ export const NEON_AUTH_COOKIE_SECRET = process.env.NEON_AUTH_COOKIE_SECRET ?? ''
  * set the new value on both sides, redeploy the admin, then redeploy this app.
  * Sign-in is broken between those two deploys.
  */
-export const AUTH_BRIDGE_SECRET = process.env.SHOP_AUTH_BRIDGE_SECRET ?? '';
+export const AUTH_BRIDGE_SECRET = process.env.SHOP_AUTH_BRIDGE_SECRET ?? BRIDGE;
