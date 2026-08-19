@@ -1,4 +1,4 @@
-import { auth } from '@/lib/auth/server';
+import { getAuth } from '@/lib/auth/server';
 
 /**
  * Sign out of BOTH sessions, Neon's first.
@@ -16,6 +16,6 @@ import { auth } from '@/lib/auth/server';
 export const runtime = 'nodejs';
 
 export async function POST(): Promise<Response> {
-  await auth.signOut();
+  await getAuth().signOut();
   return Response.json({ ok: true });
 }

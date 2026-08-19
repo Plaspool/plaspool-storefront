@@ -1,5 +1,5 @@
 import { createHmac, randomBytes } from 'node:crypto';
-import { auth } from '@/lib/auth/server';
+import { getAuth } from '@/lib/auth/server';
 
 /**
  * Mint a short-lived assertion that the BROWSER carries to the admin API.
@@ -25,7 +25,7 @@ export async function POST(): Promise<Response> {
     return Response.json({ error: 'not_implemented', feature: 'identity-bridge' }, { status: 501 });
   }
 
-  const { data: session } = await auth.getSession();
+  const { data: session } = await getAuth().getSession();
   if (!session?.user) {
     return Response.json({ error: 'unauthorized' }, { status: 401 });
   }
