@@ -124,7 +124,12 @@ function CartButton() {
 
 /** Icon-only from `md`, where the six category names already fill most of
  *  the row; the label rejoins at `xl` once there is room for it. The
- *  accessible name always says "Account", labelled or not. */
+ *  accessible name always says "Account", labelled or not.
+ *
+ *  POINTS AT `/sign-in`, NOT `/waitlist`. The waitlist was where this went
+ *  while there was no way to have an account at all; now there is one, and
+ *  `/sign-in` handles the already-signed-in case itself rather than making
+ *  this decide which destination to render. */
 function AccountLink({ className }: { className?: string }) {
   return (
     <Button
@@ -137,7 +142,7 @@ function AccountLink({ className }: { className?: string }) {
         className,
       )}
     >
-      <Link href="/waitlist">
+      <Link href="/sign-in">
         <User aria-hidden="true" className="h-4 w-4" />
         <span className="hidden xl:inline">Account</span>
       </Link>
@@ -181,7 +186,7 @@ function MobileMenu({ categories }: { categories: Category[] }) {
             </ul>
             <Separator className="my-4" />
             <SheetClose asChild>
-              <Link href="/waitlist" className={cn(SHEET_LINK, LINK_FOCUS)}>
+              <Link href="/sign-in" className={cn(SHEET_LINK, LINK_FOCUS)}>
                 <User aria-hidden="true" className="h-4 w-4" />
                 Account
               </Link>
