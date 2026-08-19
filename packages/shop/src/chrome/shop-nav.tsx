@@ -20,6 +20,7 @@ import {
 import { BrandLogo } from "@plaspool/brand";
 
 import { useCart } from "../cart/cart-context";
+import { getShopCustomer } from "../data/auth-api";
 import type { Category } from "../data/types";
 
 /**
@@ -122,6 +123,25 @@ function CartButton() {
   );
 }
 
+/** `/sign-in` for a guest, `/account/orders` once a shop session resolves —
+ *  a signed-in visitor's "Account" affordance should reach their orders, not
+ *  a page that just tells them they're already signed in. Starts at
+ *  `/sign-in` and flips after the one-shot session check, same "answers null
+ *  rather than throwing" contract `getShopCustomer` documents. */
+function useAccountHref(): string {
+  const [href, setHref] = React.useState("/sign-in");
+  React.useEffect(() => {
+    let cancelled = false;
+    getShopCustomer().then((customer) => {
+      if (!cancelled && customer) setHref("/account/orders");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return href;
+}
+
 /** Icon-only from `md`, where the six category names already fill most of
  *  the row; the label rejoins at `xl` once there is room for it. The
  *  accessible name always says "Account", labelled or not.
@@ -129,8 +149,10 @@ function CartButton() {
  *  POINTS AT `/sign-in`, NOT `/waitlist`. The waitlist was where this went
  *  while there was no way to have an account at all; now there is one, and
  *  `/sign-in` handles the already-signed-in case itself rather than making
- *  this decide which destination to render. */
+ *  this decide which destination to render — except for the signed-in case,
+ *  which `useAccountHref` resolves to `/account/orders` instead. */
 function AccountLink({ className }: { className?: string }) {
+  const href = useAccountHref();
   return (
     <Button
       asChild
@@ -142,7 +164,7 @@ function AccountLink({ className }: { className?: string }) {
         className,
       )}
     >
-      <Link href="/sign-in">
+      <Link href={href}>
         <User aria-hidden="true" className="h-4 w-4" />
         <span className="hidden xl:inline">Account</span>
       </Link>
@@ -151,6 +173,7 @@ function AccountLink({ className }: { className?: string }) {
 }
 
 function MobileMenu({ categories }: { categories: Category[] }) {
+  const accountHref = useAccountHref();
   return (
     <Sheet>
       <SheetTrigger asChild>
@@ -186,7 +209,7 @@ function MobileMenu({ categories }: { categories: Category[] }) {
             </ul>
             <Separator className="my-4" />
             <SheetClose asChild>
-              <Link href="/sign-in" className={cn(SHEET_LINK, LINK_FOCUS)}>
+              <Link href={accountHref} className={cn(SHEET_LINK, LINK_FOCUS)}>
                 <User aria-hidden="true" className="h-4 w-4" />
                 Account
               </Link>
