@@ -4,7 +4,7 @@ import { Badge, cn } from "@plaspool/ui";
 import type { Product } from "../data/types";
 import { cheapestSize, firstInStockColour, priceFrom } from "../data/money";
 import { CardAddButton } from "./card-add-button";
-import { SpoolImage } from "./spool-image";
+import { ProductPhoto } from "./product-photo";
 import { Price } from "./price";
 import { ColourSwatches } from "./colour-swatches";
 import { RatingStars } from "./rating-stars";
@@ -45,10 +45,11 @@ export function ProductCard({ product, className }: ProductCardProps) {
           is a sibling of the link rather than a child of it. */}
       <div className="relative overflow-hidden rounded-lg border border-brand-line bg-background">
         <div className="aspect-square p-3">
-          <SpoolImage
+          <ProductPhoto
+            src={colour.imageUrl ?? product.coverImageUrl}
+            alt={`${product.name} spool in ${colour.name}`}
             colourHex={colour.hex}
             weightGrams={size.weightGrams}
-            label={`${product.name} spool in ${colour.name}`}
             className="h-full w-full"
           />
         </div>

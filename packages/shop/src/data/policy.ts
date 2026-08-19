@@ -40,16 +40,20 @@ export const STANDARD_TIERS: BulkTier[] = [];
  * that animation, not an inventory claim, which is why they keep `inStock: true`
  * without consulting anything. Real colours and real availability come from
  * variants, through `coloursFrom` in `api.ts`.
+ *
+ * `imageUrl: null` on every one of them for the same reason: these name no
+ * product, so there is no photograph of them to have. The carousel draws the
+ * generated spool, which is what it has always drawn and what it should draw.
  */
 export const HERO_COLOURS: Record<string, Colour> = {
-  "obsidian-black": { id: "obsidian-black", name: "Obsidian black", hex: "#101014", inStock: true },
-  "signal-red": { id: "signal-red", name: "Signal red", hex: "#C42B2B", inStock: true },
-  "lagos-orange": { id: "lagos-orange", name: "Lagos orange", hex: "#E2620F", inStock: true },
-  "solar-yellow": { id: "solar-yellow", name: "Solar yellow", hex: "#E8B71A", inStock: true },
-  "palm-green": { id: "palm-green", name: "Palm green", hex: "#1F7A4C", inStock: true },
-  "deep-teal": { id: "deep-teal", name: "Deep teal", hex: "#12626B", inStock: true },
-  "cobalt-blue": { id: "cobalt-blue", name: "Cobalt blue", hex: "#1B4FA8", inStock: true },
-  "brand-navy": { id: "brand-navy", name: "Spool navy", hex: "#231C50", inStock: true },
-  "clay-brown": { id: "clay-brown", name: "Clay brown", hex: "#7A4B2A", inStock: true },
-  "arctic-white": { id: "arctic-white", name: "Arctic white", hex: "#F4F4F6", inStock: true },
+  "obsidian-black": { id: "obsidian-black", name: "Obsidian black", hex: "#101014", inStock: true, imageUrl: null },
+  "signal-red": { id: "signal-red", name: "Signal red", hex: "#C42B2B", inStock: true, imageUrl: null },
+  "lagos-orange": { id: "lagos-orange", name: "Lagos orange", hex: "#E2620F", inStock: true, imageUrl: null },
+  "solar-yellow": { id: "solar-yellow", name: "Solar yellow", hex: "#E8B71A", inStock: true, imageUrl: null },
+  "palm-green": { id: "palm-green", name: "Palm green", hex: "#1F7A4C", inStock: true, imageUrl: null },
+  "deep-teal": { id: "deep-teal", name: "Deep teal", hex: "#12626B", inStock: true, imageUrl: null },
+  "cobalt-blue": { id: "cobalt-blue", name: "Cobalt blue", hex: "#1B4FA8", inStock: true, imageUrl: null },
+  "brand-navy": { id: "brand-navy", name: "Spool navy", hex: "#231C50", inStock: true, imageUrl: null },
+  "clay-brown": { id: "clay-brown", name: "Clay brown", hex: "#7A4B2A", inStock: true, imageUrl: null },
+  "arctic-white": { id: "arctic-white", name: "Arctic white", hex: "#F4F4F6", inStock: true, imageUrl: null },
 };

@@ -74,6 +74,9 @@ export interface ApiVariant {
   /** Null when the variant has no inventory row at all, which is not zero. */
   available: number | null;
   backorderable: boolean;
+  /** Relative (`/api/public/images/…`); null until this colour is photographed.
+   *  Resolved server-side — see `Plaspool/plaspool-admin#39`. */
+  imageUrl?: string | null;
 }
 
 export interface ApiProduct {
@@ -271,7 +274,10 @@ function idOf(value: string): string {
  * render as something; grey reads as "no colour set" rather than as a claim.
  */
 export function coloursFrom(variants: ApiVariant[]): Colour[] {
-  const byName = new Map<string, { name: string; hex: string | null; inStock: boolean }>();
+  const byName = new Map<
+    string,
+    { name: string; hex: string | null; inStock: boolean; imageUrl: string | null }
+  >();
   for (const variant of variants) {
     const name = (variant.optionValues.Colour ?? variant.optionValues.colour ?? "").trim();
     if (!name) continue;
@@ -287,8 +293,14 @@ export function coloursFrom(variants: ApiVariant[]): Colour[] {
     if (existing) {
       existing.inStock = existing.inStock || sellable;
       existing.hex = existing.hex ?? variant.colorHex;
+      existing.imageUrl = existing.imageUrl ?? variant.imageUrl ?? null;
     } else {
-      byName.set(key, { name, hex: variant.colorHex, inStock: sellable });
+      byName.set(key, {
+        name,
+        hex: variant.colorHex,
+        inStock: sellable,
+        imageUrl: variant.imageUrl ?? null,
+      });
     }
   }
   return [...byName.entries()].map(([id, c]) => ({
@@ -296,6 +308,10 @@ export function coloursFrom(variants: ApiVariant[]): Colour[] {
     name: c.name,
     hex: c.hex ?? "#8a8a94",
     inStock: c.inStock,
+    /* THE FIRST PHOTOGRAPH WINS. A colour is several variants — one per weight —
+       and they are the same spool in the same colour, so the first one anybody
+       photographed is the picture of it. */
+    imageUrl: imageUrl(c.imageUrl),
   }));
 }
 
@@ -461,7 +477,17 @@ export function toProduct(api: ApiProduct, ctx: AdaptContext): Product | null {
       ctx.categorySlugByName.get(api.category.trim().toLowerCase()) ?? idOf(api.category),
     material: materialFrom(api.tags),
     diameterMm: diameterFrom(variants),
-    colours: colours.length ? colours : [{ id: "default", name: "Standard", hex: "#8a8a94", inStock: true }],
+    colours: colours.length
+      ? colours
+      : [
+          {
+            id: "default",
+            name: "Standard",
+            hex: "#8a8a94",
+            inStock: true,
+            imageUrl: imageUrl(api.coverImageUrl),
+          },
+        ],
     sizes,
     /* A POLICY CONSTANT, NOT PRODUCT DATA — `policy.ts` sets out why, and why
        every product currently gets the same ladder. */
@@ -472,6 +498,14 @@ export function toProduct(api: ApiProduct, ctx: AdaptContext): Product | null {
     overviewClaims: [],
     description,
     parameters: null,
+    /* ═══ THE PICTURES THE SHOP ACTUALLY UPLOADED ═══
+       The API has sent `coverImageUrl`/`imageUrls` all along and this mapper
+       dropped them, so every surface in the storefront drew the generated
+       `SpoolImage` instead and a photograph set in the admin never reached a
+       customer. Absolute here, because `imageUrl()` owns the one place the
+       API's origin is prefixed. */
+    coverImageUrl: imageUrl(api.coverImageUrl),
+    imageUrls: (api.imageUrls ?? []).map((u) => imageUrl(u)).filter((u): u is string => !!u),
     /* Reviews are their own API and their own cache window — the product page
        fetches the prose beside this rather than through it, so a review write
        never invalidates the catalogue. What a CARD needs is one number, and
