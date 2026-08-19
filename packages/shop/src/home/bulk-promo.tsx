@@ -6,8 +6,13 @@ import { formatNaira } from "../data/money";
 import { BulkTierTable } from "../components/bulk-tier-table";
 
 /**
- * The dark band, and the page's one inverted surface. `id="bulk"` is the
- * anchor the hero's "Bulk pricing" button jumps to.
+ * The dark band, and the page's one inverted surface.
+ *
+ * `id="bulk"` no longer has anything pointing at it. The hero's second CTA used
+ * to jump here; it now goes to the full catalogue, because this band renders
+ * nothing while the discount ladder is empty and a link to a section that does
+ * not render is worse than no link. The id stays so the anchor works again the
+ * moment real tiers do.
  *
  * The visual is the ladder itself — there is no illustration here and
  * deliberately no spool: `SpoolImage` fills its flanges and bore with
