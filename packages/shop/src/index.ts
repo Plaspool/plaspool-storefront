@@ -7,6 +7,7 @@ export * from "./data/config";
 export * from "./data/reviews";
 export * from "./data/catalog";
 export * from "./data/auth-api";
+export * from "./data/checkout-api";
 
 // Presentational primitives. Every later surface — cards, listings, the
 // product page, the cart — composes from these.
@@ -94,3 +95,10 @@ export * from "./waitlist/metadata";
 // The assembled `/store/products/<slug>`, and the metadata and static params
 // the host route re-exports.
 export * from "./product/product-page";
+
+// Checkout: cart entry, the address/delivery/contact/review flow, and the
+// Paystack return route. See `checkout/checkout-flow.tsx` for why it is one
+// component rather than one route per step.
+export * from "./checkout/checkout-flow";
+export * from "./checkout/checkout-complete";
+export * from "./checkout/cart-page";
