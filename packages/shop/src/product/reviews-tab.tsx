@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { MessageSquareText } from "lucide-react";
-import { cn } from "@plaspool/ui";
+import { Skeleton, SkeletonText, cn } from "@plaspool/ui";
 
 import { REVIEWS_PER_PAGE } from "../data/config";
 import { listReviewsFromBrowser, starsFromAggregate } from "../data/reviews";
@@ -187,6 +187,18 @@ export function ReviewsTab({
             {reviews.map((review) => (
               <ReviewCard key={review.id} review={review} />
             ))}
+            {/* The next page, shaped like a review — see the same treatment on
+                the orders list, and `CLAUDE.md`'s "Loading states" rule. */}
+            {loading &&
+              Array.from({ length: 2 }, (_, i) => (
+                <li key={`pending-${i}`} aria-hidden="true" className="border-b border-brand-line py-6">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-3 w-24" />
+                    <Skeleton className="h-3 w-20" />
+                  </div>
+                  <SkeletonText className="mt-3" lines={3} />
+                </li>
+              ))}
           </ul>
 
           {cursor && (
@@ -195,13 +207,14 @@ export function ReviewsTab({
                 type="button"
                 onClick={loadMore}
                 disabled={loading}
+                aria-busy={loading}
                 className={cn(
                   "inline-flex h-10 items-center justify-center rounded-md border border-brand-line px-4 font-sans text-sm",
                   "transition-colors hover:border-foreground motion-reduce:transition-none disabled:opacity-50",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                 )}
               >
-                {loading ? "Loading…" : "Load more reviews"}
+                Load more reviews
               </button>
               {failed && (
                 <p role="alert" className="text-sm text-destructive">
