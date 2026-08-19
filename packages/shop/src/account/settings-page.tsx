@@ -6,7 +6,7 @@ import { LogOut, MapPin } from "lucide-react";
 import { Button, Skeleton, SkeletonRegion } from "@plaspool/ui";
 
 import { Avatar } from "./avatar";
-import { getShopCustomer, signOutEverywhere, type ShopCustomer } from "../data/auth-api";
+import { readShopSession, signOutEverywhere, type ShopCustomer } from "../data/auth-api";
 import { listSavedAddresses } from "../data/orders-api";
 import { readSavedAddress } from "../checkout/saved-address";
 import type { Address } from "../data/checkout-api";
@@ -42,15 +42,26 @@ import type { Address } from "../data/checkout-api";
 export function AccountSettingsPage() {
   const router = useRouter();
   const [state, setState] = React.useState<
-    { kind: "loading" } | { kind: "guest" } | { kind: "ready"; customer: ShopCustomer }
+    | { kind: "loading" }
+    | { kind: "guest" }
+    | { kind: "failed" }
+    | { kind: "ready"; customer: ShopCustomer }
   >({ kind: "loading" });
   const [signingOut, setSigningOut] = React.useState(false);
   const [addresses, setAddresses] = React.useState<Address[]>([]);
 
   React.useEffect(() => {
     let cancelled = false;
-    void getShopCustomer().then((customer) => {
+    void readShopSession().then((result) => {
       if (cancelled) return;
+      /* An unreachable API is not a signed-out shopper — see `orders-list.tsx`.
+         Reported here rather than redirected: being bounced to a login screen
+         by a timeout is the same lie the header was fixed to stop telling. */
+      if (result.kind === "unknown") {
+        setState({ kind: "failed" });
+        return;
+      }
+      const customer = result.kind === "customer" ? result.customer : null;
       if (!customer) {
         setState({ kind: "guest" });
         /* `?next=` SO SIGNING IN RETURNS YOU HERE. Without it a shopper whose
@@ -69,6 +80,28 @@ export function AccountSettingsPage() {
       cancelled = true;
     };
   }, [router]);
+
+  if (state.kind === "failed") {
+    return (
+      <Shell>
+        <h1 className="font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+          Account
+        </h1>
+        <p role="alert" className="mt-6 border border-red-700 px-4 py-3 font-sans text-sm text-red-700">
+          We couldn&apos;t reach your account just now. This doesn&apos;t mean you&apos;re signed
+          out — try again in a moment.
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => window.location.reload()}
+          className="mt-4"
+        >
+          Try again
+        </Button>
+      </Shell>
+    );
+  }
 
   if (state.kind !== "ready") {
     /* The layout is known, so it is drawn — see `CLAUDE.md`, "Loading states". */

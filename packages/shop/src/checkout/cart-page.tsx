@@ -28,6 +28,31 @@ export function CartPage() {
 
   if (!cart.hydrated) return null;
 
+  /* ═══ THE SAME GUARD THE DRAWER HAS, ON THE PAGE A BOOKMARK LANDS ON ═══
+     The drawer stopped asserting an empty basket on a failed read; this page
+     and the checkout did not, so the identical failure produced "Your cart is
+     empty" here and "We couldn't load your cart" in the drawer — at the same
+     instant, about the same cart. An empty basket and an unreadable one are
+     different claims and only one of them is ours to make. */
+  if (cart.problem) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
+        <h1 className="font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+          Your cart
+        </h1>
+        <p
+          role="alert"
+          className="mt-8 border border-red-700 px-4 py-3 font-sans text-sm text-red-700"
+        >
+          {cart.problem}
+        </p>
+        <Button type="button" variant="outline" onClick={() => window.location.reload()} className="mt-4">
+          Try again
+        </Button>
+      </div>
+    );
+  }
+
   if (cart.resolved.length === 0) {
     return (
       <div className="mx-auto max-w-xl px-4 py-16 sm:px-6">
