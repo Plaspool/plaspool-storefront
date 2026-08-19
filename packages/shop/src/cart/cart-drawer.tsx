@@ -29,9 +29,9 @@ import type { CartLineKey, ResolvedLine } from "./types";
  * controls that open it (the nav's cart icon, a successful add, "Buy Now")
  * live elsewhere in the tree and just call `open()` on the shared context.
  *
- * Checkout does not exist yet. The footer says so in a plain sentence instead
- * of showing a disabled "Checkout" button — a disabled control invites
- * clicking; a sentence explains.
+ * Checkout exists now — the footer's "Checkout" link is the drawer's way in,
+ * landing on `/checkout` (`CheckoutFlow`), which owns everything from the
+ * address on. The drawer itself changes nothing about how a line is edited.
  */
 
 function toKey(line: ResolvedLine): CartLineKey {
@@ -182,8 +182,18 @@ export function CartDrawer() {
               )}
 
               <SheetClose asChild>
-                <Button className="w-full focus-visible:ring-brand focus-visible:ring-offset-background">
-                  Continue shopping
+                <Button asChild className="w-full focus-visible:ring-brand focus-visible:ring-offset-background">
+                  <Link href="/checkout">Checkout</Link>
+                </Button>
+              </SheetClose>
+
+              <SheetClose asChild>
+                <Button
+                  asChild
+                  variant="outline"
+                  className="w-full focus-visible:ring-brand focus-visible:ring-offset-background"
+                >
+                  <Link href="/cart">View cart</Link>
                 </Button>
               </SheetClose>
 
@@ -191,11 +201,9 @@ export function CartDrawer() {
                   TRUE OF A `localStorage` CART AND IS NOT TRUE OF THIS ONE. The
                   basket is now held by the commerce API against a cookie, so it
                   survives a reload and a new tab in this browser, and it
-                  EXPIRES — the cart cookie carries a two-week `Max-Age`.
-                  Promising a basket keeps itself indefinitely on a device is a
-                  promise the server does not make. */}
+                  EXPIRES — the cart cookie carries a two-week `Max-Age`. */}
               <p className="text-center text-xs text-muted-foreground">
-                {"We're still building checkout. Your cart is saved for two weeks — come back to it in this browser."}
+                {"Your cart is saved for two weeks — come back to it in this browser."}
               </p>
             </SheetFooter>
           </>

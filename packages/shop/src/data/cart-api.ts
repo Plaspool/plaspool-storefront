@@ -71,7 +71,7 @@ export interface ApiCartPreview {
  * window in which the two disagree.
  */
 export interface ApiCartView {
-  cart: { id: string; currency: string; status: string } | null;
+  cart: { id: string; currency: string; status: string; revision: number } | null;
   lines: ApiCartLine[];
   /** Null only when the cart is unreadable; an empty cart still previews zero. */
   preview: ApiCartPreview | null;
@@ -116,8 +116,20 @@ export function createCart(): Promise<ApiCartView | null> {
   return call("/cart", { method: "POST" });
 }
 
-export function addLine(variantId: string, qty: number): Promise<ApiCartView | null> {
-  return call("/cart/lines", { method: "POST", body: JSON.stringify({ variantId, qty }) });
+/**
+ * `baseRevision` is the cart's CURRENT revision, and it changes after almost
+ * every call — see the file header on `/cart/lines`. Reading it back with a
+ * fresh `GET` rather than tracking a local counter costs one extra round trip
+ * per add, and it is the round trip that avoids the `400 {"detail":
+ * "baseRevision"}` a stale value produces.
+ */
+export async function addLine(variantId: string, qty: number): Promise<ApiCartView | null> {
+  const current = await call("/cart");
+  if (!current?.cart) return null;
+  return call("/cart/lines", {
+    method: "POST",
+    body: JSON.stringify({ variantId, qty, baseRevision: current.cart.revision }),
+  });
 }
 
 export function setLineQty(lineId: string, qty: number): Promise<ApiCartView | null> {

@@ -31,10 +31,13 @@ import { useCart } from "../cart/cart-context";
  */
 
 /**
- * "Buy Now" adds the line and opens the drawer. There is no checkout, and
- * there is not going to be a fake one: a checkout that cannot take money is a
- * worse lie than an absent one. So the button does the only honest thing a
- * buy button can do here, and its label is what happens.
+ * "Buy Now" adds the line and opens the drawer, same as before — checkout
+ * exists now, but the drawer's own "Checkout" button is the way in, and this
+ * button's job stops at getting the item into the cart. Making "Buy Now"
+ * itself jump straight to `/checkout` would skip the one place a customer
+ * sees the drawer confirm what was actually added, and would special-case
+ * this button against every other add-to-cart control in the store for a
+ * step that is one click away either way.
  */
 export function BuyNowButton({
   line,
