@@ -56,6 +56,31 @@ function referenceToIntentId(reference: string): string {
   return reference.replace(/-/g, "_");
 }
 
+/*
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ⚠️  THE POLL WINDOW IS COUPLED TO THE ADMIN'S SWEEP CRON. Changing either
+ *     one alone is the trap.
+ *
+ * 12 attempts × 5s = SIXTY SECONDS before this settles on "still confirming".
+ * That number is not arbitrary: the order is created by the outbox sweep in
+ * `plaspool-admin`, not by the webhook — Vercel freezes the function after it
+ * responds — so this window has to outlast the gap between sweeps.
+ *
+ * The cron currently runs every minute, which is inside this window, so a
+ * customer watches the page flip from pending to confirmed. **If that cadence
+ * is slowed** — and there is a live reason to slow it, since a 1-minute cron
+ * keeps Neon's free-tier compute awake 24/7 and exhausts its monthly hours in
+ * about a week — **this window must widen to match.** Leaving them mismatched
+ * means every single order times out on screen, which reads as a failure to
+ * the one person least able to tell the difference.
+ *
+ * The honest alternative at a slower cadence is to stop polling early and say
+ * "we will email you when it is confirmed", which is true and calm, rather than
+ * spinning for a minute and then looking broken.
+ *
+ * The counterpart comment lives on `GET /admin/sweep` in the admin repo.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 export function CheckoutComplete() {
   const params = useSearchParams();
   const reference = params.get("reference") ?? params.get("trxref");
