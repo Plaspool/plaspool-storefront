@@ -77,6 +77,27 @@ export interface CartApi {
    */
   changes: { lineId?: string; reason?: string }[];
   add(key: CartLineKey, qty?: number): void;
+  /**
+   * Add several lines at once, BY VARIANT ID rather than by the (product,
+   * colour, size) triple the UI names a row by.
+   *
+   * This exists for "order it again", where the source is an order line and an
+   * order line carries a `variantId` and nothing the catalogue keys on. A
+   * variant the catalogue no longer sells is skipped rather than failing the
+   * whole reorder — the count comes back so the caller can say what happened
+   * instead of silently delivering a shorter basket.
+   */
+  addVariants(items: { variantId: string; qty: number }[]): Promise<{
+    /** UNITS that reached the basket — the same thing `itemCount` counts, so a
+     *  reorder's message cannot contradict the badge it just changed. */
+    added: number;
+    /** Lines whose write failed. The caller must say so: a basket that did not
+     *  change while the page claims it did is the worst available outcome. */
+    failed: number;
+    /** Variants the catalogue no longer sells. Returned as ids rather than a
+     *  count so the caller can name what it left out. */
+    skippedVariantIds: string[];
+  }>;
   setQty(key: CartLineKey, qty: number): void;
   remove(key: CartLineKey): void;
   clear(): void;
