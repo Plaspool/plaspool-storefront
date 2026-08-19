@@ -102,3 +102,9 @@ export * from "./product/product-page";
 export * from "./checkout/checkout-flow";
 export * from "./checkout/checkout-complete";
 export * from "./checkout/cart-page";
+
+// Order history: `/account/orders` (the signed-in list) and
+// `/account/orders/[orderNumber]` (one order, signed-in or guest-with-token).
+export * from "./data/orders-api";
+export * from "./account/orders-list";
+export * from "./account/order-detail";

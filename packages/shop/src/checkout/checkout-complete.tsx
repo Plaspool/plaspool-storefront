@@ -9,6 +9,7 @@ import { Button, NEO_SURFACE, cn } from "@plaspool/ui";
 import { EmptyState } from "../components/empty-state";
 import { confirmPaymentIntent, getPaymentIntent } from "../data/checkout-api";
 import type { PaymentIntent } from "../data/checkout-api";
+import { getShopCustomer } from "../data/auth-api";
 
 /**
  * `/checkout/complete` — where Paystack sends the customer back.
@@ -27,9 +28,14 @@ import type { PaymentIntent } from "../data/checkout-api";
  * a minute after the customer is already looking at this page. That is not a
  * failure to render — it is the expected shape of the return trip, and this
  * page's whole job is to say so instead of guessing "payment failed" from an
- * order it cannot find. There is no order-lookup call here at all (order
- * history is out of scope for this change — see the report) so "pending" is
- * rendered from the intent's own status, not from a failed order fetch.
+ * order it cannot find. There is still no order-lookup call here — "pending"
+ * is rendered from the intent's own status, never from a failed order fetch —
+ * because this page has no order number to look up, only a payment intent id,
+ * and the order response deliberately omits `paymentIntentId` so there is no
+ * way back from one to the other. A signed-in customer is pointed at
+ * `/account/orders` instead, where the order they just paid for will have
+ * landed by the time they open it; a guest gets no link here, since there is
+ * no order number to attach a guest token to yet.
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * `reference` IS OUR OWN `payment_intents.id` WITH UNDERSCORES TURNED TO
@@ -58,6 +64,17 @@ export function CheckoutComplete() {
     reference ? { kind: "loading" } : { kind: "no_reference" },
   );
   const attemptsRef = React.useRef(0);
+  const [signedIn, setSignedIn] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    getShopCustomer().then((customer) => {
+      if (!cancelled && customer) setSignedIn(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   React.useEffect(() => {
     if (!reference) return;
@@ -153,11 +170,21 @@ export function CheckoutComplete() {
         <EmptyState
           icon={<CheckCircle2 aria-hidden="true" className="text-brand" />}
           title="Payment received"
-          body="Your order is being created now — this usually finishes within a minute of paying. A receipt is on its way to your email; there is nowhere to track it on the store yet, so hold onto that email."
+          body={
+            signedIn
+              ? "Your order is being created now — this usually finishes within a minute of paying. It will appear in your orders shortly; a receipt is also on its way to your email."
+              : "Your order is being created now — this usually finishes within a minute of paying. A receipt is on its way to your email; there is nowhere to track it on the store yet, so hold onto that email."
+          }
           action={
-            <Button asChild className="focus-visible:ring-brand focus-visible:ring-offset-background">
-              <Link href="/store">Continue shopping</Link>
-            </Button>
+            signedIn ? (
+              <Button asChild className="focus-visible:ring-brand focus-visible:ring-offset-background">
+                <Link href="/account/orders">View your orders</Link>
+              </Button>
+            ) : (
+              <Button asChild className="focus-visible:ring-brand focus-visible:ring-offset-background">
+                <Link href="/store">Continue shopping</Link>
+              </Button>
+            )
           }
         />
       )}
