@@ -8,14 +8,12 @@ import { Button, Input, Label, NEO_SURFACE, cn } from "@plaspool/ui";
 import { EmptyState } from "../components/empty-state";
 import { formatNaira } from "../data/money";
 import { getShopCustomer } from "../data/auth-api";
+import { majorUnits } from "../data/cart-api";
 import { useCart } from "../cart/cart-context";
 import {
-  confirmPaymentIntent,
   createPaymentIntent,
   currentCartRevision,
   freezeCheckout,
-  getPaymentIntent,
-  newIdempotencyKey,
   setCheckoutAddress,
   setCheckoutShipping,
   startCheckout,
@@ -104,7 +102,16 @@ function errorCopy(error: CheckoutError): { title: string; body: string } {
   }
 }
 
-function ErrorBanner({ error }: { error: CheckoutError }) {
+function ErrorBanner({
+  error,
+  action,
+}: {
+  error: CheckoutError;
+  /** A control the customer can actually take, e.g. "gone" sending them back
+   *  to the cart. Optional — most errors here are recoverable by trying the
+   *  same step again, which the form's own submit already offers. */
+  action?: React.ReactNode;
+}) {
   const { title, body } = errorCopy(error);
   return (
     <div className="mb-4 flex gap-3 border-2 border-foreground bg-destructive/10 p-4">
@@ -112,6 +119,7 @@ function ErrorBanner({ error }: { error: CheckoutError }) {
       <div>
         <p className="font-sans text-sm font-semibold text-foreground">{title}</p>
         <p className="mt-0.5 font-sans text-sm text-muted-foreground">{body}</p>
+        {action && <div className="mt-3">{action}</div>}
       </div>
     </div>
   );
@@ -169,6 +177,35 @@ export function CheckoutFlow() {
   const [totals, setTotals] = React.useState<FrozenTotals | null>(null);
   const [checkoutId, setCheckoutId] = React.useState<string | null>(null);
   const [redirecting, setRedirecting] = React.useState(false);
+
+  /**
+   * Minted ONCE, when the checkout freezes, and reused for every `payNow`
+   * attempt after that — never `crypto.randomUUID()` per click.
+   *
+   * THE SERVER DEDUPES ON THIS KEY, AND DERIVES THE PAYSTACK REFERENCE FROM
+   * THE RESULTING INTENT ID. A fresh key per click is not a retry — it is a
+   * second live transaction: a new `payment_intents` row, a new provider
+   * reference, a second authorization page a customer can genuinely pay on.
+   * `checkout-api.ts`'s own header already promised "reusing one on a genuine
+   * retry is what stops a double charge" — this is what makes that true.
+   *
+   * Derived from `checkoutId` (the cart id) rather than random, so it is
+   * reproducible without being stored anywhere beyond this component's state:
+   * a double-click, or a Back-then-retry into a bfcache-restored review step,
+   * replays the same key and gets back the SAME intent (200, same
+   * `authorizationUrl`) rather than minting a second one. It is not reused
+   * across a different checkout — a new freeze (new `checkoutId`) derives a
+   * new key — and the server's own replay fingerprint is `(checkoutId,
+   * amount, currency)`, which deliberately excludes email, so correcting a
+   * refused email and retrying still reaches the provider rather than
+   * replaying a request the provider rejected for an unrelated reason.
+   */
+  const [idempotencyKey, setIdempotencyKey] = React.useState<string | null>(null);
+  /** A `useState` guard is not enough on its own — two clicks inside one
+   *  render/commit cycle can both read `busy === false` before either write
+   *  lands. This ref is set synchronously, inside the click handler, before
+   *  anything is awaited. */
+  const payingRef = React.useRef(false);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -271,6 +308,9 @@ export function CheckoutFlow() {
       }
       setTotals(result.data.totals);
       setCheckoutId(rev.cartId);
+      /* Minted here, once, from the id that will not change for the rest of
+         this checkout attempt — see the field's own doc comment. */
+      setIdempotencyKey(`ckout_${rev.cartId}`);
       setStep("review");
     } finally {
       setBusy(false);
@@ -278,11 +318,20 @@ export function CheckoutFlow() {
   }
 
   async function payNow() {
-    if (!checkoutId || !email) return;
+    if (!checkoutId || !email || !idempotencyKey) return;
+    /* Synchronous, before any `await` — closes the window a `busy` state
+       (which only updates on the next render) leaves open between two clicks
+       or a click racing a bfcache-restored click. */
+    if (payingRef.current) return;
+    payingRef.current = true;
     setBusy(true);
     setError(null);
+    /* A local flag, not the `redirecting` state — a `finally` block closes
+       over the render's stale value of any state variable it did not itself
+       just read fresh, and `setRedirecting` does not mutate that closure. */
+    let handingOff = false;
     try {
-      const result = await createPaymentIntent(checkoutId, email, newIdempotencyKey());
+      const result = await createPaymentIntent(checkoutId, email, idempotencyKey);
       if (!result.ok) {
         setError(result.error);
         return;
@@ -291,12 +340,20 @@ export function CheckoutFlow() {
         setError({ code: "unknown", status: 0, detail: "no_authorization_url" });
         return;
       }
+      handingOff = true;
       setRedirecting(true);
       /* The storefront never touches card data — this is a top-level redirect
          to Paystack's own hosted page, not a fetch. */
       window.location.href = result.data.authorizationUrl;
     } finally {
       setBusy(false);
+      /* NOT reset once the hand-off has started. `window.location.href`
+         begins an unload; anything that runs before the browser actually
+         navigates away — a second click, or a bfcache restore landing back on
+         this exact JS state — must still see `payingRef.current === true`.
+         The reset only happens on a genuine failure, so the customer can
+         retry with the same key. */
+      if (!handingOff) payingRef.current = false;
     }
   }
 
@@ -331,7 +388,23 @@ export function CheckoutFlow() {
         </Link>
 
         <StepHeader step={step} />
-        {error && <ErrorBanner error={error} />}
+        {error && (
+          <ErrorBanner
+            error={error}
+            action={
+              error.code === "gone" ? (
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="border-2 border-foreground bg-background hover:bg-background"
+                >
+                  <Link href="/cart">Back to cart</Link>
+                </Button>
+              ) : undefined
+            }
+          />
+        )}
 
         {step === "address" && (
           <form onSubmit={submitAddress} className="flex flex-col gap-4">
@@ -432,7 +505,7 @@ export function CheckoutFlow() {
                   </span>
                 </span>
                 <span className="font-mono text-sm tabular-nums text-foreground">
-                  {formatNaira(Math.round(option.amount.amount / 100))}
+                  {formatNaira(majorUnits(option.amount))}
                 </span>
               </label>
             ))}
@@ -505,20 +578,20 @@ export function CheckoutFlow() {
                   <div className="flex items-center justify-between py-1">
                     <span className="font-sans text-sm text-muted-foreground">Subtotal</span>
                     <span className="font-mono text-sm tabular-nums text-foreground">
-                      {formatNaira(Math.round(totals.subtotal.amount / 100))}
+                      {formatNaira(majorUnits(totals.subtotal))}
                     </span>
                   </div>
                   <div className="flex items-center justify-between py-1">
                     <span className="font-sans text-sm text-muted-foreground">Delivery</span>
                     <span className="font-mono text-sm tabular-nums text-foreground">
-                      {formatNaira(Math.round(totals.shippingTotal.amount / 100))}
+                      {formatNaira(majorUnits(totals.shippingTotal))}
                     </span>
                   </div>
                   {totals.taxTotal.amount > 0 && (
                     <div className="flex items-center justify-between py-1">
                       <span className="font-sans text-sm text-muted-foreground">Tax</span>
                       <span className="font-mono text-sm tabular-nums text-foreground">
-                        {formatNaira(Math.round(totals.taxTotal.amount / 100))}
+                        {formatNaira(majorUnits(totals.taxTotal))}
                       </span>
                     </div>
                   )}
@@ -527,7 +600,7 @@ export function CheckoutFlow() {
                       Total
                     </span>
                     <span className="font-mono text-base font-bold tabular-nums text-foreground">
-                      {formatNaira(Math.round(totals.grandTotal.amount / 100))}
+                      {formatNaira(majorUnits(totals.grandTotal))}
                     </span>
                   </div>
                 </div>
@@ -535,7 +608,7 @@ export function CheckoutFlow() {
                 <Button
                   type="button"
                   onClick={payNow}
-                  disabled={busy || redirecting}
+                  disabled={busy || redirecting || error?.code === "gone"}
                   className={cn("h-12 text-base", NEO_SURFACE)}
                 >
                   {(busy || redirecting) && (

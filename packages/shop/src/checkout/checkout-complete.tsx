@@ -65,15 +65,15 @@ export function CheckoutComplete() {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
-    async function poll() {
+    async function poll(reconcile: boolean) {
       attemptsRef.current += 1;
-      // Ask the provider directly on the first pass — it is the fast path to
-      // a genuine capture reaching `captured` without waiting on the webhook
-      // or the sweep.
-      const result =
-        attemptsRef.current === 1
-          ? await confirmPaymentIntent(intentId)
-          : await getPaymentIntent(intentId);
+      // Ask the provider directly (not just our own row) on the first pass,
+      // AND on any pass that follows an errored attempt. `confirm` is the one
+      // call that can resolve a status our own DB has not heard yet — a plain
+      // `getPaymentIntent` after a transient failure would spend the rest of
+      // the poll window re-reading a row the webhook has not touched, with
+      // the sweep not due for up to a minute.
+      const result = reconcile ? await confirmPaymentIntent(intentId) : await getPaymentIntent(intentId);
 
       if (cancelled) return;
 
@@ -83,9 +83,10 @@ export function CheckoutComplete() {
           return;
         }
         // A transient network hiccup on the return trip is not evidence of
-        // anything either — keep the pending state and retry.
+        // anything either — keep the pending state and retry, reconciling
+        // again rather than reading our own possibly-stale row.
         if (attemptsRef.current < 12) {
-          timer = setTimeout(() => void poll(), 5000);
+          timer = setTimeout(() => void poll(true), 5000);
         } else {
           setPhase({ kind: "pending" });
         }
@@ -99,9 +100,11 @@ export function CheckoutComplete() {
       }
       if (intent.status === "requires_payment") {
         // Still waiting on Paystack itself — keep polling a while, then settle
-        // on pending rather than declared-failed.
+        // on pending rather than declared-failed. Re-reading our own row is
+        // enough here: `confirm` already ran this pass and found nothing new,
+        // so the next few passes read cheaply until one does.
         if (attemptsRef.current < 12) {
-          timer = setTimeout(() => void poll(), 5000);
+          timer = setTimeout(() => void poll(false), 5000);
         } else {
           setPhase({ kind: "pending" });
         }
@@ -111,7 +114,7 @@ export function CheckoutComplete() {
       setPhase({ kind: "declined", intent });
     }
 
-    void poll();
+    void poll(true);
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
@@ -120,6 +123,11 @@ export function CheckoutComplete() {
 
   return (
     <div className="mx-auto max-w-xl px-4 py-16 sm:px-6">
+      {/* `EmptyState` renders an `h2` — the page needs its own top-level
+          heading regardless of which phase is showing. Visually hidden: the
+          icon-plus-title inside `EmptyState` already carries the page's
+          purpose for a sighted visitor. */}
+      <h1 className="sr-only">Payment confirmation</h1>
       {phase.kind === "loading" && (
         <EmptyState
           icon={<Clock aria-hidden="true" />}
