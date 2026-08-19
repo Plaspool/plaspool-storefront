@@ -111,4 +111,7 @@ export * from "./checkout/cart-page";
 // `/account/orders/[orderNumber]` (one order, signed-in or guest-with-token).
 export * from "./data/orders-api";
 export * from "./account/orders-list";
+export * from "./account/avatar";
+export * from "./account/account-menu";
+export * from "./account/settings-page";
 export * from "./account/order-detail";
