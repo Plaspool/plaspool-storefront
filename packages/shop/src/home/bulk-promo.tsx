@@ -54,6 +54,14 @@ const INVERTED_TABLE = cn(
 );
 
 export async function BulkPromo() {
+  /*
+   * NO LADDER MEANS NOTHING TO PROMOTE. `STANDARD_TIERS` is empty while the
+   * shop offers no bulk discounts; rendering this band over an empty ladder
+   * would advertise a scheme that does not exist, which is worse than a
+   * shorter home page.
+   */
+  if (!STANDARD_TIERS.length) return null;
+
   const price = await referencePrice();
   /*
    * NOTHING TO QUOTE MEANS NOTHING TO SHOW. An empty catalogue makes this band a
