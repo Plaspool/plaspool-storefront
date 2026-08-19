@@ -76,6 +76,16 @@ export interface CartApi {
    * basket that silently edits itself is the failure this exists to prevent.
    */
   changes: { lineId?: string; reason?: string }[];
+  /**
+   * What the last write ran into, in the shopper's words, or null.
+   *
+   * DISTINCT FROM `changes`, which is the server editing the basket on its own
+   * initiative. This is the shopper's own edit not landing — and it exists
+   * because it used to not exist: every failure was swallowed into "keep
+   * showing what we have", so a cart the server had retired sat on screen with
+   * a Remove button that did nothing and said nothing.
+   */
+  problem: string | null;
   add(key: CartLineKey, qty?: number): void;
   /**
    * Add several lines at once, BY VARIANT ID rather than by the (product,

@@ -22,10 +22,29 @@ import { COMMERCE_API_BASE } from "./config";
  * answers a credentialed preflight. See `Plaspool/plaspool-admin#15`.
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * NOTHING HERE THROWS FOR A NETWORK FAILURE. A cart that cannot reach the API
- * is a cart the customer cannot change, and the drawer says so — but a rejected
- * promise inside a click handler is an unhandled rejection and a dead button.
- * Every call answers `null` instead, and the provider decides what that means.
+ * NOTHING HERE THROWS. A rejected promise inside a click handler is an
+ * unhandled rejection and a dead button, so every call answers a `CartResult`
+ * instead and the provider decides what it means.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * IT USED TO ANSWER `null` FOR EVERYTHING, AND THAT COST A PRODUCTION BUG.
+ *
+ * "The request timed out" and "the server refused this" were the same value, so
+ * the provider — which correctly keeps the basket on screen when the network
+ * drops, because clearing it would look exactly like a customer's cart being
+ * thrown away — also kept it on screen when the server said the cart no longer
+ * existed. After checkout the API answered `409 precondition_failed` on a
+ * converted cart and the drawer showed a dead basket with a Remove button that
+ * did nothing, silently, forever. The API side of that is fixed
+ * (`Plaspool/plaspool-admin#38`); this is the half that made it INVISIBLE.
+ *
+ * The distinction the provider actually needs is three-way:
+ *
+ *   `offline`  — nothing was reached. Keep what is on screen; it is still true.
+ *   `gone`     — the cart is not there (404). Stop drawing it.
+ *   `refused`  — reached, understood, declined (409/400/…). What is on screen
+ *                is stale: resync from the server and say so.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 
 /** Minor units plus a code. `{amount: 2300000, currency: "NGN"}` is ₦23,000. */
@@ -84,23 +103,70 @@ export interface ApiCartView {
   changes: { lineId?: string; reason?: string }[];
 }
 
-async function call(path: string, init: RequestInit = {}): Promise<ApiCartView | null> {
+/**
+ * What a cart call answers. Never a thrown error, never a bare `null`.
+ *
+ * `refused` carries the status because the provider treats a stale-revision
+ * `409` (resync and retry is reasonable) differently from a `400` it cannot
+ * fix, and a human-readable `detail` when the API sent one.
+ */
+export type CartResult =
+  | { ok: true; view: ApiCartView }
+  | { ok: false; reason: "offline" }
+  | { ok: false; reason: "gone" }
+  | { ok: false; reason: "refused"; status: number; detail?: string };
+
+async function call(path: string, init: RequestInit = {}): Promise<CartResult> {
+  let res: Response;
   try {
-    const res = await fetch(`${COMMERCE_API_BASE}/api/shop${path}`, {
+    res = await fetch(`${COMMERCE_API_BASE}/api/shop${path}`, {
       ...init,
       /* The cart's identity. Nothing works without it. */
       credentials: "include",
       headers: init.body ? { "content-type": "application/json" } : undefined,
     });
-    if (!res.ok) return null;
-    return (await res.json()) as ApiCartView;
   } catch {
-    return null;
+    /* THE ONLY CASE WHERE NOTHING IS KNOWN. `fetch` rejects for transport
+       failures — offline, DNS, CORS preflight — and for nothing else. A 4xx is
+       a successful round trip carrying bad news, which is why it is below and
+       not here. */
+    return { ok: false, reason: "offline" };
+  }
+
+  if (res.ok) {
+    try {
+      return { ok: true, view: (await res.json()) as ApiCartView };
+    } catch {
+      /* A 200 whose body is not the cart is not a cart. Treated as a refusal
+         rather than as offline: the server answered, we just cannot use it. */
+      return { ok: false, reason: "refused", status: res.status };
+    }
+  }
+
+  /* 404 IS NOT AN ERROR TO SHOW ANYONE. It means this browser has no cart —
+     because it never had one, because it expired, or because the one it had
+     became an order. All three are "your basket is empty", which is a state,
+     not a failure. */
+  if (res.status === 404) return { ok: false, reason: "gone" };
+
+  return { ok: false, reason: "refused", status: res.status, detail: await detailOf(res) };
+}
+
+/** The API's `detail` string when it sent one. Never trusted to exist, and
+ *  never shown raw to a shopper — the provider writes the copy. */
+async function detailOf(res: Response): Promise<string | undefined> {
+  try {
+    const body = (await res.json()) as { detail?: unknown; error?: unknown };
+    const value = body.detail ?? body.error;
+    return typeof value === "string" ? value : undefined;
+  } catch {
+    return undefined;
   }
 }
 
-/** The current basket. Answers an empty view rather than 404 when there is none. */
-export function readCart(): Promise<ApiCartView | null> {
+/** The current basket. The API answers an empty view rather than 404 when this
+ *  browser has never had one, so `gone` here means a cart that was retired. */
+export function readCart(): Promise<CartResult> {
   return call("/cart");
 }
 
@@ -112,7 +178,7 @@ export function readCart(): Promise<ApiCartView | null> {
  * carts table with empties — and the API's own rate budget on this endpoint is
  * sized for a real basket rather than a page view.
  */
-export function createCart(): Promise<ApiCartView | null> {
+export function createCart(): Promise<CartResult> {
   return call("/cart", { method: "POST" });
 }
 
@@ -123,23 +189,28 @@ export function createCart(): Promise<ApiCartView | null> {
  * per add, and it is the round trip that avoids the `400 {"detail":
  * "baseRevision"}` a stale value produces.
  */
-export async function addLine(variantId: string, qty: number): Promise<ApiCartView | null> {
+export async function addLine(variantId: string, qty: number): Promise<CartResult> {
   const current = await call("/cart");
-  if (!current?.cart) return null;
+  /* The read's own failure is the add's failure, and it is passed through
+     unchanged rather than flattened — a `gone` here means the cart was retired
+     between opening the page and pressing the button, which the provider
+     handles by starting a new one. */
+  if (!current.ok) return current;
+  if (!current.view.cart) return { ok: false, reason: "gone" };
   return call("/cart/lines", {
     method: "POST",
-    body: JSON.stringify({ variantId, qty, baseRevision: current.cart.revision }),
+    body: JSON.stringify({ variantId, qty, baseRevision: current.view.cart.revision }),
   });
 }
 
-export function setLineQty(lineId: string, qty: number): Promise<ApiCartView | null> {
+export function setLineQty(lineId: string, qty: number): Promise<CartResult> {
   return call(`/cart/lines/${encodeURIComponent(lineId)}`, {
     method: "PATCH",
     body: JSON.stringify({ qty }),
   });
 }
 
-export function removeLine(lineId: string): Promise<ApiCartView | null> {
+export function removeLine(lineId: string): Promise<CartResult> {
   return call(`/cart/lines/${encodeURIComponent(lineId)}`, { method: "DELETE" });
 }
 
