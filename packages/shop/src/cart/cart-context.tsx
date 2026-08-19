@@ -4,7 +4,7 @@ import * as React from "react";
 
 import { addLine, createCart, majorUnits, readCart, removeLine, setLineQty } from "../data/cart-api";
 import { lineKey } from "./line-key";
-import type { ApiCartView } from "../data/cart-api";
+import type { ApiCartView, CartResult } from "../data/cart-api";
 import type { CartApi, CartLine, CartLineKey, ResolvedLine } from "./types";
 import type { BulkTier, Colour, SizeOption } from "../data/types";
 
@@ -76,11 +76,24 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
    *  two edits race and land in the order the network chose. */
   const [pending, setPending] = React.useState(false);
 
+  /** What the last write ran into, in the shopper's words. Null when the cart
+   *  and the server agree. */
+  const [problem, setProblem] = React.useState<string | null>(null);
+
   React.useEffect(() => {
     let cancelled = false;
-    void readCart().then((next) => {
+    void readCart().then((result) => {
       if (cancelled) return;
-      if (next) setView(next);
+      if (result.ok) setView(result.view);
+      /* A READ THAT FAILED IS NOT AN EMPTY CART. With nothing set here the
+         drawer falls through to "Your cart is empty", which is an assertion
+         this client is in no position to make when it never heard back — the
+         same class of lie as the dead basket, told the other way round.
+         `gone` is exempt: there genuinely is no cart, and a shopper who has
+         just checked out does not need that in red. */
+      if (!result.ok && result.reason !== "gone") {
+        setProblem("We couldn't load your cart. Refresh to try again.");
+      }
       setHydrated(true);
     });
     return () => {
@@ -131,19 +144,63 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
   );
 
   /**
-   * Every mutation goes through here.
+   * Every mutation goes through here, and what it does depends on WHICH failure.
    *
-   * A NULL ANSWER LEAVES THE PREVIOUS VIEW ALONE rather than clearing it. The
-   * cart client returns null for any failure, and replacing a real basket with
-   * an empty one because a request timed out is the worst available outcome —
-   * it looks exactly like the customer's cart being thrown away.
+   * ═══════════════════════════════════════════════════════════════════════════
+   * THIS USED TO TREAT EVERY FAILURE AS A TIMEOUT.
+   *
+   * The rule was "a null answer leaves the previous view alone", and the
+   * reasoning was sound as far as it went: replacing a real basket with an empty
+   * one because a request timed out looks exactly like a customer's cart being
+   * thrown away. But `cart-api.ts` answered null for a refusal too, so a server
+   * that said "that cart became an order" was handled as though it had said
+   * nothing at all — the drawer kept the dead basket and the Remove button did
+   * nothing, with no error, indefinitely. That is the storefront half of
+   * `Plaspool/plaspool-admin#38`.
+   *
+   *   `offline` — KEEP THE VIEW. Nothing was reached, so what is on screen is
+   *               still the last thing the server said. This is the case the
+   *               original rule was written for, and it is unchanged.
+   *   `gone`    — CLEAR THE VIEW. There is no cart. Continuing to draw one is
+   *               the failure, not the fix.
+   *   `refused` — RESYNC. The server rejected this against a state we evidently
+   *               do not have, so the answer is to go and get the real one
+   *               rather than to guess. A stale revision resolves itself this
+   *               way; anything else at least stops the UI from lying.
+   * ═══════════════════════════════════════════════════════════════════════════
    */
-  const mutate = React.useCallback(async (run: () => Promise<ApiCartView | null>) => {
+  const mutate = React.useCallback(async (run: () => Promise<CartResult>) => {
     setPending(true);
+    setProblem(null);
     try {
-      const next = await run();
-      if (next) setView(next);
-      return next;
+      const result = await run();
+      if (result.ok) {
+        setView(result.view);
+        return result;
+      }
+
+      if (result.reason === "offline") {
+        setProblem("We couldn't reach your cart. Check your connection and try again.");
+        return result;
+      }
+
+      if (result.reason === "gone") {
+        setView(EMPTY);
+        setProblem("That basket is no longer open — it was checked out or it expired.");
+        return result;
+      }
+
+      /* REFUSED. Re-read rather than reason about it: the server is the only
+         thing that knows what the cart actually is now, and every branch of
+         this ends in wanting that answer. */
+      const fresh = await readCart();
+      setView(fresh.ok ? fresh.view : EMPTY);
+      setProblem(
+        fresh.ok && fresh.view.cart
+          ? "That change didn't go through — your cart is up to date now, try again."
+          : "That basket is no longer open — it was checked out or it expired.",
+      );
+      return result;
     } finally {
       setPending(false);
     }
@@ -164,7 +221,18 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
            second create on an existing cookie is a 200 returning the same
            basket, so this is safe to call whenever there is no cart yet. */
         if (!view.cart) await createCart();
-        return addLine(variantId, amount);
+        const added = await addLine(variantId, amount);
+        /* ONE RETRY, AND ONLY FOR `gone`. The API retires the cookie naming a
+           cart that has become an order, so the first add after a checkout finds
+           no cart — and the honest response to "your old basket is finished" is
+           a new basket with the thing they just asked for in it, not an error
+           about a cart they were not thinking about. `createCart` mints one
+           because the cookie is already cleared, so this cannot loop. */
+        if (!added.ok && added.reason === "gone") {
+          const created = await createCart();
+          if (created.ok) return addLine(variantId, amount);
+        }
+        return added;
       });
     },
     [variantFor, open, mutate, view.cart],
@@ -200,14 +268,20 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
       let failed = 0;
       await mutate(async () => {
         if (!view.cart) await createCart();
-        let last: ApiCartView | null = null;
+        let last: CartResult = { ok: false, reason: "gone" };
         for (const item of known) {
-          const next = await addLine(item.variantId, Math.trunc(item.qty));
-          /* THE RESULT, NOT THE INTENTION. `addLine` answers null for any
-             failure and `mutate` deliberately keeps the previous view on null,
-             so a cart write that never landed used to leave the basket
-             untouched, open the drawer on it, and still report success. */
-          if (next) {
+          let next = await addLine(item.variantId, Math.trunc(item.qty));
+          /* The same one-retry rule `add` follows: reordering is the commonest
+             thing to do right after checking out, which is exactly when the
+             previous cart has just been retired. */
+          if (!next.ok && next.reason === "gone") {
+            const created = await createCart();
+            if (created.ok) next = await addLine(item.variantId, Math.trunc(item.qty));
+          }
+          /* THE RESULT, NOT THE INTENTION. A cart write that never landed used
+             to leave the basket untouched, open the drawer on it, and still
+             report success. */
+          if (next.ok) {
             added += Math.trunc(item.qty);
             last = next;
           } else {
@@ -256,7 +330,7 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
   const clear = React.useCallback(() => {
     const ids = view.lines.map((l) => l.id);
     void mutate(async () => {
-      let last: ApiCartView | null = null;
+      let last: CartResult = { ok: false, reason: "gone" };
       for (const id of ids) last = await removeLine(id);
       return last;
     });
@@ -332,6 +406,7 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
       hydrated,
       pending,
       changes: view.changes,
+      problem,
       add,
       addVariants,
       setQty,
@@ -345,6 +420,7 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
     view.lines,
     view.preview,
     view.changes,
+    problem,
     resolved,
     lines,
     hydrated,

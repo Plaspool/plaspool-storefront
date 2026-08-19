@@ -124,11 +124,30 @@ export function CartDrawer() {
           </SheetDescription>
         </SheetHeader>
 
+        {/* THE ONE THING THAT RENDERS BEFORE ANYTHING ELSE. A write that did not
+            land is the shopper's own action failing, and it used to be silent:
+            the drawer kept drawing the basket it already had and the button
+            simply did nothing. `role="alert"` because they pressed something
+            and are owed an answer. */}
+        {cart.problem && (
+          <p
+            role="alert"
+            className="mx-6 mt-4 border border-red-700 px-3 py-2 font-sans text-sm text-red-700"
+          >
+            {cart.problem}
+          </p>
+        )}
+
         {/* Anything derived from the cart renders nothing until hydrated —
             otherwise this would flash an empty cart before the real one
             loads from the server. See cart-context.tsx. */}
 
-        {cart.hydrated && cart.resolved.length === 0 && (
+        {/* `!cart.problem`: an empty basket and an unreadable one are different
+            claims, and only one of them is ours to make. Without this the
+            drawer stacked "We couldn't load your cart" directly on top of "Your
+            cart is empty" — the second sentence being exactly what the first
+            one says we do not know. */}
+        {cart.hydrated && cart.resolved.length === 0 && !cart.problem && (
           <div className="flex flex-1 items-center justify-center">
             <EmptyState
               icon={<ShoppingCart aria-hidden="true" />}
