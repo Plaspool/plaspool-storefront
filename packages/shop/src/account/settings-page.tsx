@@ -91,9 +91,9 @@ export function AccountSettingsPage() {
         <p
           role="alert"
           /* WAS `red-700`, HAND-PICKED. Same colour, now a token
-             (`--destructive-strong`), so the one grep in
-             `destructive-text.test.ts` can hold every failure line in this
-             folder to it instead of each one being someone's memory. */
+             (`--destructive-strong`), so the one grep in `house-rules.test.ts`
+             can hold every failure line in the shop AND in `@plaspool/ui` to it
+             instead of each one being someone's memory. */
           className="mt-6 border border-destructive-strong px-4 py-3 font-sans text-sm text-destructive-strong"
         >
           We couldn&apos;t reach your account just now. This doesn&apos;t mean you&apos;re signed

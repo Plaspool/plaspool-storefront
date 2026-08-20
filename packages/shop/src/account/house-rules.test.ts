@@ -20,6 +20,9 @@ import { describe, expect, it } from "vitest";
 
 const HERE = join(__dirname);
 const SHOP = join(__dirname, "..");
+/** `packages/ui/src` — a sibling PACKAGE, reached deliberately. The note on the
+ *  destructive rules below says why one file polices both. */
+const UI = join(__dirname, "..", "..", "..", "ui", "src");
 
 function sourcesIn(dir: string): { path: string; text: string }[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
@@ -97,16 +100,30 @@ describe("the red that is read is never the red that is filled", () => {
    * left failing in eleven siblings — "the instance fixed, the sibling left",
    * which is the defect this package's ledger keeps recording. There is now a
    * token (`--destructive-strong`, 6.47:1 on white, 5.86:1 on the tinted
-   * panel), and this holds the account area to it.
+   * panel), and this holds every screen in the shop to it.
    *
-   * SCOPED TO THIS FOLDER, deliberately. The checkout, the review form and the
-   * cart drawer carry the same defect and are outside the change that added
-   * this file; widening the glob is the right follow-up and should be done as
-   * its own piece of work, not smuggled in by a test.
+   * ═══ WHY ONE FILE REACHES INTO A SIBLING PACKAGE ═══
+   * This was scoped to `account/` when it was written, because the checkout,
+   * the review form and the cart drawer still carried the defect and were
+   * outside the change that added it. They have since been migrated, and the
+   * glob widened with them: `packages/shop/src` AND `packages/ui/src`.
+   *
+   * The UI half is not incidental. `FormMessage` in `@plaspool/ui` is the
+   * primitive every future form error inherits from, so the failing spelling
+   * sitting there outweighs any one screen carrying it — and a guard that
+   * stopped at the package boundary would report "clean" while the shared
+   * component shipped the defect to its next consumer. That is the failure
+   * above one level up. One grep, one answer, everywhere.
+   *
+   * `bg-destructive` is untouched by both rules and must stay that way: as a
+   * FILL the base token is correct, which is what `button`, `badge` and the
+   * checkout's tinted error banner use it for. Only the read spellings —
+   * `text-` and `border-` — are the defect. The `(?!-)` is what keeps
+   * `text-destructive-foreground` (white ON the fill) out of the net.
    */
-  it("never uses `text-destructive` as body text in the account area", () => {
+  it("never uses `text-destructive` as body text or as a hairline", () => {
     const offenders: string[] = [];
-    for (const { path, text } of sourcesIn(HERE)) {
+    for (const { path, text } of [...sourcesIn(SHOP), ...sourcesIn(UI)]) {
       text.split("\n").forEach((line, i) => {
         if (/\btext-destructive\b(?!-)/.test(line) || /\bborder-destructive\b(?!-)/.test(line)) {
           offenders.push(`${path}:${i + 1}  ${line.trim().slice(0, 80)}`);
@@ -121,7 +138,7 @@ describe("the red that is read is never the red that is filled", () => {
        value, so this is not about the pixels — it is about there being one
        spelling, so the next grep finds every site. */
     const offenders: string[] = [];
-    for (const { path, text } of sourcesIn(HERE)) {
+    for (const { path, text } of [...sourcesIn(SHOP), ...sourcesIn(UI)]) {
       text.split("\n").forEach((line, i) => {
         if (/\b(?:text|border|bg)-red-\d{3}\b/.test(line)) offenders.push(`${path}:${i + 1}`);
       });

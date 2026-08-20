@@ -197,7 +197,7 @@ export function ReviewForm({ productSlug, productName, className }: ReviewFormPr
         </span>
         <StarPicker value={rating} onChange={setRating} describedBy={id("moderation")} />
         {attempted && problems.rating && (
-          <p className="mt-1.5 text-sm text-destructive">{problems.rating}</p>
+          <p className="mt-1.5 text-sm text-destructive-strong">{problems.rating}</p>
         )}
       </div>
 
@@ -235,7 +235,7 @@ export function ReviewForm({ productSlug, productName, className }: ReviewFormPr
           placeholder="How did it print? Any stringing, warping, or trouble with the first layer?"
         />
         {attempted && problems.body && (
-          <p id={id("body-error")} className="mt-1.5 text-sm text-destructive">
+          <p id={id("body-error")} className="mt-1.5 text-sm text-destructive-strong">
             {problems.body}
           </p>
         )}
@@ -259,7 +259,7 @@ export function ReviewForm({ productSlug, productName, className }: ReviewFormPr
             placeholder="Shown with your review"
           />
           {attempted && problems.authorName && (
-            <p className="mt-1.5 text-sm text-destructive">{problems.authorName}</p>
+            <p className="mt-1.5 text-sm text-destructive-strong">{problems.authorName}</p>
           )}
         </div>
 
@@ -285,13 +285,13 @@ export function ReviewForm({ productSlug, productName, className }: ReviewFormPr
             Never published — only so we can reach you about the review.
           </p>
           {attempted && problems.authorEmail && (
-            <p className="mt-1.5 text-sm text-destructive">{problems.authorEmail}</p>
+            <p className="mt-1.5 text-sm text-destructive-strong">{problems.authorEmail}</p>
           )}
         </div>
       </div>
 
       {error && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-sm text-destructive-strong">
           {MESSAGES[error]}
         </p>
       )}
