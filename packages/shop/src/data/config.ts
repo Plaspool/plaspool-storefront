@@ -65,6 +65,41 @@ export const CATALOG_LIST_REVALIDATE = 300;
 export const CATALOG_DETAIL_REVALIDATE = 3600;
 
 /**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * CACHE TAGS — THE OTHER HALF OF THE WINDOWS ABOVE.
+ *
+ * A revalidate window is a promise about the WORST case. It is not a way to
+ * get a change out quickly, and treating it as one is how the catalogue's hour
+ * came to be the thing standing between an owner editing a price and a
+ * customer seeing it.
+ *
+ * These tags are what `POST /api/revalidate` purges. Every catalogue fetch
+ * carries `CATALOG_TAG`; the single-product fetch also carries its own
+ * `productTag(slug)`, so a price change on one spool does not have to throw
+ * away the whole shop's cached listings to reach its own page.
+ *
+ * ═══ THE WINDOWS STAY, AND THEY ARE NOT REDUNDANT ═══
+ * On-demand purging is a push, and a push can be missed: the admin can fail to
+ * fire it, the request can be dropped, and a row edited straight in the
+ * database fires nothing at all. The window is the floor underneath that —
+ * what the shop is guaranteed to correct on its own with nobody watching. The
+ * tag is what makes the ordinary case fast.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export const CATALOG_TAG = "catalog";
+
+/**
+ * The tag for ONE product's detail fetch.
+ *
+ * `slug` is interpolated, so it is validated at the only door that takes one
+ * from a stranger — see the allow-list in `app/api/revalidate/route.ts`.
+ * Nothing else should build one of these from unvalidated input.
+ */
+export function productTag(slug: string): string {
+  return `product:${slug}`;
+}
+
+/**
  * Reviews are cached for a minute at the API and revalidated here on the same
  * window. The product page's own hour-long ISR sits in front of both, so an
  * approval reaches a live page within that hour — the sum of the windows, as

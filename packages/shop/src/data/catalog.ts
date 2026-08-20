@@ -1,4 +1,10 @@
-import { CATALOG_DETAIL_REVALIDATE, CATALOG_LIST_REVALIDATE, COMMERCE_API_BASE } from "./config";
+import {
+  CATALOG_DETAIL_REVALIDATE,
+  CATALOG_LIST_REVALIDATE,
+  CATALOG_TAG,
+  COMMERCE_API_BASE,
+  productTag,
+} from "./config";
 import { lineImagesFrom, toCategory, toProduct } from "./api";
 import { listReviewAggregates } from "./reviews";
 import { HERO_COLOURS, STANDARD_TIERS } from "./policy";
@@ -38,9 +44,19 @@ import type { Category, Product } from "./types";
  * error inside a Server Component is a 500 on the whole route.
  */
 
-async function getJson<T>(path: string, revalidate: number): Promise<T | null> {
+/**
+ * `tags` IS REQUIRED RATHER THAN OPTIONAL, and that is the whole point of it.
+ *
+ * An untagged fetch cannot be purged — it comes back only when its window
+ * runs out — and an optional parameter is one a future call site forgets. Every
+ * catalogue read goes through here, so making the argument mandatory is what
+ * guarantees `POST /api/revalidate` reaches all of them rather than whichever
+ * ones somebody remembered. Pass `[]` deliberately if a fetch should genuinely
+ * only ever expire on time; nothing does today.
+ */
+async function getJson<T>(path: string, revalidate: number, tags: string[]): Promise<T | null> {
   try {
-    const res = await fetch(`${COMMERCE_API_BASE}${path}`, { next: { revalidate } });
+    const res = await fetch(`${COMMERCE_API_BASE}${path}`, { next: { revalidate, tags } });
     if (!res.ok) return null;
     return (await res.json()) as T;
   } catch {
@@ -54,6 +70,7 @@ async function fetchCategories(): Promise<ApiCategory[]> {
   const body = await getJson<{ items: ApiCategory[] }>(
     "/api/shop/categories",
     CATALOG_LIST_REVALIDATE,
+    [CATALOG_TAG],
   );
   return body?.items ?? [];
 }
@@ -99,7 +116,9 @@ async function context(): Promise<AdaptContext> {
  */
 export async function listProducts(): Promise<Product[]> {
   const [list, ctx] = await Promise.all([
-    getJson<{ items: ApiProduct[] }>("/api/shop/products", CATALOG_LIST_REVALIDATE),
+    getJson<{ items: ApiProduct[] }>("/api/shop/products", CATALOG_LIST_REVALIDATE, [
+      CATALOG_TAG,
+    ]),
     context(),
   ]);
   const items = list?.items ?? [];
@@ -129,6 +148,11 @@ async function fetchProduct(slug: string): Promise<ApiProduct | null> {
   const body = await getJson<{ product: ApiProduct }>(
     `/api/shop/products/${encodeURIComponent(slug)}`,
     CATALOG_DETAIL_REVALIDATE,
+    /* BOTH TAGS, NOT JUST ITS OWN. `CATALOG_TAG` so a "the catalogue moved"
+       purge reaches every product page without the caller having to enumerate
+       slugs it may not know; `productTag` so editing one spool can reach that
+       spool's page without discarding every cached listing in the shop. */
+    [CATALOG_TAG, productTag(slug)],
   );
   return body?.product ?? null;
 }
@@ -240,6 +264,7 @@ export async function getLineImages(): Promise<LineImageIndex> {
   const list = await getJson<{ items: ApiProduct[] }>(
     "/api/shop/products",
     CATALOG_LIST_REVALIDATE,
+    [CATALOG_TAG],
   );
   return lineImagesFrom(list?.items ?? []);
 }

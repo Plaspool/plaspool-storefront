@@ -19,10 +19,28 @@
    * (the binding name @opennextjs/cloudflare expects). Deploy populates the
    * build-time prerendered pages into it automatically.
    */
+  /*
+   * The TAG cache is a SECOND, SEPARATE namespace, and it must not be folded
+   * into the one above. They hold different things with different lifetimes —
+   * rendered pages and fetch bodies here, one small "purged at T" timestamp per
+   * tag there — and OpenNext looks each up by its own binding name.
+   *
+   * Created with:
+   *   npx wrangler kv namespace create NEXT_TAG_CACHE_KV
+   *
+   * WITHOUT IT, `revalidateTag()` LOGS "No KV binding NEXT_TAG_CACHE_KV found"
+   * AND DOES NOTHING — `POST /api/revalidate` still answers 200, so the failure
+   * is invisible from the calling side. If a purge appears to be ignored in
+   * production, check this binding before anything else.
+   */
   "kv_namespaces": [
     {
       "binding": "NEXT_INC_CACHE_KV",
       "id": "16301371e9434e11aed74d90477fa25e"
+    },
+    {
+      "binding": "NEXT_TAG_CACHE_KV",
+      "id": "PASTE_THE_ID_FROM_WRANGLER_KV_NAMESPACE_CREATE"
     }
   ],
   /* The memory queue revalidates stale ISR pages by calling the Worker back
