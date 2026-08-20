@@ -2,6 +2,8 @@ export * from "./components/post-card";
 export * from "./components/load-more";
 export * from "./components/filter";
 export * from "./components/search-input";
+export * from "./components/category-chips";
+export * from "./components/featured-carousel";
 export * from "./components/doc-renderer";
 
 export * from "./data/config";

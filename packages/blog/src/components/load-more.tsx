@@ -59,8 +59,14 @@ export function LoadMore({
             className="btn btn--outline"
             onClick={loadMore}
             disabled={loading}
+            aria-label={loading ? "Loading more posts" : "View more posts"}
           >
-            {loading ? "Loading…" : "Load more posts"}
+            {/* "View more", per the reference design. The visible label is
+                short because it sits directly under "Latest blog posts" and
+                inherits its subject; `aria-label` above keeps the control
+                self-describing for anyone who reaches it without that
+                context. */}
+            {loading ? "Loading…" : "View more"}
           </button>
           {failed && (
             <p role="alert" className="text-sm" style={{ color: "var(--danger)" }}>

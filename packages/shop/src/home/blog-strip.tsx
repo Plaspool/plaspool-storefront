@@ -24,7 +24,12 @@ export async function BlogStrip() {
   if (!posts.length) return null;
 
   return (
-    <section aria-labelledby="shop-blog" className="border-t border-brand-line">
+    /* `pwa-hide`: the installed app is the shop, and the blog is the website.
+       A media query rather than a mount-time probe, so this never paints and
+       then vanishes — see `.pwa-hide` in `globals.css`. The posts are still
+       fetched above; the cost is one ISR-cached call on a page that was going
+       to make it anyway, and paying it keeps this a server component. */
+    <section aria-labelledby="shop-blog" className="pwa-hide border-t border-brand-line">
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 md:py-14 lg:px-8">
         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
           <h2

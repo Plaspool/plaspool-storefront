@@ -24,3 +24,14 @@ export const BLOG_IMAGE_PATH = "/images/blog";
  */
 export const BLOG_DEFAULT_TEMPLATE = "magazine" as const;
 export const SHOW_READING_TIME = true;
+
+/**
+ * How many posts the featured rail may hold.
+ *
+ * A ceiling shared by three places and owned by none of them: the backend
+ * enforces it on write, the admin UI counts against it, and the storefront
+ * caps whatever it is handed (`listFeaturedPosts`). Four because the rail is
+ * one post at a time and dot indicators stop being countable at a glance
+ * shortly after that.
+ */
+export const MAX_FEATURED = 4;
