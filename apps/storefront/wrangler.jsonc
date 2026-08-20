@@ -40,7 +40,7 @@
     },
     {
       "binding": "NEXT_TAG_CACHE_KV",
-      "id": "PASTE_THE_ID_FROM_WRANGLER_KV_NAMESPACE_CREATE"
+      "id": "72fbab4ce70046219bd6ca6c026d35f9"
     }
   ],
   /* The memory queue revalidates stale ISR pages by calling the Worker back
