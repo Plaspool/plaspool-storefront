@@ -5,7 +5,7 @@ import { Check, Truck } from "lucide-react";
 import { Button, cn, NEO_SURFACE } from "@plaspool/ui";
 
 import type { Colour, Product, SizeOption } from "../data/types";
-import { unitPriceFor } from "../data/money";
+import { availableColours, unitPriceFor } from "../data/money";
 import { DELIVERY } from "../data/config";
 import { starsFromAggregate } from "../data/reviews";
 import type { ReviewAggregate } from "../data/reviews";
@@ -147,7 +147,10 @@ export function BuyBox({
       <div>
         <p className="font-sans text-sm font-semibold text-foreground">Colour</p>
         <ColourSwatches
-          colours={product.colours}
+          /* Only colours somebody can order — the card's row and this picker
+             have to agree, or a colour vanishes between the grid and the buy
+             box. See `availableColours`. */
+          colours={availableColours(product)}
           selectedId={colour.id}
           onSelect={onColourChange}
           className="mt-2"

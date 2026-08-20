@@ -7,45 +7,53 @@ import type { Colour } from "../data/types";
 import { ProductPhoto } from "../components/product-photo";
 
 /**
- * The product's pictures, and the colour picker, which are the same control.
+ * The product's pictures. A GALLERY — not a colour picker.
  *
- * ═══ THE STAGE AND THE RAIL FALL BACK DIFFERENTLY, AND THAT IS THE POINT ═══
+ * ═══ THE RAIL WAS SHOWING VARIANTS, AND IT SHOULD NEVER HAVE BEEN ═══
+ * This component used to take the whole `colours` array and render one
+ * thumbnail per colour, each one a generated `SpoolImage` tinted to that
+ * colour's hex. Two things were wrong with that, and they compound:
  *
- * THE STAGE takes the selected colour's photograph, then the product's cover,
- * then the drawing. Falling back to the cover is what every catalogue does —
- * the main image is "the product", and the swatch below it is the selection.
+ * 1. IT DUPLICATED A CONTROL THAT ALREADY EXISTS. The buy box, a few hundred
+ *    pixels to the right, has the colour picker — a labelled radio group whose
+ *    selection drives the price, the variant id and the add button. A second,
+ *    unlabelled picker made of pictures competes with it, and teaches the
+ *    shopper that the left column is where you choose, which it is not.
+ * 2. IT DREW PICTURES OF THINGS NOBODY HAD PHOTOGRAPHED. No live variant
+ *    carries its own `imageUrl` today, so the rail was six or eight generated
+ *    drawings of the same spool in six or eight tints, stacked beside ONE real
+ *    photograph on the stage. A column of drawings beside a photograph reads
+ *    as "here are more photographs", and every one of them is a claim the
+ *    catalogue cannot back.
  *
- * THE RAIL takes the colour's own photograph, then the drawing — and NEVER the
- * cover. A rail is a colour picker: seven thumbnails of the same cover is seven
- * identical buttons, which destroys the one thing the control communicates. The
- * generated spool is tinted to the actual colour, so where no photograph exists
- * it is also the more truthful picture of that colour.
+ * So the rail is now what a rail is everywhere else in commerce: THE OTHER
+ * PICTURES OF THIS PRODUCT. Nothing generated ever enters it — a thumbnail
+ * here is always a file somebody uploaded.
+ *
+ * ═══ AND IT DISAPPEARS WHEN THERE IS NOTHING TO PICK BETWEEN ═══
+ * One photograph is not a gallery. Below two pictures the rail is not rendered
+ * at all, rather than rendered holding a single thumbnail of the image already
+ * filling the stage beside it — a control with no second state.
+ *
+ * The colour still reaches this component, and still matters twice: it tints
+ * the drawn spool when the product has no photographs at all, and it decides
+ * whether the stage may be NAMED for a colour.
  *
  * ═══ THE ALT TEXT DESCRIBES WHAT IS ON SCREEN, NOT WHAT IS SELECTED ═══
- * This was wrong and it was the sharpest version of the mistake this file
- * otherwise argues against. The stage's alt was built from the selected colour
- * unconditionally, so when it fell back to the product cover, the SAME BYTES
- * were announced as "PLA Filament, Black", then "PLA Filament, Red", then
- * "PLA Filament, Grey" as the shopper clicked along the rail — a false claim
- * made to exactly the people who cannot check it. A picture is named for what
- * it is a picture OF: the colour only enters the name when the photograph is
- * that colour's own.
- *
- * ═══ THE PRODUCT'S OTHER PHOTOGRAPHS ═══
- * `imageUrls` is everything the shop uploaded beyond the cover, and it was
- * carried through the data layer and rendered nowhere — a second angle sitting
- * in the API that no customer could reach. They join the rail after the
- * colours, as their own thumbnails: choosing one changes the picture WITHOUT
- * changing the colour, because a second angle of the product is not a different
- * product. Choosing a colour clears the override, since the colour is the
- * stronger statement about what you are looking at.
+ * Kept from the version that got this wrong, because the trap is still here.
+ * The stage's alt was once built from the selected colour unconditionally, so
+ * when it fell back to the product cover the SAME BYTES were announced as
+ * "PLA Filament, Black", then "PLA Filament, Red", then "PLA Filament, Grey"
+ * as the shopper clicked along — a false claim made to exactly the people who
+ * cannot check it. A picture is named for what it is a picture OF: the colour
+ * enters the name only when the picture is that colour's own photograph, or is
+ * the spool drawn in it.
  */
 
 export interface GalleryProps {
   name: string;
-  colours: Colour[];
-  selectedId: string;
-  onSelect: (id: string) => void;
+  /** The selected colour. Tints the drawn spool, and gates the honest alt. */
+  colour: Colour;
   /** Drives the fill level of the drawn spool — the selected size's weight. */
   weightGrams: number;
   /** The product's own cover, for colours nobody has photographed. */
@@ -57,46 +65,67 @@ export interface GalleryProps {
 
 export function Gallery({
   name,
-  colours,
-  selectedId,
-  onSelect,
+  colour,
   weightGrams,
   productCoverUrl = null,
   productImageUrls = [],
   className,
 }: GalleryProps) {
-  const selected = colours.find((colour) => colour.id === selectedId) ?? colours[0];
+  /**
+   * Every real photograph of what is currently selected, in the order a
+   * shopper should meet them.
+   *
+   * THE SELECTED COLOUR'S OWN PHOTOGRAPH LEADS, when there is one: it is the
+   * most specific true picture of the thing being bought. The cover follows,
+   * then the extra angles. Deduped, because a shop that sets the cover and
+   * also lists it in `imageUrls` should not get the same file twice — a
+   * thumbnail whose only distinguishing feature is its position is a broken
+   * control.
+   *
+   * OTHER COLOURS' PHOTOGRAPHS ARE DELIBERATELY ABSENT. Putting them here
+   * would rebuild the variant picker this file just removed, in a place with
+   * no room to name what each one is.
+   */
+  const photos = React.useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const url of [colour.imageUrl, productCoverUrl, ...productImageUrls]) {
+      if (!url || seen.has(url)) continue;
+      seen.add(url);
+      out.push(url);
+    }
+    return out;
+  }, [colour.imageUrl, productCoverUrl, productImageUrls]);
 
   /**
-   * A product photograph the shopper picked, overriding the colour's picture
-   * until they pick a colour again.
+   * A thumbnail the shopper picked, overriding the leading photograph.
    *
-   * The product it belongs to is stored WITH it, so navigating to another
-   * product drops the override during render rather than in an effect that
-   * would paint the wrong picture first and correct it a frame later.
+   * The product AND the colour it was picked under travel with it, so moving
+   * to another product — or changing colour, which re-shuffles `photos` —
+   * drops the override DURING RENDER rather than in an effect that would paint
+   * the wrong picture first and correct it a frame later. The membership test
+   * does the same job for a `photos` list that changed shape under a stale
+   * pick.
    */
-  const [picked, setPicked] = React.useState<{ product: string; url: string } | null>(null);
-  const extraUrl = picked?.product === name ? picked.url : null;
-  const setExtraUrl = (url: string | null) =>
-    setPicked(url === null ? null : { product: name, url });
+  const [picked, setPicked] = React.useState<Picked | null>(null);
+  const pickedUrl =
+    picked &&
+    picked.product === name &&
+    picked.colourId === colour.id &&
+    photos.includes(picked.url)
+      ? picked.url
+      : null;
 
-  /**
-   * What the stage shows, and what it is honestly called.
-   *
-   * Three cases, and the name follows the picture in every one: an extra
-   * product photograph is "PLA Filament" (it is not of a colour), a colour's
-   * own photograph names the colour, and the cover standing in for an
-   * unphotographed colour names only the product.
-   */
-  const stage: { src: string | null; alt: string } = extraUrl
-    ? { src: extraUrl, alt: name }
-    : selected.imageUrl
-      ? { src: selected.imageUrl, alt: `${name}, ${selected.name}` }
-      : productCoverUrl
-        ? { src: productCoverUrl, alt: name }
-        : /* The drawing, which IS tinted to the selected colour — so here, and
-             only here, the colour belongs in the name. */
-          { src: null, alt: `${name}, ${selected.name}` };
+  const shown = pickedUrl ?? photos[0] ?? null;
+
+  /* Named for what it is a picture of. The colour's own photograph and the
+     drawn spool are both pictures OF the colour; the cover and the extra
+     angles are pictures of the product. */
+  const ofThisColour = shown === null || shown === colour.imageUrl;
+  const stageAlt = ofThisColour ? `${name}, ${colour.name}` : name;
+
+  /* One picture is not a gallery. */
+  const hasRail = photos.length > 1;
 
   return (
     <div className={cn("flex w-full min-w-0 flex-col gap-4 md:flex-row-reverse", className)}>
@@ -115,9 +144,9 @@ export function Gallery({
           stays on the background surface and never on a tinted one. */}
       <div className="mx-auto aspect-square w-full min-w-0 max-w-md self-start rounded-xl border border-brand-line bg-background p-4 sm:p-8 md:flex-1">
         <ProductPhoto
-          src={stage.src}
-          alt={stage.alt}
-          colourHex={selected.hex}
+          src={shown}
+          alt={stageAlt}
+          colourHex={colour.hex}
           weightGrams={weightGrams}
           /* The page's LCP: the largest thing above the fold, and the reason
              somebody opened this page. */
@@ -142,76 +171,64 @@ export function Gallery({
           the wrapper is an ordinary block and the rail is the horizontal strip
           it always was, scrolling inside itself at 375px rather than widening
           the page. */}
-      <div className="w-full min-w-0 shrink-0 md:relative md:w-20 md:self-stretch">
-        <ul
-          aria-label="Colours and photos"
-          className={cn(
-            "flex w-full min-w-0 gap-2 overflow-x-auto pb-1",
-            "md:absolute md:inset-0 md:flex-col md:overflow-x-visible md:overflow-y-auto md:pb-0",
-            /* One thumbnail wide, so a scrollbar gutter would come out of the
-               thumbnail itself. The strip below md already scrolls without one. */
-            "no-scrollbar",
-          )}
-        >
-          {colours.map((colour) => {
-            const active = !extraUrl && colour.id === selected.id;
-            return (
-              <li key={colour.id} className="shrink-0">
-                <button
-                  type="button"
-                  aria-pressed={active}
-                  aria-label={colour.inStock ? colour.name : `${colour.name}, out of stock`}
-                  onClick={() => {
-                    onSelect(colour.id);
-                    /* A colour is the stronger statement about what you are
-                       looking at, so it wins over a chosen angle. */
-                    setExtraUrl(null);
-                  }}
-                  className={cn(THUMB, active ? "border-brand" : "border-brand-line hover:border-foreground")}
-                >
-                  <ProductPhoto
-                    /* THE COLOUR'S OWN PHOTOGRAPH OR THE DRAWING — never the
-                       product cover. See the file header. */
-                    src={colour.imageUrl}
-                    /* Decorative: the button already carries the colour's name,
-                       and `SpoolImage` reads `""` as "hide me" rather than as
-                       an empty name. */
-                    alt=""
-                    colourHex={colour.hex}
-                    weightGrams={weightGrams}
-                    className="h-full w-full"
-                  />
-                </button>
-              </li>
-            );
-          })}
-
-          {productImageUrls.map((url, i) => {
-            const active = extraUrl === url;
-            return (
-              <li key={url} className="shrink-0">
-                <button
-                  type="button"
-                  aria-pressed={active}
-                  aria-label={`${name}, photo ${i + 2}`}
-                  onClick={() => setExtraUrl(url)}
-                  className={cn(THUMB, active ? "border-brand" : "border-brand-line hover:border-foreground")}
-                >
-                  <ProductPhoto
-                    src={url}
-                    alt=""
-                    colourHex={selected.hex}
-                    weightGrams={weightGrams}
-                    className="h-full w-full"
-                  />
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+      {hasRail && (
+        <div className="w-full min-w-0 shrink-0 md:relative md:w-20 md:self-stretch">
+          <ul
+            aria-label={`Photos of ${name}`}
+            className={cn(
+              "flex w-full min-w-0 gap-2 overflow-x-auto pb-1",
+              "md:absolute md:inset-0 md:flex-col md:overflow-x-visible md:overflow-y-auto md:pb-0",
+              /* One thumbnail wide, so a scrollbar gutter would come out of the
+                 thumbnail itself. The strip below md already scrolls without one. */
+              "no-scrollbar",
+            )}
+          >
+            {photos.map((url, i) => {
+              const active = url === shown;
+              return (
+                <li key={url} className="shrink-0">
+                  <button
+                    type="button"
+                    aria-pressed={active}
+                    /* Same rule as the stage: only the colour's own photograph
+                       may be named for the colour. Everything else is "photo
+                       N", which is all anybody can honestly say about a file
+                       the catalogue ships no caption for. */
+                    aria-label={
+                      url === colour.imageUrl
+                        ? `${name}, ${colour.name}`
+                        : `${name}, photo ${i + 1}`
+                    }
+                    onClick={() => setPicked({ product: name, colourId: colour.id, url })}
+                    className={cn(
+                      THUMB,
+                      active ? "border-brand" : "border-brand-line hover:border-foreground",
+                    )}
+                  >
+                    <ProductPhoto
+                      src={url}
+                      /* Decorative: the button already carries the name. */
+                      alt=""
+                      colourHex={colour.hex}
+                      weightGrams={weightGrams}
+                      className="h-full w-full"
+                    />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </div>
   );
+}
+
+/** A chosen thumbnail, with the product and colour it was chosen under. */
+interface Picked {
+  product: string;
+  colourId: string;
+  url: string;
 }
 
 const THUMB = cn(

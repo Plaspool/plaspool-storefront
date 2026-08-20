@@ -3,6 +3,7 @@
 // It starts empty; each later task appends its own exports as it lands.
 export * from "./data/types";
 export * from "./data/money";
+export * from "./data/badges";
 export * from "./data/config";
 export * from "./data/reviews";
 export * from "./data/catalog";

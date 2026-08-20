@@ -2,7 +2,8 @@ import Link from "next/link";
 import { Badge, cn } from "@plaspool/ui";
 
 import type { Product } from "../data/types";
-import { cheapestSize, firstInStockColour, priceFrom } from "../data/money";
+import { availableColours, cheapestSize, firstInStockColour, priceFrom } from "../data/money";
+import { primaryBadge } from "../data/badges";
 import { CardAddButton } from "./card-add-button";
 import { ProductPhoto } from "./product-photo";
 import { Price } from "./price";
@@ -38,6 +39,10 @@ export function ProductCard({ product, className }: ProductCardProps) {
   const colour = firstInStockColour(product);
   const size = cheapestSize(product);
   const rating = product.rating;
+  /* One badge, never a stack — see `primaryBadge` for which one wins. */
+  const badge = primaryBadge(product.badges);
+  /* Only colours somebody can order. See `availableColours`. */
+  const colours = availableColours(product);
 
   return (
     <div className={cn("group relative flex flex-col", className)}>
@@ -61,21 +66,16 @@ export function ProductCard({ product, className }: ProductCardProps) {
           />
         </div>
 
-        {product.badges.length > 0 && (
-          <div className="pointer-events-none absolute left-2 top-2 z-10 flex flex-col items-start gap-1">
-            {product.badges.map((badge) => (
-              <Badge
-                key={badge}
-                variant={badge === "Low stock" ? "outline" : "default"}
-                className={cn(
-                  "font-sans",
-                  badge === "Low stock" && "border-brand-line bg-background",
-                )}
-              >
-                {badge}
-              </Badge>
-            ))}
-          </div>
+        {badge && (
+          <Badge
+            variant={badge === "Low stock" ? "outline" : "default"}
+            className={cn(
+              "pointer-events-none absolute left-2 top-2 z-10 font-sans",
+              badge === "Low stock" && "border-brand-line bg-background",
+            )}
+          >
+            {badge}
+          </Badge>
         )}
 
         <CardAddButton product={product} />
@@ -84,7 +84,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
       {/* The swatch row sits outside the link, so its `sr-only` colour names
           never join the link's accessible name. */}
       <ColourSwatches
-        colours={product.colours}
+        colours={colours}
         max={6}
         className="mt-3"
         label={`Colours available for ${product.name}`}

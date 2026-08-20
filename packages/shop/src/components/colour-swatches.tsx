@@ -61,7 +61,16 @@ function Swatch({
         className={cn("absolute inset-0 rounded-full", !colour.inStock && "opacity-40")}
         style={{ backgroundColor: colour.hex }}
       />
-      {/* Opacity alone is a colour cue; the strike is the one that survives
+      {/* ═══ THE SOLD-OUT TREATMENT IS NOW A FALLBACK, NOT THE NORMAL PATH ═══
+          Every caller filters through `availableColours()`, which drops
+          out-of-stock colours rather than striking them: a 16px disc with a
+          diagonal line and no name beside it reads as noise, and it spends a
+          slot in a truncating row on something nobody can buy. What reaches
+          here is the one case that helper cannot filter — a product whose
+          EVERY colour is gone, where showing them struck is the only way to
+          say "they are all gone" rather than "this product has no colours".
+
+          Opacity alone is a colour cue; the strike is the one that survives
           low vision and greyscale. */}
       {!colour.inStock && (
         <span
