@@ -19,7 +19,7 @@ function product(over: Partial<Product> = {}): Product {
     diameterMm: 1.75,
     featured: false,
     rating: { average: 0, count: 0, distribution: [0, 0, 0, 0, 0] },
-    colours: [{ id: "black", name: "Black", hex: "#000000", inStock: true }],
+    colours: [{ id: "black", name: "Black", hex: "#000000", inStock: true, imageUrl: null }],
     sizes: [
       { id: "1kg", label: "1 kg", weightGrams: 1000, priceNaira: 18500, compareAtNaira: null },
     ],
@@ -143,7 +143,7 @@ describe("applyFilters", () => {
   it("excludes a product with no colour in stock", () => {
     const soldOut = product({
       slug: "sold-out",
-      colours: [{ id: "black", name: "Black", hex: "#000000", inStock: false }],
+      colours: [{ id: "black", name: "Black", hex: "#000000", inStock: false, imageUrl: null }],
     });
     expect(applyFilters([soldOut, product()], parseFilters({ stock: "in" })).map((p) => p.slug)).toEqual(["spool"]);
   });
@@ -176,8 +176,8 @@ describe("facetsFor", () => {
   it("counts a colour once per product, not once per variant", () => {
     const twice = product({
       colours: [
-        { id: "black", name: "Black", hex: "#000000", inStock: true },
-        { id: "black", name: "Black", hex: "#000000", inStock: false },
+        { id: "black", name: "Black", hex: "#000000", inStock: true, imageUrl: null },
+        { id: "black", name: "Black", hex: "#000000", inStock: false, imageUrl: null },
       ],
     });
     expect(facetsFor([twice]).colours).toEqual([

@@ -93,7 +93,17 @@ export interface ApiProduct {
   coverImageUrl: string | null;
   imageUrls: string[];
   publishedAt: number | null;
-  /** Detail responses only. */
+  /**
+   * Present on BOTH the list and the detail response.
+   *
+   * This said "Detail responses only" and had been wrong since
+   * `Plaspool/plaspool-admin#14` put variants on the list so a card could be
+   * priced without a second call — which is the whole reason `listProducts()`
+   * is one request rather than `1 + N`. The comment survived the change and
+   * then argued against reading variants off a list, which is exactly what
+   * `getLineImages()` does. Optional here because the field is optional on the
+   * wire, not because one shape of response omits it.
+   */
   variants?: ApiVariant[];
 }
 
@@ -244,8 +254,13 @@ export function diameterFrom(variants: ApiVariant[]): DiameterMm | null {
   return null;
 }
 
-/** `"1 kg"` → `1000`, `"750 g"` → `750`. Null when the label says neither. */
-function gramsFrom(label: string): number | null {
+/** `"1 kg"` → `1000`, `"750 g"` → `750`. Null when the label says neither.
+ *
+ *  EXPORTED BECAUSE `weightGrams` IS NULL ON EVERY LIVE VARIANT and the weight
+ *  only exists as the free-text `optionValues.Weight`. `sizesFrom` has always
+ *  needed that fallback; `lineImagesFrom` needs the same one to fill the drawn
+ *  spool, and two copies of this parse would be two ways to read one label. */
+export function gramsFrom(label: string): number | null {
   const value = Number.parseFloat(label.replace(/[^0-9.]/g, ""));
   if (!Number.isFinite(value) || value <= 0) return null;
   return /kg/i.test(label) ? Math.round(value * 1000) : Math.round(value);
@@ -262,6 +277,27 @@ function idOf(value: string): string {
 }
 
 /**
+ * What a variant with no `colorHex` is drawn in ON THE CATALOGUE SURFACES.
+ *
+ * A NEUTRAL GREY RATHER THAN A DROPPED FIELD, because `hex` drives the
+ * generated spool as well as the swatch and something has to be drawn. Grey
+ * reads as "no colour set" rather than as a claim that the filament is grey —
+ * which is the distinction that matters, since the alternative is picking a
+ * plausible colour and asserting it.
+ *
+ * ═══ AN ORDER LINE DOES NOT GET THIS, AND THE DIFFERENCE IS THE CAPTION ═══
+ * `lineImagesFrom` used to apply the same fallback and it was wrong. On a
+ * listing, the grey spool sits beside a swatch row and a colour NAME the
+ * shopper is choosing between — the picture is one input among several, and
+ * grey visibly abstains. On an order line, the picture stands alone as the
+ * record of what arrived in the box, and `lineImageAlt` would then put the
+ * line's own colour on top of it: `aria-label="PLA Filament, Red"` over a grey
+ * spool. Same constant, opposite meaning, so `LineImage.colourHex` keeps null
+ * instead and the order surfaces show no picture at all.
+ */
+const NO_COLOUR_SET = "#8a8a94";
+
+/**
  * The colour axis, from the variants that carry one.
  *
  * A colour is IN STOCK when any variant of that colour can be bought — some
@@ -269,9 +305,8 @@ function idOf(value: string): string {
  * inventory row, which is "not tracked" rather than "none left", so it does not
  * make a colour out of stock on its own.
  *
- * `hex` FALLS BACK TO A NEUTRAL GREY rather than being dropped. `hex` drives
- * the generated spool image as well as the swatch, so a missing one has to
- * render as something; grey reads as "no colour set" rather than as a claim.
+ * `hex` FALLS BACK TO `NO_COLOUR_SET` rather than being dropped, for the
+ * reason that constant records.
  */
 export function coloursFrom(variants: ApiVariant[]): Colour[] {
   const byName = new Map<
@@ -306,7 +341,7 @@ export function coloursFrom(variants: ApiVariant[]): Colour[] {
   return [...byName.entries()].map(([id, c]) => ({
     id,
     name: c.name,
-    hex: c.hex ?? "#8a8a94",
+    hex: c.hex ?? NO_COLOUR_SET,
     inStock: c.inStock,
     /* THE FIRST PHOTOGRAPH WINS. A colour is several variants — one per weight —
        and they are the same spool in the same colour, so the first one anybody
@@ -391,6 +426,190 @@ export function variantIdsFrom(variants: ApiVariant[]): Record<string, string> {
 
 export function variantKey(colourId: string, sizeId: string): string {
   return `${colourId}:${sizeId}`;
+}
+
+// -------------------------------------------------------------- order lines
+
+/**
+ * The picture an ORDER LINE may honestly show, and how much of it is a claim
+ * about that line's own colour.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * AN ORDER LINE HAS NO IMAGE FIELD, AND THAT IS NOT AN OVERSIGHT. A line is a
+ * purchase-time SNAPSHOT — `variantId`, `sku`, `title`, `optionValues`, `qty`,
+ * amounts — so a customer's history shows what they bought rather than what the
+ * catalogue says today. A rename or a repricing must not rewrite an old order,
+ * which is exactly why the title and the money are frozen onto the line.
+ *
+ * A PICTURE CANNOT BE FROZEN THAT WAY, because none was ever stored. The only
+ * field on a line that can find one is `variantId`, so a photograph on an order
+ * page is unavoidably a claim sourced from the CURRENT catalogue about a PAST
+ * purchase. Everything in this type exists to keep that claim narrow enough to
+ * stay true.
+ *
+ * ═══ FOUR CASES, AND THE FOURTH WAS MISSING FOR A ROUND ═══
+ * The two fields below are a pair, and the pair — not either one alone —
+ * decides what may be drawn and what may be said:
+ *
+ *   src ≠ null, ofThisColour  → a photograph OF this colour. Name both.
+ *   src ≠ null, !ofThisColour → the product's cover standing in. Name the
+ *                               product only. Today this is EVERY live line.
+ *   src = null, hex ≠ null    → no photograph, but the catalogue records this
+ *                               variant's colour. Draw the spool in it and name
+ *                               it: the hex IS the catalogue's answer to "what
+ *                               colour is this", so the drawing is evidence.
+ *   src = null, hex = null    → the catalogue has the variant and knows neither.
+ *                               NOTHING may be drawn and nothing may be said.
+ *
+ * THE FOURTH IS WHY `colourHex` IS NULLABLE. It was `string`, defaulted to
+ * `NO_COLOUR_SET`, and the renderer inferred "we know the colour" from
+ * `src === null` — which is true of the third case and false of the fourth. The
+ * result, reproduced in a browser, was a spool filled `#8a8a94` under
+ * `aria-label="PLA Filament, Red"`: a grey picture asserting a colour, which is
+ * verbatim the `gallery.tsx` bug this type was written to shut out. A default
+ * that stands in for missing knowledge cannot also be the signal that the
+ * knowledge is missing, so the absence is now spelled `null` and no caller can
+ * infer it wrongly.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export interface LineImage {
+  /**
+   * The photograph, same-origin through `imageUrl()`, or null when neither this
+   * colour nor its product has been photographed at all.
+   *
+   * Null is the DRAWN SPOOL *IF* `colourHex` IS NOT ALSO NULL. With a hex,
+   * `ProductPhoto` renders `SpoolImage` tinted to it, which is a truthful
+   * picture of the colour rather than a hole in the row. Without one, null here
+   * means there is nothing to draw at all — read the two fields together, never
+   * this one alone.
+   */
+  src: string | null;
+  /**
+   * Whether `src` is a photograph OF THIS COLOUR, or the product's cover
+   * standing in for one.
+   *
+   * ═══ THIS FLAG IS THE REASON THE TYPE EXISTS ═══
+   * `gallery.tsx` records the bug it prevents in its own words: the product
+   * page's stage built its `alt` from the SELECTED colour unconditionally, so
+   * when it fell back to the cover the same bytes were announced as "PLA
+   * Filament, Black", then "…, Red", then "…, Grey" as the shopper clicked
+   * along the rail — a false statement made to precisely the people who cannot
+   * check it. An order line is that trap with the same shape, and worse odds:
+   * NO live variant has its own photograph today, so EVERY line resolves to the
+   * cover and a name built from the line's colour would be wrong on every row
+   * in the shop.
+   *
+   * A caller may name the colour when this is true. When it is false the
+   * picture is of the product, and only the product may be named.
+   */
+  ofThisColour: boolean;
+  /**
+   * The filament's own colour, straight from the catalogue, for the drawn spool
+   * and for nothing else.
+   *
+   * NULL IS "THE CATALOGUE DOES NOT RECORD ONE", and it is a rendering
+   * instruction, not a missing value to paper over: with no photograph either,
+   * there is nothing honest left to draw, so `LineThumb` shows its "no picture"
+   * box. Deliberately NOT defaulted to `NO_COLOUR_SET` — that constant's own
+   * note explains why the swatch surfaces can take a grey and an order line
+   * cannot.
+   */
+  colourHex: string | null;
+  /**
+   * Drives the drawn spool's fill level, and is read only when the spool is
+   * drawn.
+   *
+   * `0` WHEN NEITHER `weightGrams` NOR THE `Weight` OPTION SAYS, which draws a
+   * spool with no filament on it. That is an imprecision and it is the chosen
+   * one: the alternatives are defaulting to a full spool, which claims more
+   * than we know, or refusing to draw at all, which throws away the colour we
+   * do know. Every live variant carries `Weight` in `optionValues`, so this is
+   * a shape the catalogue does not currently produce; if it starts to, the
+   * answer is an "unknown level" mode in `SpoolImage`, not a guess here.
+   */
+  weightGrams: number;
+}
+
+/**
+ * `variantId` → `LineImage`, for every variant the catalogue can currently
+ * describe.
+ *
+ * ═══ AN ABSENT KEY IS THE HONEST ANSWER, NOT A MISSING ONE ═══
+ * A line whose variant is not in here is a line the catalogue cannot describe:
+ * a discontinued product, a deleted variant, or a catalogue that could not be
+ * reached at all. Those three are DELIBERATELY collapsed, and the collapse is
+ * argued in `getLineImages()` — the caller must render "there is no picture of
+ * this", never a spool in a guessed colour.
+ *
+ * A PLAIN OBJECT RATHER THAN A `Map`, because this crosses the server/client
+ * boundary as a prop. A `Map` is not serialisable by React's flight protocol
+ * and would arrive at the client as `{}` — silently, and only in the build that
+ * matters. `AdaptContext.categorySlugByName` is a `Map` because it never
+ * leaves the server.
+ *
+ * THE VALUE IS `| undefined` ON PURPOSE, and it is not noise. This repo's
+ * `strict` does not include `noUncheckedIndexedAccess`, so a plain
+ * `Record<string, LineImage>` hands every caller a `LineImage` for a key that
+ * is not there and lets `image.colourHex` typecheck its way to a crash — or,
+ * worse here, lets somebody skip the absent branch entirely and never learn
+ * that it exists. Spelling it out makes the one case this whole seam is about
+ * unskippable at the call site.
+ */
+export type LineImageIndex = Record<string, LineImage | undefined>;
+
+/**
+ * Every variant in a catalogue response, indexed by id.
+ *
+ * ═══ NOTHING IS FILTERED OUT HERE, AND THAT IS THE DIFFERENCE FROM
+ * `toProduct` ═══
+ * `toProduct` drops a product with no slug (no page to link to) and one with no
+ * priced size (nothing that can be quoted), and filters variants to
+ * `status === "active"` (nothing that can be added to a cart). Every one of
+ * those tests asks "can this be SOLD?".
+ *
+ * An order page asks a different question: "what does the thing they ALREADY
+ * BOUGHT look like?" A spool that has been delisted, unpriced or deactivated
+ * since January is still the spool in the box, and its photograph is still the
+ * right picture of it. Filtering here would silently blank the pictures on
+ * exactly the oldest orders — the ones whose owner is least able to remember
+ * what they ordered — so it does not filter.
+ *
+ * THAT IS ALSO WHY THIS DOES NOT REUSE `listProducts()`: not only would that
+ * drag the reviews aggregate onto two order routes for nothing, it would hand
+ * back the sellable projection and lose precisely the lines that need help.
+ */
+export function lineImagesFrom(products: ApiProduct[]): LineImageIndex {
+  const index: LineImageIndex = {};
+  for (const product of products) {
+    const cover = imageUrl(product.coverImageUrl);
+    for (const variant of product.variants ?? []) {
+      /* THE VARIANT'S OWN PHOTOGRAPH FIRST, THE COVER SECOND — the stage's
+         rule in `gallery.tsx`, for the stage's reason: the main image "is the
+         product", and a colour nobody has photographed is better served by the
+         product's picture than by a hole. What the rail does instead (colour's
+         own photograph, then the drawing, NEVER the cover) is right for a
+         colour PICKER, where seven identical covers destroy the control. An
+         order line is not choosing anything. */
+      const own = imageUrl(variant.imageUrl ?? null);
+      index[variant.id] = {
+        src: own ?? cover,
+        ofThisColour: own !== null,
+        /* PASSED THROUGH, NOT DEFAULTED. A grey stand-in here would be
+           indistinguishable downstream from a colour the catalogue actually
+           records, and `lineImageAlt` would then name the line's colour over a
+           picture of grey. Null travels; the renderer decides. */
+        colourHex: variant.colorHex,
+        /* `weightGrams` is null on every live variant and the weight lives in
+           the free-text option, so `gramsFrom` is the real reader here rather
+           than the fallback it looks like. */
+        weightGrams:
+          variant.weightGrams ??
+          gramsFrom(variant.optionValues.Weight ?? variant.optionValues.weight ?? "") ??
+          0,
+      };
+    }
+  }
+  return index;
 }
 
 /** Thirty days. Long enough that a slow week still shows something new. */
@@ -483,7 +702,7 @@ export function toProduct(api: ApiProduct, ctx: AdaptContext): Product | null {
           {
             id: "default",
             name: "Standard",
-            hex: "#8a8a94",
+            hex: NO_COLOUR_SET,
             inStock: true,
             imageUrl: imageUrl(api.coverImageUrl),
           },

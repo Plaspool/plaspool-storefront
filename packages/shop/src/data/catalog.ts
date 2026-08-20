@@ -1,8 +1,8 @@
 import { CATALOG_DETAIL_REVALIDATE, CATALOG_LIST_REVALIDATE, COMMERCE_API_BASE } from "./config";
-import { toCategory, toProduct } from "./api";
+import { lineImagesFrom, toCategory, toProduct } from "./api";
 import { listReviewAggregates } from "./reviews";
 import { HERO_COLOURS, STANDARD_TIERS } from "./policy";
-import type { AdaptContext, ApiCategory, ApiProduct } from "./api";
+import type { AdaptContext, ApiCategory, ApiProduct, LineImageIndex } from "./api";
 import type { Category, Product } from "./types";
 
 /**
@@ -167,6 +167,89 @@ export async function listFeaturedProducts(limit = 4): Promise<Product[]> {
 export async function productPaths(): Promise<{ slug: string }[]> {
   return (await listProducts()).map((p) => ({ slug: p.slug }));
 }
+
+// --------------------------------------------------------- order line images
+
+/**
+ * Pictures for order lines: `variantId` → `LineImage`, from one catalogue read.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * WHY THIS IS NOT `listProducts()`.
+ *
+ * `listProducts()` answers the SELLABLE catalogue — it drops a product with no
+ * slug or no priced size and keeps only active variants — and it serialises a
+ * second fetch, `listReviewAggregates`, to put stars on cards. An order page
+ * needs neither. It needs pictures for things that were bought, including
+ * things that can no longer be bought, and it has no stars anywhere on it.
+ *
+ * Calling it here would cost both ways. `config.ts` sets out the trap under
+ * `REVIEWS_BULK_REVALIDATE`: anything composed into a shared route inherits its
+ * revalidate window to every route that composes it, which is how a 60s reviews
+ * window silently took `/store` and every category page from five minutes to
+ * one. Composing a reviews fetch into two account routes for data neither
+ * renders is the same mistake pointed at a new pair of pages.
+ *
+ * ═══ THE WINDOW IS `CATALOG_LIST_REVALIDATE`, AND IT IS THE SAME FETCH ═══
+ * Same URL, same options as the one `listProducts()` makes, so Next's data
+ * cache keys them together: an order route and `/store` share one cached
+ * response rather than each holding their own. Choosing a shorter window here
+ * would not make an order's pictures fresher — it would split the cache entry
+ * in two and pull `/store` down to the shorter of them.
+ *
+ * 300s IS ALSO SAFE TO COMPOSE, which is the second half of that rule. Both
+ * callers are `force-dynamic` account routes with no static window of their own
+ * to drag down; and even if one were static, five minutes is what every other
+ * catalogue read in the shop already costs.
+ *
+ * ═══ `force-dynamic` MAKES `no-store` THE SEGMENT DEFAULT, AND THE EXPLICIT
+ * `revalidate` IS WHAT SURVIVES IT ═══
+ * `getJson` passes `next: { revalidate }` on every call, and Next only applies
+ * the segment's `no-store` default when a fetch has set no revalidate of its
+ * own (`patch-fetch.js`: the branch is guarded on `!currentFetchRevalidate`).
+ * So this stays cached on both order routes. Anything that later drops the
+ * explicit window here would turn one cached catalogue read into an origin hit
+ * per page view, on a runtime with a 10ms CPU budget — silently, and only in
+ * production.
+ *
+ * ONE FETCH PER RENDER, SHARED BY EVERY LINE OF EVERY ORDER ON THE PAGE. The
+ * route awaits this once and passes the plain object down; nothing resolves a
+ * picture over the network, so an order with five lines and a list with twenty
+ * orders cost exactly the same as an empty one.
+ *
+ * ═══ IT NEVER THROWS, AND AN UNREACHABLE CATALOGUE COSTS PICTURES ═══
+ * `getJson` answers null for a transport failure and for a non-2xx alike, so
+ * this answers an EMPTY INDEX and every line resolves to "no picture". That is
+ * the same rule the rest of this file follows, applied to the surface where it
+ * matters most: a customer checking where their order is must not get a 500
+ * because the product API blinked.
+ *
+ * WHAT THAT COLLAPSES, STATED PLAINLY: "this variant is gone from the
+ * catalogue" and "the catalogue could not be read" arrive at the caller
+ * identically, as an absent key. They are NOT distinguishable downstream and
+ * deliberately so — to a customer looking at a 48px box beside a row that
+ * already names what they bought, the fact is the same one ("there is no
+ * picture of this"), only the reason differs, and a thumbnail cannot carry a
+ * reason. What they must never collapse into is the case next to them: a
+ * variant the catalogue DOES know but nobody has photographed still has a
+ * colour, and draws a spool in it. Distinguishing the two failures would mean
+ * a page-level notice, not a different picture; if that is ever wanted, this
+ * function has to start returning the reason rather than the caller guessing.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export async function getLineImages(): Promise<LineImageIndex> {
+  const list = await getJson<{ items: ApiProduct[] }>(
+    "/api/shop/products",
+    CATALOG_LIST_REVALIDATE,
+  );
+  return lineImagesFrom(list?.items ?? []);
+}
+
+/**
+ * Re-exported so the order surfaces can type the prop without reaching past
+ * this seam into `api.ts` — `catalog.ts` is what the package's `index.ts`
+ * publishes, and `LineImage` is part of what `getLineImages()` answers.
+ */
+export type { LineImage, LineImageIndex } from "./api";
 
 /**
  * Shared catalog vocabulary.

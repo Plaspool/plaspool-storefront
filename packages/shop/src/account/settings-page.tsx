@@ -10,6 +10,7 @@ import { readShopSession, signOutEverywhere, type ShopCustomer } from "../data/a
 import { listSavedAddresses } from "../data/orders-api";
 import { readSavedAddress } from "../checkout/saved-address";
 import type { Address } from "../data/checkout-api";
+import { AccountShell } from "./account-shell";
 
 /**
  * `/account/settings` — who you are signed in as, and the things that can
@@ -87,7 +88,14 @@ export function AccountSettingsPage() {
         <h1 className="font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
           Account
         </h1>
-        <p role="alert" className="mt-6 border border-red-700 px-4 py-3 font-sans text-sm text-red-700">
+        <p
+          role="alert"
+          /* WAS `red-700`, HAND-PICKED. Same colour, now a token
+             (`--destructive-strong`), so the one grep in
+             `destructive-text.test.ts` can hold every failure line in this
+             folder to it instead of each one being someone's memory. */
+          className="mt-6 border border-destructive-strong px-4 py-3 font-sans text-sm text-destructive-strong"
+        >
           We couldn&apos;t reach your account just now. This doesn&apos;t mean you&apos;re signed
           out — try again in a moment.
         </p>
@@ -213,5 +221,5 @@ export function AccountSettingsPage() {
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
-  return <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6 sm:py-16">{children}</div>;
+  return <AccountShell>{children}</AccountShell>;
 }

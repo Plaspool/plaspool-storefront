@@ -35,6 +35,22 @@
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
+    /* ═══ THE RED THAT MAY BE READ, AS OPPOSED TO THE RED THAT MAY BE FILLED
+       ═══
+       `--destructive` is tuned as a BUTTON FILL — white text on it, which is
+       what `--destructive-foreground` is for. As text on the page it measures
+       **3.76:1 against white**, under the 4.5:1 that WCAG 2.1 AA requires for
+       anything under 18.66px. That is the colour of every "something went
+       wrong" line in this shop: the one string a shopper must be able to read
+       at the moment they most need it.
+       This was found once before and fixed in ONE file by hardcoding
+       `text-red-700` (`order-detail.tsx`), while eleven siblings kept the
+       failing token — the "instance fixed, sibling left" defect this codebase's
+       ledger keeps recording. A token is the fix that cannot be half-applied.
+       The value IS Tailwind's `red-700` (#b91c1c), so nothing that was already
+       corrected changes colour; only its spelling does. 6.47:1 on white,
+       4.94:1 on `brand-soft` at full strength. */
+    --destructive-strong: 0 73.7% 41.8%;
 
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
@@ -79,6 +95,10 @@
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
+    /* On a near-black page the failing direction is the opposite one: the text
+       has to be LIGHTER than the fill, not darker. `red-400`, 7.03:1 on
+       `--background`. */
+    --destructive-strong: 0 90.6% 70.8%;
 
     --border: 0 0% 14.9%;
     --input: 0 0% 14.9%;
