@@ -217,7 +217,7 @@ export function ReviewsTab({
                 Load more reviews
               </button>
               {failed && (
-                <p role="alert" className="text-sm text-destructive">
+                <p role="alert" className="text-sm text-destructive-strong">
                   Could not load more reviews. Try again.
                 </p>
               )}

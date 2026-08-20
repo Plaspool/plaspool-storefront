@@ -119,8 +119,12 @@ function ErrorBanner({
 }) {
   const { title, body } = errorCopy(error);
   return (
+    /* `bg-destructive/10` stays on the BASE token — a tint is a fill, which is
+       what that token is tuned for. Only the glyph moves: an icon owes 3:1 and
+       passed either way, but it should not be a different red from the failure
+       text everywhere else in the shop. */
     <div className="mb-4 flex gap-3 border-2 border-foreground bg-destructive/10 p-4">
-      <AlertTriangle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+      <AlertTriangle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-destructive-strong" />
       <div>
         <p className="font-sans text-sm font-semibold text-foreground">{title}</p>
         <p className="mt-0.5 font-sans text-sm text-muted-foreground">{body}</p>

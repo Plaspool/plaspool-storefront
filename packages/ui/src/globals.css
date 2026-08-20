@@ -45,6 +45,10 @@
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
+    /* Text and hairlines only — see the long note in
+       apps/storefront/app/globals.css. `--destructive` is a FILL and measures
+       3.76:1 as text; this is red-700, 6.47:1 on white. */
+    --destructive-strong: 0 73.7% 41.8%;
 
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;

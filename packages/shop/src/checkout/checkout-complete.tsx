@@ -233,7 +233,11 @@ export function CheckoutComplete() {
 
       {phase.kind === "declined" && (
         <EmptyState
-          icon={<XCircle aria-hidden="true" className="text-destructive" />}
+          /* `destructive-strong` even though an icon only owes 3:1 and the
+             base token clears that. A glyph beside a failure line that is a
+             different red from the line is a second decision to make at the
+             worst moment; matching costs nothing here. */
+          icon={<XCircle aria-hidden="true" className="text-destructive-strong" />}
           title="Payment not completed"
           body={
             phase.intent?.status === "cancelled"

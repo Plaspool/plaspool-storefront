@@ -42,7 +42,9 @@ export function CartPage() {
         </h1>
         <p
           role="alert"
-          className="mt-8 border border-red-700 px-4 py-3 font-sans text-sm text-red-700"
+          /* WAS `red-700`, HAND-PICKED — same colour, now the token. See the
+             twin of this line in `cart-drawer.tsx`. */
+          className="mt-8 border border-destructive-strong px-4 py-3 font-sans text-sm text-destructive-strong"
         >
           {cart.problem}
         </p>

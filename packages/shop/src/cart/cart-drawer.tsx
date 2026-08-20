@@ -138,7 +138,10 @@ export function CartDrawer() {
         {cart.problem && (
           <p
             role="alert"
-            className="mx-6 mt-4 border border-red-700 px-3 py-2 font-sans text-sm text-red-700"
+            /* WAS `red-700`, HAND-PICKED. Same colour — `--destructive-strong`
+               IS red-700 — so this is a change of spelling, not of pixels, and
+               the repo-wide grep in `house-rules.test.ts` can hold it. */
+            className="mx-6 mt-4 border border-destructive-strong px-3 py-2 font-sans text-sm text-destructive-strong"
           >
             {cart.problem}
           </p>
