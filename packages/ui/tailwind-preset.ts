@@ -39,6 +39,9 @@ export const preset = {
         destructive: {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
+          /* Text and hairlines, never a fill. `DEFAULT` is a fill colour and
+             measures 3.76:1 as text — see the note in `globals.css`. */
+          strong: "hsl(var(--destructive-strong))",
         },
         muted: {
           DEFAULT: "hsl(var(--muted))",
@@ -86,10 +89,66 @@ export const preset = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+
+        /* ═══════════════════════════════════════════════════════════════════
+         * THE THREE THE STATUS HISTORY IS BUILT FROM.
+         *
+         * They are HERE rather than in the component so that the durations
+         * agree. A timeline whose rule finishes drawing after its own marker
+         * has landed reads as two animations fighting, and that only stays
+         * fixed if one file owns both numbers.
+         *
+         * EVERY ONE ENDS IN THE RESTING STATE AND IS RUN WITH `both`. The
+         * elements are therefore correct before the animation starts and after
+         * it finishes, so dropping the animation entirely — which is exactly
+         * what `motion-reduce:animate-none` does — leaves a finished timeline
+         * rather than a collapsed rule and an invisible marker. That is the
+         * property that makes reduced motion safe here, and it is a property of
+         * the KEYFRAMES, not of the component.
+         * ═══════════════════════════════════════════════════════════════════ */
+
+        /**
+         * The rule between two stops, drawn downward from the marker above.
+         *
+         * ═══ `translateX(-50%)` IS IN HERE, AND IT IS NOT DECORATION ═══
+         * The rule is a 1px line centred in a 32px column, which needs a half
+         * pixel of offset — `left-1/2 -translate-x-1/2` — that no integer
+         * `left-*` can express. `transform` IS ONE PROPERTY: a keyframe setting
+         * `scaleY()` replaces the utility's `translateX()` outright rather than
+         * composing with it, so the animated rule sat 0.5px right of every
+         * marker's centre, for the whole animation and for ever after it.
+         * Measured at ruleX 32.5 against a marker centre of 32.0.
+         * Carrying the translate through both frames restores it. The element
+         * keeps `-translate-x-1/2` as well, because that is what positions it
+         * when the animation is dropped under `prefers-reduced-motion`.
+         */
+        "rule-draw": {
+          from: { transform: "translateX(-50%) scaleY(0)" },
+          to: { transform: "translateX(-50%) scaleY(1)" },
+        },
+        /** A stop's marker arriving. Scale only — a marker that slid would
+         *  leave the rule it is anchored to pointing at nothing. */
+        "stop-in": {
+          from: { opacity: "0", transform: "scale(0.72)" },
+          to: { opacity: "1", transform: "scale(1)" },
+        },
+        /** The words beside a marker. 4px, not 12 — this is a hint that the
+         *  row is arriving, not a slide the eye has to follow. */
+        "row-in": {
+          from: { opacity: "0", transform: "translateY(4px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+
+        /* `both` is load-bearing — see the keyframes above. `ease-out` on all
+           three: motion that decelerates into place reads as something
+           arriving, where `ease-in` reads as something leaving. */
+        "rule-draw": "rule-draw 0.26s ease-out both",
+        "stop-in": "stop-in 0.24s ease-out both",
+        "row-in": "row-in 0.28s ease-out both",
       },
     },
   },

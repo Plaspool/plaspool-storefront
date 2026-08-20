@@ -104,8 +104,8 @@ function product(over: Partial<Product> = {}): Product {
     diameterMm: 1.75,
     featured: false,
     colours: [
-      { id: "black", name: "Black", hex: "#000000", inStock: false },
-      { id: "red", name: "Red", hex: "#ff0000", inStock: true },
+      { id: "black", name: "Black", hex: "#000000", inStock: false, imageUrl: null },
+      { id: "red", name: "Red", hex: "#ff0000", inStock: true, imageUrl: null },
     ],
     sizes: [
       { id: "1kg", label: "1 kg", weightGrams: 1000, priceNaira: 18500, compareAtNaira: null },
@@ -135,8 +135,8 @@ describe("firstInStockColour", () => {
   it("falls back to the first colour when nothing is in stock", () => {
     const p = product({
       colours: [
-        { id: "black", name: "Black", hex: "#000000", inStock: false },
-        { id: "red", name: "Red", hex: "#ff0000", inStock: false },
+        { id: "black", name: "Black", hex: "#000000", inStock: false, imageUrl: null },
+        { id: "red", name: "Red", hex: "#ff0000", inStock: false, imageUrl: null },
       ],
     });
     expect(firstInStockColour(p).id).toBe("black");

@@ -42,6 +42,39 @@ export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivEl
 }
 
 /**
+ * A placeholder for ONE LINE OF TEXT, at that text's own height.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * PASS THE TYPE, NOT A HEIGHT. `<TextSkeleton className="w-40 text-sm" />` is a
+ * bar exactly as tall as the `text-sm` line it stands in for, at every
+ * breakpoint and every root font size, for ever — because it is a line box of
+ * that type rather than a number somebody measured once.
+ *
+ * ═══ WHY THIS IS A COMPONENT AND NOT AN IDIOM ═══
+ * The idiom was `<Skeleton className="text-sm">{" "}</Skeleton>`, and the
+ * character is load-bearing: an empty `Skeleton` has no line box and collapses
+ * to ZERO height, and so does one holding a plain ASCII space, because CSS
+ * discards a lone collapsible space. Only a NO-BREAK space survives.
+ *
+ * Written out by hand twelve times across this shop, it was already wrong in
+ * EIGHT of them — a `{" "}` that looks identical to a `{" "}` in every
+ * diff, every review and every editor, and produced 0px bars. The measured
+ * fallout: a rewards ledger row 36px short of the row it stood in for, every
+ * row; the balance panel 44px short; four account-hub rows 16px each. Nothing
+ * about that is visible by reading, which is exactly why it may not be an idiom.
+ *
+ * So the character lives here, once, and no caller ever types it.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function TextSkeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <Skeleton className={className} {...props}>
+      {" "}
+    </Skeleton>
+  );
+}
+
+/**
  * The wrapper that tells assistive tech a wait is happening, once.
  *
  * `aria-busy` alone is not announced by most screen readers, so the label is

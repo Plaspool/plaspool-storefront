@@ -89,6 +89,10 @@ export function MobileAccountLinks({ linkClassName }: { linkClassName: string })
       </div>
 
       <SheetClose asChild>
+        <Link href="/account" className={linkClassName}>
+          <User aria-hidden="true" className="h-4 w-4" />
+          Your account
+        </Link>
         <Link href="/account/orders" className={linkClassName}>
           <Package aria-hidden="true" className="h-4 w-4" />
           Orders

@@ -166,6 +166,12 @@ export function AccountMenu({ className }: { className?: string }) {
         <DropdownMenuSeparator />
 
         <DropdownMenuItem asChild>
+          <Link href="/account" className="cursor-pointer gap-2">
+            <User aria-hidden="true" className="h-4 w-4" />
+            Your account
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
           <Link href="/account/orders" className="cursor-pointer gap-2">
             <Package aria-hidden="true" className="h-4 w-4" />
             Orders

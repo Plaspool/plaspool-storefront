@@ -40,6 +40,7 @@ export * from "./cart/add-to-cart";
 export * from "./chrome/announcement-bar";
 export * from "./chrome/shop-nav";
 export * from "./chrome/shop-footer";
+export * from "./chrome/install-banner";
 export * from "./chrome/shop-shell";
 
 // `/store` — the shop home. Six sections between the shell's chrome, plus the
@@ -109,9 +110,41 @@ export * from "./checkout/cart-page";
 
 // Order history: `/account/orders` (the signed-in list) and
 // `/account/orders/[orderNumber]` (one order, signed-in or guest-with-token).
+// `LineThumb` is here rather than up with the other presentational primitives
+// because it takes an `OrderLine` — the picture for an order line has to be
+// resolved `variantId` → catalogue, since a line carries no image field of its
+// own. `getLineImages()` in `data/catalog.ts` builds what it reads.
 export * from "./data/orders-api";
+export * from "./components/line-thumb";
+export * from "./account/account-shell";
+export * from "./account/tab-row";
 export * from "./account/orders-list";
 export * from "./account/avatar";
 export * from "./account/account-menu";
 export * from "./account/settings-page";
 export * from "./account/order-detail";
+/* `/account/orders/[orderNumber]/status` — the whole journey of one order.
+   `order-progress` is exported alongside it because both surfaces read the
+   same `resolveStops`/`headlineFor`/`outcomeOf`, and the bench needs them to
+   assert that the two agree. */
+export * from "./account/order-progress";
+export * from "./account/status-timeline";
+export * from "./account/order-status-page";
+/* `/account` (the hub) and `/account/rewards` (the balance and every movement
+   of it). The rewards page is where the request's "vouchers and discounts"
+   landed — its own header records why, and it is not a rename for its own
+   sake: there is no per-customer voucher in this system to list. */
+export * from "./account/account-home";
+export * from "./account/rewards-page";
+/* ═══ NAMED, NOT `export *`, AND THAT IS NOT A STYLE CHOICE ═══
+   `data/marketing.ts` and `data/points-api.ts` BOTH export a `pointsLabel`,
+   with different signatures — `(quantity, program)` against `(balance,
+   quantity)` — because one reads the public programme and the other reads a
+   signed-in balance. Star-exporting the second file over the first would make
+   `pointsLabel` mean whichever one this list happens to mention last, and every
+   existing caller inside the package imports directly from its own module and
+   would not notice. Only the programme itself is published here, which is all
+   the two account routes need: they read `program.name` on the server so a page
+   has a title before the customer's own calls resolve. */
+export { getRewardsProgram, listBanners } from "./data/marketing";
+export type { RewardsProgram, PublicBanner, BannerPlacement } from "./data/marketing";
