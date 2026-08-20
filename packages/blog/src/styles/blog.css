@@ -37,7 +37,12 @@
   color-scheme: light;
 
   /* surfaces */
-  --paper: #fbfaf7;
+  /* WHITE, not the admin's warm paper. This one token is both the listing's
+     ground and the reading view's — `.blog` paints the surface for both — so
+     the blog reads as white end to end. The ink ramp below was measured
+     against #fbfaf7; every value gains contrast on #ffffff rather than
+     losing it, so the annotated ratios remain floors. */
+  --paper: #ffffff;
   --paper-raised: #ffffff;
   --paper-sunken: #f2f0ea;
   --paper-inset: #e8e5da;
@@ -55,24 +60,30 @@
   --rule-strong: #c7c0ae;
 
   /*
-   * THE PRESSABLE CARD — a hard edge and a hard offset shadow, no blur.
+   * THE CARD IS A STROKE. THE BUTTON IS THE PRESSABLE OBJECT.
    *
-   * Neobrutalism in one place so it can be turned up or down in one place.
-   * A blurred shadow says "this floats"; an unblurred one at an offset says
-   * "this is a solid thing sitting on the page", and that is the claim a
-   * card has to make before pressing it down on click reads as physics
-   * rather than as a glitch.
+   * These used to be the same thing: every card carried the admin's hard
+   * black edge, hard offset shadow and press-down travel. On a dense listing
+   * that is a page of two dozen competing solid objects, and the one control
+   * a reader is actually looking for — "Read More" — was the quietest thing
+   * on the card.
    *
-   * `--card-paper` is the cream: cards are WARMER than the page here, which
-   * inverts the usual raised-is-lighter rule on purpose — on a near-white
-   * page a white card is a card with no edges.
+   * So the neobrutalism moved rather than left. `--card-line` and
+   * `--card-lift` still describe a hard edge and a hard unblurred offset, and
+   * are still the single place to turn that treatment up or down; they are
+   * now spent on `.card__more` alone. The card itself is a 1px rule.
    *
-   * The shadow is composed at the CARD, not here — a correctness point the
+   * `--card-paper` stays FRACTIONALLY warmer than the page. It is no longer
+   * cream — the page is white now, and cream against white read as a stain
+   * rather than as a surface — but it is not `#fff` either: a white card on a
+   * white page has nothing but its border, and the border is a hairline.
+   *
+   * The shadow is composed at the ELEMENT, not here — a correctness point the
    * admin file makes and this port preserves: a custom property's `var()`s
    * are substituted where the property is DECLARED, so a `--card-shadow`
    * written at this level would bake in this level's `--card-line`.
    */
-  --card-paper: #fbf7ec;
+  --card-paper: #fdfbf6;
   --card-line: #1f1d14;
   --card-lift: 3px;
 
@@ -400,70 +411,51 @@
 /* ------------------------------------------------------------------ card */
 
 /*
- * A CARD IS A PHYSICAL OBJECT YOU PRESS — ported whole from the admin's
- * dashboard.css, which is the canonical neobrutalist source this repo's
- * earlier hand-rolled treatments are converging on (#7, #15). The travel
- * and the shadow are the same `--card-lift`, which is what makes the press
- * look like the card landing rather than like it shrinking.
+ * A CARD IS A SHEET WITH AN EDGE — and the thing you press is the button on it.
  *
- * NO BLUR ANYWHERE IN IT. A blurred shadow is a light source; an offset
- * solid one is a shape. Mixing them gives a card lit from two directions.
+ * IT USED TO BE THE WHOLE CARD: the admin's hard 2px black border, a hard
+ * offset shadow, a lift on hover and a press down into its own shadow on
+ * click. Ported wholesale from a dashboard, where a handful of cards are
+ * objects on a desk. A blog listing is two dozen of them at once, and two
+ * dozen solid pressable slabs is a page with no hierarchy in it — every card
+ * shouting equally, and the one affordance that names the action ("Read
+ * More") reduced to a soft white pill with a blur behind it.
  *
- * The press is scoped to `.card__hit` — the full-card link — rather than
- * `.card:active`, so pressing a tag link doesn't drop the whole card.
+ * The treatment did not go away; it moved to `.card__more`, which is where a
+ * reader is already looking for the control. The card keeps a 1px stroke on
+ * all four sides and gets out of the way.
+ *
+ * NO BLUR ANYWHERE IN THE NEOBRUTALIST PART. A blurred shadow is a light
+ * source; an offset solid one is a shape. Mixing them lights an object from
+ * two directions at once.
  */
 .blog .card {
   position: relative;
   display: flex;
   flex-direction: column;
   background: var(--card-paper);
-  /* 2px, NOT 1.5. Chrome snaps a border's used width down to whole device
-     pixels: on a 1.25× display — the Windows default — 1.5px is drawn as one
-     device pixel, a hairline, the thing this edge exists not to be. */
-  border: 2px solid var(--card-line);
+  /* 1px and a soft line, where this was 2px of near-black. At 1px there is no
+     device-pixel rounding to design around — the reason the old edge could not
+     be 1.5px — and a hairline is the whole point of it now. */
+  border: 1px solid var(--rule-strong);
   border-radius: var(--radius-l);
-  box-shadow: var(--card-lift) var(--card-lift) 0 var(--card-line);
   overflow: hidden;
-  transition:
-    box-shadow var(--dur-1) var(--ease),
-    transform var(--dur-1) var(--ease);
+  /* No transform anywhere in here any more, so nothing to unwind under
+     reduced motion — a colour change is not a jolt. */
+  transition: border-color var(--dur-1) var(--ease);
 }
 .blog .card:hover {
-  transform: translate(-2px, -2px);
-  box-shadow: 5px 5px 0 var(--card-line);
+  border-color: var(--ink-4);
 }
+/*
+ * Focus still gets the accent, and that is not the spine coming back: this
+ * fires only for keyboard focus inside the card, and an accent ring is the
+ * blog's focus language everywhere else (`.blog :focus-visible`). The removed
+ * green bar was permanent, decorative, and on every card at once.
+ */
 .blog .card:focus-within {
   border-color: var(--accent);
-  box-shadow:
-    var(--card-lift) var(--card-lift) 0 var(--card-line),
-    0 0 0 3px var(--accent-soft);
-}
-/* Down into its own shadow, and the shadow goes with it. */
-.blog .card:has(.card__hit:active) {
-  transform: translate(var(--card-lift), var(--card-lift));
-  box-shadow: 0 0 0 0 var(--card-line);
-}
-/* A hard shadow that snaps between two positions is the one motion here
-   that a reduced-motion reader would feel as a jolt rather than feedback. */
-@media (prefers-reduced-motion: reduce) {
-  .blog .card,
-  .blog .card:hover,
-  .blog .card:has(.card__hit:active) {
-    transform: none;
-    transition: none;
-  }
-}
-/* The accent spine. On the admin it marks what is live; everything the
-   public API serves is live, so every card carries it. */
-.blog .card::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: var(--accent);
-  z-index: 3;
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 /* Full-card click target that doesn't swallow the tag links. */
@@ -638,8 +630,21 @@
   object-fit: cover;
   display: block;
 }
-/* The reference design's cue that the picture is pressable. Not a control:
-   the card is the control, so this takes no clicks and no focus. */
+/*
+ * THE ONE NEOBRUTALIST OBJECT ON THE CARD.
+ *
+ * Hard 2px edge, hard unblurred offset, and the press physics that used to
+ * belong to the whole card: lifts with the card's hover, drops into its own
+ * shadow when the card is actually pressed. The card is now a quiet sheet, so
+ * this is the only thing on it claiming to be a physical control — which is
+ * the correct number, and it is the thing the reader wants.
+ *
+ * STILL NOT A CONTROL IN THE DOM. `pointer-events: none` and no tabindex: the
+ * whole card is one link (`.card__hit`), and a second focusable "Read More"
+ * inside it would put every card in the tab order twice for the same
+ * destination. It looks like the button because it marks where the button
+ * would be; `.card__hit` is what actually takes the click.
+ */
 .blog .card__more {
   position: absolute;
   left: var(--s3);
@@ -649,12 +654,26 @@
   gap: var(--s2);
   padding: var(--s2) var(--s3);
   border-radius: var(--radius-full);
+  border: 2px solid var(--card-line);
   background: var(--paper-raised);
   color: var(--ink);
   font-size: var(--step--2);
   font-weight: 600;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
+  box-shadow: var(--card-lift) var(--card-lift) 0 var(--card-line);
   pointer-events: none;
+  transition:
+    box-shadow var(--dur-1) var(--ease),
+    transform var(--dur-1) var(--ease);
+}
+.blog .card:hover .card__more {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--card-line);
+}
+/* Down into its own shadow, and the shadow goes with it. Keyed off the card's
+   link being pressed, not this element's — this one cannot be pressed. */
+.blog .card:has(.card__hit:active) .card__more {
+  transform: translate(var(--card-lift), var(--card-lift));
+  box-shadow: 0 0 0 0 var(--card-line);
 }
 .blog .card__more .ui-ic {
   width: 0.85rem;
@@ -663,6 +682,16 @@
 }
 .blog .card:hover .card__more .ui-ic {
   transform: translateX(3px);
+}
+/* A hard shadow snapping between two positions is the one motion here a
+   reduced-motion reader would feel as a jolt rather than as feedback. */
+@media (prefers-reduced-motion: reduce) {
+  .blog .card__more,
+  .blog .card:hover .card__more,
+  .blog .card:has(.card__hit:active) .card__more {
+    transform: none;
+    transition: none;
+  }
 }
 
 /* --------------------------------------------------------------- templates
@@ -1385,4 +1414,277 @@
   font-size: var(--step--2);
   color: var(--ink-4);
   font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------- consumer index layout
+ *
+ * The reader's front page, which is a DIFFERENT PAGE FROM THE ADMIN'S even
+ * though both list posts. The admin's version is a work queue: a dense grid,
+ * left-aligned, every post equal because the job is to find one and edit it.
+ * A reader arriving cold has no post in mind, so the page has to lead —
+ * centred masthead, one thing worth reading first, then everything else.
+ *
+ * `sr-only` is declared here rather than borrowed from Tailwind: this package
+ * has its own dev harness that loads no Tailwind at all, and a visually-hidden
+ * class that silently does nothing is the failure mode where a carousel's
+ * only labels become visible junk in the middle of the page.
+ */
+.blog .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.blog .blog-head--center {
+  text-align: center;
+  max-width: 44rem;
+  margin-inline: auto;
+}
+.blog .blog-head--center .blog-head__sub {
+  margin-inline: auto;
+}
+
+/* The masthead's controls stack and centre instead of sitting on one
+   justified row — the admin's toolbar is a filter bar, this is an invitation. */
+.blog .blog-toolbar--center {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s4);
+}
+.blog .blog-toolbar--center .searchbox {
+  width: min(26rem, 100%);
+}
+
+/* Category chips. A row of pills that wraps as a whole and centres each line,
+   replacing the two dropdowns the admin uses — a reader browses categories,
+   they do not "apply a filter". */
+.blog .cat-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--s2);
+}
+.blog .cat-chip {
+  display: inline-flex;
+  align-items: center;
+  height: var(--ctl-h);
+  padding: 0 var(--s4);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-full);
+  background: var(--paper-raised);
+  color: var(--ink-2);
+  font-size: var(--step--1);
+  font-weight: 500;
+  white-space: nowrap;
+  text-decoration: none;
+  transition:
+    background var(--dur-1) var(--ease),
+    border-color var(--dur-1) var(--ease),
+    color var(--dur-1) var(--ease);
+}
+.blog .cat-chip:hover {
+  border-color: var(--ink-4);
+  color: var(--ink);
+}
+/* The selected one inverts rather than tinting: on a white page a tinted
+   chip and a hovered chip are the same value, and "which category am I in"
+   is the question this row exists to answer. */
+.blog .cat-chip.is-on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper-raised);
+}
+.blog .cat-chip.is-on:hover {
+  color: var(--paper-raised);
+}
+
+/* A dismissable statement of the tag filter. Tags reach this page only by
+   being clicked ON a card, so there is no tag picker to return to — what the
+   reader needs is to see the filter and be able to drop it. */
+.blog .tag-filter {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--s2);
+  font-size: var(--step--1);
+  color: var(--ink-3);
+}
+
+.blog .section-head {
+  margin-top: var(--s8);
+  margin-bottom: var(--s4);
+  font-size: var(--step-1);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+/* ------------------------------------------------------- featured rail */
+
+.blog .feat {
+  position: relative;
+}
+.blog .feat__stage {
+  position: relative;
+}
+.blog .feat__slide {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-l);
+  background: var(--card-paper);
+  overflow: hidden;
+  /* Re-keyed on the post id by the component, so this replays on every
+     change — the movement is what makes the swap legible. */
+  animation: feat-in var(--dur-3) var(--ease-out);
+}
+@keyframes feat-in {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .blog .feat__slide {
+    animation: none;
+  }
+}
+.blog .feat__hit {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+.blog .feat__hit:focus-visible {
+  outline-offset: -3px;
+}
+.blog .feat__media {
+  position: relative;
+  aspect-ratio: 21 / 9;
+  background: var(--paper-sunken);
+  overflow: hidden;
+}
+/* A post with no cover still holds the rail's height, so the dots below do
+   not move when the reader pages onto it. */
+.blog .feat__media--empty {
+  aspect-ratio: 21 / 9;
+  background: linear-gradient(135deg, var(--paper-sunken), var(--paper-inset));
+}
+.blog .feat__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.blog .feat__body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s3);
+  padding: 0 var(--s5) var(--s5);
+}
+.blog .feat__title {
+  font-family: var(--font-display);
+  font-size: var(--step-3);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.blog .feat__excerpt {
+  font-size: var(--step-0);
+  color: var(--ink-3);
+  max-width: var(--measure);
+}
+.blog .feat__by {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s2);
+  font-size: var(--step--1);
+  color: var(--ink-4);
+}
+
+.blog .feat__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s4);
+  margin-top: var(--s4);
+}
+.blog .feat__arrows {
+  display: flex;
+  gap: var(--s2);
+}
+.blog .feat__arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ctl-h);
+  height: var(--ctl-h);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-full);
+  background: var(--paper-raised);
+  color: var(--ink-2);
+  cursor: pointer;
+  transition:
+    border-color var(--dur-1) var(--ease),
+    color var(--dur-1) var(--ease);
+}
+.blog .feat__arrow:hover {
+  border-color: var(--ink-4);
+  color: var(--ink);
+}
+.blog .feat__dots {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+/* The visible dot is 8px; the BUTTON is 44px, padded out around it. A dot
+   small enough to look right is far too small to hit on a phone, and the two
+   requirements are settled separately rather than compromised into one
+   medium-sized dot that satisfies neither. */
+.blog .feat__dot {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.blog .feat__dot::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: var(--radius-full);
+  background: var(--rule-strong);
+  transition: background var(--dur-1) var(--ease);
+}
+.blog .feat__dot:hover::before {
+  background: var(--ink-4);
+}
+.blog .feat__dot.is-on::before {
+  background: var(--ink);
+}
+
+@media (min-width: 48rem) {
+  .blog .feat__title {
+    font-size: var(--step-4);
+  }
+  .blog .feat__body {
+    padding: 0 var(--s6) var(--s6);
+  }
 }
