@@ -38,9 +38,22 @@ function FooterColumn({ title, children }: { title: string; children: ReactNode 
   );
 }
 
-function FooterLink({ href, children }: { href: string; children: ReactNode }) {
+/**
+ * `className` lands on the `<li>`, not on the anchor — the only caller that
+ * passes one is the Blog link passing `pwa-hide`, and hiding the anchor alone
+ * would leave its list item behind as a gap in the column.
+ */
+function FooterLink({
+  href,
+  children,
+  className,
+}: {
+  href: string;
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <li>
+    <li className={className}>
       <Link
         href={href}
         className={cn(
@@ -88,7 +101,11 @@ export async function ShopFooter() {
 
           <FooterColumn title="Company">
             <FooterLink href="/#about">About</FooterLink>
-            <FooterLink href="/posts">Blog</FooterLink>
+            {/* The website's, not the shop's. Hidden in the installed app —
+                see `.pwa-hide` in `globals.css`. */}
+            <FooterLink href="/posts" className="pwa-hide">
+              Blog
+            </FooterLink>
           </FooterColumn>
         </div>
 

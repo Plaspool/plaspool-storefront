@@ -153,3 +153,35 @@
 html {
   scroll-behavior: smooth;
 }
+
+/* ------------------------------------------------------------------ pwa
+ *
+ * THE INSTALLED APP IS THE SHOP. Launched from a home screen it opens at
+ * `/shop`, plays the mark, and lands in `/store` — see `app/manifest.ts`.
+ * What follows keeps it there: the blog and the marketing pages are the
+ * website, and an app installed to buy filament should not spend its chrome
+ * pointing away from the till.
+ *
+ * ═══ WHY THIS IS A MEDIA QUERY AND NOT A `useEffect` ═══
+ * Standalone-ness cannot be known on the server, so the obvious JavaScript
+ * version — probe `window.matchMedia('(display-mode: standalone)')` after
+ * mount, then hide — renders the blog strip, paints it, and only then yanks
+ * it away. The shopper watches a section of the page disappear on every cold
+ * start. `display-mode` is a real media feature, so CSS answers correctly in
+ * the very first style pass, before anything is painted, with no JS at all
+ * and no hydration mismatch to reconcile.
+ *
+ * SCOPE IS STILL `/`, ON PURPOSE. This hides ENTRY POINTS; it does not fence
+ * the origin. A shopper who follows a link to a post from outside still gets
+ * a readable page rather than a dead end, and — the reason the manifest could
+ * not simply narrow `scope` — `/cart` and `/checkout` stay inside the app.
+ *
+ * iOS: `display-mode: standalone` has been supported in Safari since iOS 13.
+ * Older iOS installs fall through to the browser branch and see the blog
+ * links, which is the safe direction to fail.
+ */
+@media (display-mode: standalone) {
+  .pwa-hide {
+    display: none !important;
+  }
+}

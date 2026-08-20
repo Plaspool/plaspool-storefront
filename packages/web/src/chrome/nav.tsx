@@ -22,7 +22,9 @@ export default function Nav() {
                       <Link href="/shop" className="whitespace-nowrap text-slate-600 hover:text-slate-900 font-medium tracking-wide">
                         Products
                       </Link>
-                      <Link href="/posts" className="whitespace-nowrap text-slate-600 hover:text-slate-900 font-medium tracking-wide">
+                      {/* `pwa-hide` — the installed app is the shop, not the
+                          website. See `.pwa-hide` in `globals.css`. */}
+                      <Link href="/posts" className="pwa-hide whitespace-nowrap text-slate-600 hover:text-slate-900 font-medium tracking-wide">
                         Blog
                       </Link>
                       <Link href="/contact" className="whitespace-nowrap text-slate-600 hover:text-slate-900 font-medium tracking-wide">
@@ -86,7 +88,7 @@ export default function Nav() {
                     </Link>
                     <Link onClick={() => setMobileMenuOpen(false)}
                       href="/posts"
-                      className="block px-3 py-2 rounded-md text-base font-medium text-slate-900 hover:bg-slate-100"
+                      className="pwa-hide block px-3 py-2 rounded-md text-base font-medium text-slate-900 hover:bg-slate-100"
                     >
                       Blog
                     </Link>
