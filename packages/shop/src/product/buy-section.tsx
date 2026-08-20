@@ -57,11 +57,12 @@ export function ProductBuySection({
             choosing a size. `top-20` clears the shop nav (`h-16`) with a
             little air. Below `lg` the two are stacked and there is nothing to
             hold position beside. */}
+        {/* The gallery no longer picks the colour — the buy box beside it does,
+            and did all along. See `gallery.tsx` for why a second, unlabelled
+            picker made of tinted drawings was the wrong left column. */}
         <Gallery
           name={product.name}
-          colours={product.colours}
-          selectedId={colour.id}
-          onSelect={setColourId}
+          colour={colour}
           weightGrams={size.weightGrams}
           productCoverUrl={product.coverImageUrl}
           productImageUrls={product.imageUrls}
