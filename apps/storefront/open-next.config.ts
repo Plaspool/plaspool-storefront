@@ -1,7 +1,12 @@
 import { defineCloudflareConfig } from "@opennextjs/cloudflare";
 import kvIncrementalCache from "@opennextjs/cloudflare/overrides/incremental-cache/kv-incremental-cache";
 import memoryQueue from "@opennextjs/cloudflare/overrides/queue/memory-queue";
+import queueCache from "@opennextjs/cloudflare/overrides/queue/queue-cache";
 import kvNextTagCache from "@opennextjs/cloudflare/overrides/tag-cache/kv-next-tag-cache";
+import {
+  softTagFilter,
+  withFilter,
+} from "@opennextjs/cloudflare/overrides/tag-cache/tag-cache-filter";
 
 /*
  * The configuration that makes `revalidate` true in production (#9).
@@ -58,9 +63,81 @@ import kvNextTagCache from "@opennextjs/cloudflare/overrides/tag-cache/kv-next-t
  * same KV-backed fetch cache, and with the unfiltered baseline served from
  * cache they are the rare case, not every case.
  */
+/*
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ⚠ `softTagFilter` — THE FREE KV READ TIER IS SPENT ON TAGS NOTHING PURGES.
+ *
+ * The free plan allows 100,000 KV READS PER DAY, and a bulk read is billed one
+ * read PER KEY, not one per call. That matters here because a cached page serve
+ * is not one KV read, it is:
+ *
+ *     1  (the page, from NEXT_INC_CACHE_KV)
+ *   + N  (one per cache tag, from NEXT_TAG_CACHE_KV, via `hasBeenRevalidated`)
+ *
+ * and N is the `x-next-cache-tags` list Next writes at build time. Measured
+ * from this app's own build output:
+ *
+ *     /                              5 tags  ->  6 reads per request
+ *     /store/all                     7 tags  ->  8 reads per request
+ *     /store/products/[slug]         9 tags  -> 10 reads per request
+ *     /posts/[slug]                  8 tags  ->  9 reads per request
+ *     /privacy, /terms, /shipping    5 tags  ->  6 reads per request
+ *
+ * FIVE TO SEVEN OF EVERY ONE OF THOSE TAGS IS A `_N_T_/…` SOFT TAG — Next's
+ * internal per-segment tags (`_N_T_/layout`, `_N_T_/(shop)/store/[category]/page`
+ * and so on). They only ever get purged by `revalidatePath()`, WHICH THIS APP
+ * DOES NOT CALL ANYWHERE. `POST /api/revalidate` purges `catalog` and
+ * `product:<slug>` and nothing else. So the shop was spending roughly three
+ * quarters of its daily read budget looking up tags that can never change.
+ *
+ * The filter drops them before they reach KV. Pages whose tags are ALL soft —
+ * the home page, the legal pages — short-circuit to zero tag reads without
+ * touching KV at all. The rest fall to one or two. Average request cost goes
+ * from ~8 reads to ~2.
+ *
+ * ⚠ THE PRECONDITION IS THE `revalidatePath` ONE, AND IT IS LOAD-BEARING. The
+ * day someone adds a `revalidatePath()` call, it will appear to work and do
+ * nothing, because the tag it writes is filtered out on the way in AND on the
+ * way out. If that call is ever wanted, delete this filter in the same commit.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+/*
+ * ═══════════════════════════════════════════════════════════════════════════
+ * `queueCache` — WITHOUT IT, ONE STALE PAGE RE-RENDERS ONCE PER REQUEST.
+ *
+ * `memoryQueue` de-dupes revalidations per isolate, but look at how long it
+ * holds the de-dupe key: it `delete`s it in a `finally`, the moment the
+ * revalidation returns. So it only ever collapses revalidations that are
+ * IN FLIGHT AT THE SAME INSTANT, not ones that arrive a second apart.
+ *
+ * That interacts badly with the eventual consistency this file already accepts
+ * above. The sequence is:
+ *
+ *   1. A request finds the page stale and fires a self-call to re-render it.
+ *   2. The re-render finishes and WRITES the fresh entry to KV.
+ *   3. KV takes UP TO 60 SECONDS to make that write visible everywhere.
+ *   4. Every request arriving inside that window still reads the OLD entry,
+ *      still concludes "stale", and — the de-dupe key having been dropped at
+ *      step 2 — fires ANOTHER full re-render. And another.
+ *
+ * So the cost of a stale page is not one re-render, it is one re-render per
+ * request for up to a minute: double the Worker invocations, a full render
+ * each, plus a KV write each against a free tier that allows ONE THOUSAND
+ * WRITES A DAY.
+ *
+ * `queueCache` holds the de-dupe key in the Cache API instead of an isolate's
+ * `Set`, so it survives past the revalidation AND is shared by every isolate in
+ * the colo. 60s rather than the 5s default is deliberate: the window being
+ * closed is KV's propagation delay, and upstream names that as up to 60s.
+ * Nothing is served staler for it — the entry was already being served stale
+ * through that minute; the only thing suppressed is the redundant re-rendering
+ * of it.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 export default defineCloudflareConfig({
   incrementalCache: kvIncrementalCache,
-  queue: memoryQueue,
-  tagCache: kvNextTagCache,
+  queue: queueCache(memoryQueue, { regionalCacheTtlSec: 60 }),
+  tagCache: withFilter({ tagCache: kvNextTagCache, filterFn: softTagFilter }),
   enableCacheInterception: true,
 });
