@@ -1,4 +1,4 @@
-import { ReturnRequestPage } from "@plaspool/shop";
+import { ReturnRequestPage, returnRequestMetadata } from "@plaspool/shop";
 
 /**
  * `/returns` — the no-JS target of Task 10's intercepting CTA, and a real
@@ -11,3 +11,5 @@ import { ReturnRequestPage } from "@plaspool/shop";
 export default function Page() {
   return <ReturnRequestPage />;
 }
+
+export const metadata = returnRequestMetadata;

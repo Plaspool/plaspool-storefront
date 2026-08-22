@@ -1,4 +1,6 @@
-import { ReturnForm } from "./return-form";
+import type { Metadata } from "next";
+
+import { ReturnFormGate } from "./return-form-gate";
 import { getRewardsProgram } from "../data/marketing";
 import { listServiceAreas } from "../data/returns-api";
 
@@ -32,8 +34,19 @@ import { listServiceAreas } from "../data/returns-api";
  * Unlike `/account/rewards`, neither read here is cookie-identified: the
  * programme and the district list are the same for every visitor, so the
  * page is free to sit in the static shell and be served from cache like any
- * other marketing page. `ReturnForm` itself is a client component and reads
- * the signed-in session only when it actually submits.
+ * other marketing page. `ReturnFormGate` and `ReturnForm` are both client
+ * components; the session they read is a browser-side check, same as
+ * `ReturnModal`'s, and reads nothing on the server.
+ *
+ * ═══ WHO ACTUALLY LANDS HERE, WHICH IS WHY `ReturnFormGate` EXISTS ═══
+ * This is the one URL for the feature that gets emailed by an operator,
+ * handed out by support, clicked before a bundle has hydrated, returned to by
+ * `next=/returns` after an abandoned sign-in, and indexed by a crawler. It is
+ * the entry point MOST likely to receive a guest, and used to be the one that
+ * made them pay for it — filling in the whole form before ever being told
+ * they needed to sign in. `ReturnFormGate` is that check, asked here the same
+ * way `ReturnModal` already asks it before mounting the form — see its own
+ * header for the one place the two deliberately differ.
  */
 export async function ReturnRequestPage() {
   const [program, areas] = await Promise.all([getRewardsProgram(), listServiceAreas()]);
@@ -61,11 +74,32 @@ export async function ReturnRequestPage() {
       </p>
 
       <div className="mt-8">
-        <ReturnForm program={program} areas={areas ?? []} />
+        <ReturnFormGate program={program} areas={areas ?? []} />
       </div>
     </div>
   );
 }
+
+/**
+ * `/returns`'s own metadata — a title and description, no more.
+ *
+ * The only public, crawlable `(shop)` route that had neither: every other one
+ * either carries its own (`storeHomeMetadata`, `productMetadata`) or is
+ * per-customer and deliberately unindexable. This page's whole reason to
+ * exist is that it is linkable from an email a shopper did not write
+ * themselves — see the header above — so a link preview or a search result
+ * naming it is exactly the audience this was missing. No `alternates` beyond
+ * the app's own default: nothing here varies by query string worth a
+ * canonical of its own.
+ */
+export const returnRequestMetadata: Metadata = {
+  title: "Request a return pickup",
+  /* The same sentence the page itself leads with, above. Deliberately free of
+     any unit or points noun, the same rule that sentence already follows: an
+     operator-renamed unit would make a hardcoded one here the stalest copy on
+     the page. */
+  description: "Tell us how many you're sending back and where to collect them.",
+};
 
 /** The short page a shopper who followed a link to `/returns` gets when no
  *  programme is configured. See the file header for why this exists at all

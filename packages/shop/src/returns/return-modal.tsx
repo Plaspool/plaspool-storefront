@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +13,7 @@ import {
 } from "@plaspool/ui";
 
 import { ReturnForm } from "./return-form";
+import { GuestPrompt } from "./guest-prompt";
 import { readShopSession } from "../data/auth-api";
 import type { ShopSession } from "../data/auth-api";
 import type { ServiceArea } from "../data/returns-api";
@@ -127,33 +127,6 @@ export function ReturnModal({ open, onOpenChange, program, areas }: ReturnModalP
         {session === "unknown" && <FormSkeleton />}
       </DialogContent>
     </Dialog>
-  );
-}
-
-/** A shopper who opened the dialog without ever having signed in. Styled the
- *  same way `ReturnForm` styles its own `already-open` and `sign-in`
- *  placements, for the one form the two files share the look of. */
-function GuestPrompt() {
-  return (
-    <div className="border-2 border-foreground bg-brand-soft px-4 py-3">
-      <p className="font-sans text-sm font-semibold text-foreground">
-        Sign in to send a return request.
-      </p>
-      <p className="mt-0.5 font-sans text-sm text-muted-foreground">
-        {/* NOT "bring you back here". `next=/returns` lands on the standalone
-            page (Task 9) once signed in — not back on whatever page this
-            dialog was opened over, reopened. Same care `return-form.tsx`'s
-            own sign-in placement takes about not promising a return trip it
-            cannot actually deliver. */}
-        Signing in will take you to the returns page to send this.
-      </p>
-      <Link
-        href={`/sign-in?next=${encodeURIComponent("/returns")}`}
-        className="mt-1.5 inline-block font-sans text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-      >
-        Sign in
-      </Link>
-    </div>
   );
 }
 
