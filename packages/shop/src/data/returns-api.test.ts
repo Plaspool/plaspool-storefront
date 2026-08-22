@@ -45,6 +45,15 @@ it("carries the existing id off already_open, so the form can link to it", async
   });
 });
 
+it("maps program_type_mismatch to the same paused copy — the API says nothing about why", async () => {
+  // The admin can answer this on a 409; it was reachable and unmapped, which
+  // degraded to `placeError`'s generic "failed" — naming a connection problem
+  // the shopper does not have. `programme-paused` is the honest sentence
+  // either way, since this file learns nothing more about WHY from the API.
+  reply(409, { error: "program_type_mismatch" });
+  await expect(requestReturn(INPUT)).rejects.toMatchObject({ reason: "programme-paused" });
+});
+
 it("maps a 401 to `unauthenticated`, which is a sign-in prompt and not an error", async () => {
   reply(401, { error: "unauthenticated" });
   await expect(requestReturn(INPUT)).rejects.toMatchObject({ reason: "unauthenticated" });

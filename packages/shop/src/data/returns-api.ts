@@ -107,14 +107,54 @@ export interface RequestReturnInput {
   name?: string;
 }
 
-/** The API's error vocabulary, mapped to this form's. One place, so a renamed
- *  code is a compile error here rather than a silent "failed" on screen. */
-const REASONS: Record<string, ReturnFailure> = {
+/** The admin's own codes for this endpoint's refusals
+ *  (`server/marketing/returns/customer.ts` in the admin repo). A closed union
+ *  rather than `string` — see `REASONS`'s own comment for exactly what that
+ *  buys and what it does not. */
+type ReturnErrorCode =
+  | "below_minimum"
+  | "outside_service_area"
+  | "return_already_open"
+  | "program_paused"
+  | "program_type_mismatch";
+
+/**
+ * The API's error vocabulary, mapped to this form's.
+ *
+ * ═══ WHAT "ONE PLACE" ACTUALLY BUYS — CORRECTED ═══
+ * This used to claim a renamed code becomes "a compile error here". It does
+ * not, and cannot: the two repos share no types package, so nothing on this
+ * side can see an admin-side rename at compile time. That gap is exactly how
+ * `program_type_mismatch` shipped on the admin, was never added below, and
+ * degraded silently to `placeError`'s generic "failed" — the wrong cause,
+ * naming a connection problem the shopper does not have.
+ *
+ * What the closed-union key type above DOES buy: within THIS file, forgetting,
+ * duplicating, or misspelling a key below is a compile error, because
+ * `Record<ReturnErrorCode, ReturnFailure>` requires every member of the union
+ * and rejects any other. That catches a mistake made here. It does not, and
+ * cannot, catch a code the admin ships that this union has not been told
+ * about — that is still a silent "failed" on screen until a human updates
+ * `ReturnErrorCode` to match, exactly as before this file's key type was
+ * narrowed.
+ */
+const REASONS: Record<ReturnErrorCode, ReturnFailure> = {
   below_minimum: "below-minimum",
   outside_service_area: "outside-area",
   return_already_open: "already-open",
   program_paused: "programme-paused",
+  /* The API tells the storefront nothing about WHY a programme is closed —
+     `programme-paused`'s copy is already the honest sentence for that, and
+     the only one this form can send either way. */
+  program_type_mismatch: "programme-paused",
 };
+
+/** So `REASONS` can be indexed by a runtime string safely. The union above
+ *  has no index signature, on purpose — that omission is what makes the
+ *  object literal itself exhaustively checked. */
+function isReturnErrorCode(code: string): code is ReturnErrorCode {
+  return Object.prototype.hasOwnProperty.call(REASONS, code);
+}
 
 export async function requestReturn(input: RequestReturnInput): Promise<ReturnConfirmation> {
   let res: Response;
@@ -138,7 +178,10 @@ export async function requestReturn(input: RequestReturnInput): Promise<ReturnCo
   const body = (await res.json().catch(() => ({}))) as {
     error?: string; min?: number; served?: string[]; existingId?: string;
   };
-  const reason = body.error ? REASONS[body.error] : undefined;
+  let reason: ReturnFailure | undefined;
+  if (body.error && isReturnErrorCode(body.error)) {
+    reason = REASONS[body.error];
+  }
   if (reason) {
     throw new ReturnRequestError(reason, {
       min: body.min, served: body.served, existingId: body.existingId,
