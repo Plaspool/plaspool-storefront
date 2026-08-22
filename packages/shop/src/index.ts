@@ -137,6 +137,10 @@ export * from "./account/order-status-page";
    sake: there is no per-customer voucher in this system to list. */
 export * from "./account/account-home";
 export * from "./account/rewards-page";
+/* `/account/returns` — a shopper's own return requests, and where each has
+   got to. Reads `listMyReturns` independently of Task 11's `ReturnsCta`; the
+   two only meet at the URL a shopper lands on after submitting. */
+export * from "./account/returns-page";
 /* ═══ NAMED, NOT `export *`, AND THAT IS NOT A STYLE CHOICE ═══
    `data/marketing.ts` and `data/points-api.ts` BOTH export a `pointsLabel`,
    with different signatures — `(quantity, program)` against `(balance,
