@@ -21,13 +21,17 @@ import type { RewardsProgram } from "../data/marketing";
  * ═══ THE DISTRICT PICKER IS A NATIVE `<select>`, NOT `@plaspool/ui`'s `Select` ═══
  * That `Select` is Radix: it portals its listbox and renders it only once
  * opened on the client, so under `renderToStaticMarkup` — this file's own test
- * harness — it emits zero options. A shopper without JavaScript, on a page
- * whose entire design is that it works as a plain page, would see an empty
- * field with no way to fill it. There is no form-select precedent to violate
- * either: the only Radix `Select` in this package is `listing/sort-select.tsx`,
- * a sort control where client-only is fine, and the checkout's address form
- * uses `<Input>` throughout, even for "State". A native select is also the
- * better mobile control, which is where most of this shop's traffic is.
+ * harness — it emits zero options, and the district grouping this form's own
+ * test asserts on would have nothing to assert against. (NOT because it makes
+ * the form work without JavaScript — it does not. There is no `name`
+ * attribute anywhere in this form and no `action`, so a shopper with no
+ * script running cannot submit any of it regardless of what this one field is
+ * made of; that is not this select's problem to solve.) There is no
+ * form-select precedent to violate either: the only Radix `Select` in this
+ * package is `listing/sort-select.tsx`, a sort control where client-only is
+ * fine, and the checkout's address form uses `<Input>` throughout, even for
+ * "State". A native select is also the better mobile control, which is where
+ * most of this shop's traffic is.
  *
  * ═══ NO EMAIL FIELD ═══
  * The pickup address belongs to the signed-in session, not to whatever a
@@ -190,6 +194,26 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
   const [placement, setPlacement] = React.useState<Placement | null>(null);
   const [confirmation, setConfirmation] = React.useState<ReturnConfirmation | null>(null);
 
+  /* THE TWO BLOCK-LEVEL OUTCOMES — `already-open` AND `sign-in` — CAN LAND
+     ENTIRELY OFF-SCREEN, SILENTLY. Both render at the TOP of the form; submit
+     is at the BOTTOM. In the dialog (a scrolling `max-h` around a ~700px
+     form) that is off-screen on any phone; on `/returns` it is a full-page
+     scroll. This ref plus the effect below fixes the sighted and
+     screen-reader cases at once: focusing an off-screen element scrolls it
+     into view, and `role="alert"` on the block itself means a screen reader
+     announces it the moment it is placed, without waiting on focus at all.
+     Field-level errors and the plain message above the submit button are
+     deliberately UNCHANGED — see the file header on why this form never
+     empties itself, and `review-form.tsx` for the same silence being the
+     pre-existing house shape there. */
+  const blockAlertRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (placement && "kind" in placement) {
+      blockAlertRef.current?.focus();
+    }
+  }, [placement]);
+
   const uid = React.useId();
   const id = (part: string) => `${uid}-${part}`;
 
@@ -286,13 +310,34 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
           <p className="mt-1 text-muted-foreground">
             {confirmedProgram.name} will be in touch to arrange pickup. Reference {confirmation.requestId}.
           </p>
-          {/* The only dismissal this component offers. The page passes no
-              `onDone` and is happy to leave this on screen indefinitely. */}
-          {onDone && (
-            <Button type="button" variant="outline" onClick={onDone} className="mt-3">
-              Done
-            </Button>
-          )}
+          {/* ═══ "VIEW YOUR RETURNS", ALWAYS — NOT ONLY BESIDE "DONE" ═══
+              Spec §2's whole argument for requiring a session was "every
+              submitter can see their own request" — a promise this screen
+              made at every OTHER outcome (the `already-open` box above links
+              here too) and never once at the moment it is actually kept.
+              Unconditional because the standalone `/returns` page passes no
+              `onDone` and still owes this shopper the same door.
+              SAFE ON THE MODAL PATH ONLY BECAUSE OF `ReturnsCta`'s route-change
+              close (Important 2) — without it, a plain `<Link>` here would
+              navigate the page underneath while this dialog stayed open over
+              it, exactly the failure the already-open box's identical link
+              had. */}
+          <div className="mt-3 flex flex-wrap items-center gap-4">
+            {/* The only dismissal this component offers of its own. The page
+                passes no `onDone` and is happy to leave this on screen
+                indefinitely. */}
+            {onDone && (
+              <Button type="button" variant="outline" onClick={onDone}>
+                Done
+              </Button>
+            )}
+            <Link
+              href="/account/returns"
+              className="font-sans text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
+              View your returns
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -301,7 +346,12 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
   return (
     <form onSubmit={onSubmit} noValidate className={cn("flex flex-col gap-5", className)}>
       {placement && "kind" in placement && placement.kind === "already-open" && (
-        <div className="border-2 border-foreground bg-brand-soft px-4 py-3">
+        <div
+          ref={blockAlertRef}
+          role="alert"
+          tabIndex={-1}
+          className="border-2 border-foreground bg-brand-soft px-4 py-3 focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 focus:ring-offset-background"
+        >
           <p className="font-sans text-sm font-semibold text-foreground">
             You already have an open return request.
           </p>
@@ -319,7 +369,12 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
       )}
 
       {placement && "kind" in placement && placement.kind === "sign-in" && (
-        <div className="border-2 border-foreground bg-brand-soft px-4 py-3">
+        <div
+          ref={blockAlertRef}
+          role="alert"
+          tabIndex={-1}
+          className="border-2 border-foreground bg-brand-soft px-4 py-3 focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 focus:ring-offset-background"
+        >
           <p className="font-sans text-sm font-semibold text-foreground">Sign in to send this request.</p>
           <p className="mt-0.5 font-sans text-sm text-muted-foreground">
             {/* Signing in is a full navigation away from this form, so it does
