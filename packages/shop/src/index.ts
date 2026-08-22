@@ -149,3 +149,9 @@ export * from "./account/rewards-page";
    has a title before the customer's own calls resolve. */
 export { getRewardsProgram, listBanners } from "./data/marketing";
 export type { RewardsProgram, PublicBanner, BannerPlacement } from "./data/marketing";
+
+/* `/returns` — the real, linkable page behind Task 10's dialog. Named rather
+   than `export *` because that is the one export the route needs; `ReturnForm`
+   and `returns-api.ts` stay internal to the package until something outside it
+   needs them directly. */
+export { ReturnRequestPage } from "./returns/return-request-page";
