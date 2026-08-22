@@ -44,7 +44,17 @@ import type { RewardsProgram } from "../data/marketing";
  * Every branch `placeError` can reach is recoverable — a paused programme, a
  * rate limit, a session that expired mid-type — and a form that clears on any
  * of them is one the shopper types twice. Nothing here calls a setter that
- * would reset a field the shopper filled in.
+ * would reset a field the shopper filled in. The one branch that cannot avoid
+ * losing what was typed is `sign-in`: recovering means leaving the page, and
+ * the copy there says so rather than promising what a navigation cannot keep.
+ *
+ * ═══ `onDone` FIRES FROM THE CONFIRMATION, NOT AS PART OF SUCCESS ═══
+ * Task 10 passes `onDone={() => onOpenChange(false)}`, closing its dialog the
+ * instant it runs. Calling it alongside `setConfirmation(...)` would unmount
+ * this form in the same tick React would otherwise paint the confirmation —
+ * the one screen `requestId` is ever shown on would never be seen. `onDone`
+ * fires only from the confirmation's own "Done" control; the standalone
+ * `/returns` page passes no `onDone`, so its confirmation simply stays put.
  */
 
 /** The API's own floor for one request, mirrored so a quantity below it is
@@ -53,6 +63,15 @@ import type { RewardsProgram } from "../data/marketing";
  *  programme this form was handed can go stale while it sits open in a tab. */
 function belowMinimum(qty: number, program: RewardsProgram): boolean {
   return !Number.isFinite(qty) || !Number.isInteger(qty) || qty < program.minUnitsPerReturn;
+}
+
+/** Joins whichever message ids currently apply to one field into a single
+ *  `aria-describedby`, dropping the falsy ones. A field can carry permanent
+ *  help text, an error, both, or neither, and `aria-describedby` accepts a
+ *  space-separated list for exactly this case. */
+function describedBy(...parts: Array<string | false | null | undefined>): string | undefined {
+  const ids = parts.filter((part): part is string => Boolean(part));
+  return ids.length ? ids.join(" ") : undefined;
 }
 
 /*
@@ -90,6 +109,14 @@ function Field({
 const NATIVE_SELECT_CLASSES =
   "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm";
 
+/** The API's own ceilings (`server/marketing/returns/customer.ts` in the
+ *  admin repo — `phone`/`name` at 200, `pickupAddress` at 1000), mirrored so
+ *  a paste from somewhere long fails quietly at the keyboard rather than
+ *  loudly as a 400 after a round trip. */
+const PHONE_MAX = 200;
+const ADDRESS_MAX = 1000;
+const NAME_MAX = 200;
+
 /** Where a refusal belongs on screen. `null` means "above the submit". */
 type Placement =
   | { field: "qtyDeclared" | "serviceAreaId"; message: string }
@@ -97,7 +124,10 @@ type Placement =
   | { kind: "already-open"; existingId: string }
   | { kind: "sign-in" };
 
-function placeError(err: ReturnRequestError, program: RewardsProgram): Placement {
+/** Exported so the whole branch table is testable without a DOM — this
+ *  suite has none, deliberately, and the brief calls this function "the
+ *  load-bearing part". See `return-form.test.tsx`. */
+export function placeError(err: ReturnRequestError, program: RewardsProgram): Placement {
   switch (err.reason) {
     case "below-minimum": {
       const min = err.min ?? program.minUnitsPerReturn;
@@ -137,7 +167,10 @@ function placeError(err: ReturnRequestError, program: RewardsProgram): Placement
 export interface ReturnFormProps {
   program: RewardsProgram;
   areas: ServiceArea[];
-  /** Task 10's modal passes this to close itself. The page passes nothing. */
+  /** Task 10's modal passes this to close itself. Fired only from the
+   *  confirmation's own "Done" control, never automatically on success — see
+   *  the file header. The page passes nothing, and its confirmation simply
+   *  stays on screen. */
   onDone?: () => void;
   className?: string;
 }
@@ -170,6 +203,12 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
     return grouped;
   }, [areas]);
 
+  /** No district can be chosen at all. Task 9's brief calls for the select
+   *  itself to render `disabled` here; a "choose a district" nag beside a
+   *  control nobody can fill in is a dead end, so submit is disabled too
+   *  rather than letting a shopper reach a guaranteed generic API refusal. */
+  const noAreas = areas.length === 0;
+
   const qtyNumber = Number(qty);
   const problems = {
     qtyDeclared: belowMinimum(qtyNumber, program)
@@ -177,7 +216,7 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
       : null,
     phone: phone.trim() ? null : "Tell us a phone number to reach you on.",
     pickupAddress: pickupAddress.trim() ? null : "Tell us where to collect from.",
-    serviceAreaId: serviceAreaId ? null : "Choose a district.",
+    serviceAreaId: !noAreas && !serviceAreaId ? "Choose a district." : null,
   };
   const valid = Object.values(problems).every((problem) => problem === null);
 
@@ -189,6 +228,13 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
     if (attempted && problems[field]) return problems[field];
     if (placement && "field" in placement && placement.field === field) return placement.message;
     return null;
+  }
+
+  /** A server placement naming this field is only correct until the shopper
+   *  changes the value it complained about — otherwise "we don't collect
+   *  there" keeps pointing at a district they already changed away from. */
+  function clearFieldPlacement(field: "qtyDeclared" | "serviceAreaId") {
+    setPlacement((current) => (current && "field" in current && current.field === field ? null : current));
   }
 
   const pointsForQty = Number.isFinite(qtyNumber) && qtyNumber > 0 ? qtyNumber * program.pointsPerUnit : 0;
@@ -209,7 +255,6 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
         name: name.trim() ? name.trim() : undefined,
       });
       setConfirmation(result);
-      onDone?.();
     } catch (err) {
       setPlacement(
         err instanceof ReturnRequestError
@@ -241,6 +286,13 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
           <p className="mt-1 text-muted-foreground">
             {confirmedProgram.name} will be in touch to arrange pickup. Reference {confirmation.requestId}.
           </p>
+          {/* The only dismissal this component offers. The page passes no
+              `onDone` and is happy to leave this on screen indefinitely. */}
+          {onDone && (
+            <Button type="button" variant="outline" onClick={onDone} className="mt-3">
+              Done
+            </Button>
+          )}
         </div>
       </div>
     );
@@ -270,10 +322,13 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
         <div className="border-2 border-foreground bg-brand-soft px-4 py-3">
           <p className="font-sans text-sm font-semibold text-foreground">Sign in to send this request.</p>
           <p className="mt-0.5 font-sans text-sm text-muted-foreground">
-            Your session ended. Nothing you typed here is lost.
+            {/* Signing in is a full navigation away from this form, so it does
+                NOT preserve what was typed. Say that, rather than promise a
+                preservation this branch cannot actually deliver. */}
+            Your session ended. Signing in will bring you back to this page, but you will need to fill it in again.
           </p>
           <Link
-            href="/sign-in"
+            href={`/sign-in?next=${encodeURIComponent("/returns")}`}
             className="mt-1.5 inline-block font-sans text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             Sign in
@@ -288,21 +343,27 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
           inputMode="numeric"
           min={program.minUnitsPerReturn}
           value={qty}
+          aria-required="true"
           aria-invalid={fieldMessage("qtyDeclared") ? true : undefined}
-          aria-describedby={id("qty-help")}
-          onChange={(event) => setQty(event.target.value)}
+          aria-describedby={describedBy(id("qty-help"), fieldMessage("qtyDeclared") && id("qty-error"))}
+          onChange={(event) => {
+            setQty(event.target.value);
+            clearFieldPlacement("qtyDeclared");
+          }}
         />
         <p id={id("qty-help")} className="mt-1.5 font-sans text-xs text-muted-foreground">
           {Math.max(qtyNumber || 0, 0)} {unitLabel(qtyNumber || 0, program)} × {program.pointsPerUnit} ={" "}
           {pointsForQty} {pointsLabel(pointsForQty, program)}
         </p>
         {fieldMessage("qtyDeclared") && (
-          <p className="mt-1.5 font-sans text-sm text-destructive-strong">{fieldMessage("qtyDeclared")}</p>
+          <p id={id("qty-error")} className="mt-1.5 font-sans text-sm text-destructive-strong">
+            {fieldMessage("qtyDeclared")}
+          </p>
         )}
       </Field>
 
       <Field id={id("name")} label="Name">
-        <Input id={id("name")} value={name} onChange={(event) => setName(event.target.value)} />
+        <Input id={id("name")} value={name} maxLength={NAME_MAX} onChange={(event) => setName(event.target.value)} />
       </Field>
 
       <Field id={id("phone")} label="Phone" required>
@@ -310,11 +371,16 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
           id={id("phone")}
           type="tel"
           value={phone}
+          maxLength={PHONE_MAX}
+          aria-required="true"
           aria-invalid={attempted && problems.phone ? true : undefined}
+          aria-describedby={describedBy(attempted && problems.phone && id("phone-error"))}
           onChange={(event) => setPhone(event.target.value)}
         />
         {attempted && problems.phone && (
-          <p className="mt-1.5 font-sans text-sm text-destructive-strong">{problems.phone}</p>
+          <p id={id("phone-error")} className="mt-1.5 font-sans text-sm text-destructive-strong">
+            {problems.phone}
+          </p>
         )}
       </Field>
 
@@ -323,11 +389,16 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
           id={id("address")}
           rows={3}
           value={pickupAddress}
+          maxLength={ADDRESS_MAX}
+          aria-required="true"
           aria-invalid={attempted && problems.pickupAddress ? true : undefined}
+          aria-describedby={describedBy(attempted && problems.pickupAddress && id("address-error"))}
           onChange={(event) => setPickupAddress(event.target.value)}
         />
         {attempted && problems.pickupAddress && (
-          <p className="mt-1.5 font-sans text-sm text-destructive-strong">{problems.pickupAddress}</p>
+          <p id={id("address-error")} className="mt-1.5 font-sans text-sm text-destructive-strong">
+            {problems.pickupAddress}
+          </p>
         )}
       </Field>
 
@@ -338,9 +409,17 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
         <select
           id={id("area")}
           value={serviceAreaId}
-          disabled={areas.length === 0}
+          disabled={noAreas}
+          aria-required="true"
           aria-invalid={fieldMessage("serviceAreaId") ? true : undefined}
-          onChange={(event) => setServiceAreaId(event.target.value)}
+          aria-describedby={describedBy(
+            noAreas && id("area-empty"),
+            fieldMessage("serviceAreaId") && id("area-error"),
+          )}
+          onChange={(event) => {
+            setServiceAreaId(event.target.value);
+            clearFieldPlacement("serviceAreaId");
+          }}
           className={NATIVE_SELECT_CLASSES}
         >
           <option value="">Choose a district</option>
@@ -354,13 +433,15 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
             </optgroup>
           ))}
         </select>
-        {areas.length === 0 && (
-          <p className="mt-1.5 font-sans text-xs text-muted-foreground">
+        {noAreas && (
+          <p id={id("area-empty")} className="mt-1.5 font-sans text-xs text-muted-foreground">
             We are not collecting anywhere yet.
           </p>
         )}
         {fieldMessage("serviceAreaId") && (
-          <p className="mt-1.5 font-sans text-sm text-destructive-strong">{fieldMessage("serviceAreaId")}</p>
+          <p id={id("area-error")} className="mt-1.5 font-sans text-sm text-destructive-strong">
+            {fieldMessage("serviceAreaId")}
+          </p>
         )}
       </Field>
 
@@ -370,7 +451,7 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
         </p>
       )}
 
-      <Button type="submit" disabled={sending} className={cn("h-12 text-base", NEO_SURFACE)}>
+      <Button type="submit" disabled={sending || noAreas} className={cn("h-12 text-base", NEO_SURFACE)}>
         {sending && <Loader2 aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" />}
         Send return request
       </Button>
