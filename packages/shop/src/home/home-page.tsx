@@ -25,9 +25,7 @@ import { BlogStrip } from "./blog-strip";
  * rather than a gap.
  *
  * REWARDS SITS AFTER `BulkPromo`, which is the second money conversation on the
- * page: buying by the box, then what happens to the empties. Putting it above
- * the catalogue would lead with a scheme nobody can join yet — customer accounts
- * come with the auth bundle.
+ * page: buying by the box, then what happens to the empties.
  */
 
 export const storeHomeMetadata: Metadata = {
