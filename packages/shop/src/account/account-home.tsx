@@ -196,10 +196,15 @@ export function AccountHomeView({
           {/* ONLY WHEN THE SHOP ACTUALLY RUNS A PROGRAMME. `programName` is the
               public marketing read; absent means there is nothing behind
               either row, and a link to an empty page is worse than no link.
-              BOTH ROWS SHARE THE SAME TITLE, DELIBERATELY: they are two faces
-              of one programme — what it is worth (rewards) and how you feed
-              it (returns) — so the operator's own name for it is correct on
-              both, and the icon plus the note are what tell them apart. */}
+              THE TWO ROWS DO NOT SHARE A TITLE. They are two faces of one
+              programme — what it is worth (rewards) and how you feed it
+              (returns) — but the operator's own name for it already sits on
+              the row above; repeating it here reads as the same row twice,
+              told apart only by a note and an icon a shopper has no reason to
+              parse closely. "Returns" is the shop's own word for the second
+              face — the API's own vocabulary (`/api/marketing/me/returns`),
+              the same fallback `ReturnsHeading` uses on `/account/returns`
+              itself — not a programme noun invented here. */}
           {programName && (
             <>
               <HubRow
@@ -211,7 +216,7 @@ export function AccountHomeView({
               <HubRow
                 href="/account/returns"
                 icon={<Recycle aria-hidden="true" className="h-5 w-5" />}
-                title={programName}
+                title="Returns"
                 note="Every return you've sent, and where each one has got to."
               />
             </>
