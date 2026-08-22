@@ -1,4 +1,4 @@
-import type { LedgerEntry, PointsBalance, ShopCustomer } from "@plaspool/shop";
+import type { LedgerEntry, MyReturn, PointsBalance, RewardsProgram, ShopCustomer } from "@plaspool/shop";
 
 /**
  * Fixtures for `/dev/account` — the states no dev environment can reach.
@@ -127,3 +127,65 @@ export const LEDGER: LedgerEntry[] = [
 /** Every row is a credit — the state in which the "Spent" filter is empty and
  *  has to say so without claiming more than it knows. */
 export const LEDGER_CREDITS_ONLY: LedgerEntry[] = LEDGER.filter((e) => e.delta >= 0);
+
+/**
+ * The full programme object `ReturnsView`/`ReturnsSkeleton` need — not just
+ * the `programName` string the hub and the rewards views take. A return's
+ * award line has to pluralise "<n> <the operator's word>", which a bare name
+ * cannot do; see `ReturnsPage`'s own header for why the route hands the whole
+ * object in. Same words as `BALANCE` above, so this bench shows one
+ * programme throughout rather than a different name per section.
+ */
+export const PROGRAM: RewardsProgram = {
+  name: "Spool Points",
+  pointsLabelSingular: "Spool Point",
+  pointsLabelPlural: "Spool Points",
+  unitLabelSingular: "spool",
+  unitLabelPlural: "spools",
+  minUnitsPerReturn: 5,
+  pointsPerUnit: 10,
+};
+
+function myReturn(
+  id: string,
+  status: string,
+  qtyDeclared: number,
+  daysAgo: number,
+  extra: Partial<MyReturn> = {},
+): MyReturn {
+  return {
+    id,
+    status,
+    qtyDeclared,
+    qtyAccepted: null,
+    pointsAwarded: null,
+    pickupScheduledAt: null,
+    driverName: null,
+    createdAt: AUG_20 - daysAgo * DAY,
+    ...extra,
+  };
+}
+
+/** Sent, and nothing else has happened to it yet — the shape every return
+ *  starts in, and the one the two-line skeleton is sized for: the stage and
+ *  the declared figure, no pickup line, no award line. */
+export const RETURN_REQUESTED: MyReturn = myReturn("ret_1", "requested", 6, 1);
+
+/** A pickup arranged and a driver named — the pickup line's own case, on its
+ *  own before an award exists. A different declared count from the other two
+ *  returns below, so the trailing figure's width is not accidentally uniform
+ *  across every case in this bench. */
+export const RETURN_SCHEDULED: MyReturn = myReturn("ret_2", "scheduled", 12, 4, {
+  pickupScheduledAt: AUG_20 - 1 * DAY,
+  driverName: "Ade Bello",
+});
+
+/** All the way through: picked up AND awarded, which is the card's full
+ *  four-line shape — the one `ReturnsSkeleton`'s own header names as the case
+ *  the two-line wait settles DOWNWARD for. */
+export const RETURN_AWARDED: MyReturn = myReturn("ret_3", "awarded", 8, 20, {
+  qtyAccepted: 8,
+  pointsAwarded: 80,
+  pickupScheduledAt: AUG_20 - 18 * DAY,
+  driverName: "Chidinma Okafor",
+});
