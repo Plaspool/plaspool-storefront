@@ -39,7 +39,7 @@ function myReturn(over: Partial<MyReturn> = {}): MyReturn {
   };
 }
 
-function render(program: RewardsProgram | null, items: MyReturn[]): string {
+function render(program: RewardsProgram | null, items: MyReturn[] | null): string {
   return renderToStaticMarkup(<ReturnsView program={program} items={items} />);
 }
 
@@ -106,6 +106,16 @@ it("falls back to the empty state, linking to /returns, when there are no return
   const html = render(PROGRAM, []);
   expect(html).toMatch(/<a[^>]+href="\/returns"/);
   expect(html).toContain("Request a pickup");
+});
+
+it("says the read failed rather than claiming there are none, when it could not load", () => {
+  // The bug this pinned: `listMyReturns()` answers `null` for every failure —
+  // CORS, a stray 401, a network error — and collapsing that to `[]` printed
+  // "Nothing sent back yet" over a request the page never actually read.
+  const html = render(PROGRAM, null);
+  expect(html).toContain('role="alert"');
+  expect(html).not.toContain("Nothing sent back yet");
+  expect(html).not.toContain("Request a pickup");
 });
 
 it("titles the page from the programme, falling back to the API's own word for the feature", () => {

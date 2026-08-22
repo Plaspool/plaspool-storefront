@@ -82,7 +82,17 @@ export function stageOf(status: string): string {
 export function ReturnsPage({ program }: { program: RewardsProgram | null }) {
   const router = useRouter();
   const [state, setState] = React.useState<"checking" | "guest" | "ready">("checking");
-  const [items, setItems] = React.useState<MyReturn[]>([]);
+  /* `null` MEANS "COULD NOT BE READ", AND IT IS HELD ONTO — NEVER COLLAPSED TO
+     `[]`. `listMyReturns()` answers `null` for every failure (CORS, a 401 that
+     should not have happened, a network error), and `[]` is what
+     `ReturnsView` reads as "genuinely none yet" — the one state that renders
+     "Nothing sent back yet" and a CTA inviting another submission. Collapsing
+     the two here made that sentence a confident false statement on exactly
+     the failure this feature is most likely to hit before `APP_ORIGINS`
+     carries the storefront's origin: a signed-in shopper who just submitted,
+     told they have nothing, pointed at "Request a pickup", and one
+     `return_already_open` refusal later. */
+  const [items, setItems] = React.useState<MyReturn[] | null>(null);
   const [firstLoad, setFirstLoad] = React.useState<"loading" | "done">("loading");
 
   React.useEffect(() => {
@@ -92,9 +102,10 @@ export function ReturnsPage({ program }: { program: RewardsProgram | null }) {
       /* AN UNREACHABLE API IS NOT A SIGNED-OUT SHOPPER — the rule every screen
          in this folder follows. Only a CONFIRMED guest is sent to sign in;
          `session.kind === "unknown"` falls through to "ready" the same way
-         `rewards-page.tsx` does, and `listMyReturns()` already answers `null`
-         rather than throwing on that same failure, so the degraded state is
-         an empty list rather than an error panel. */
+         `rewards-page.tsx` does. `listMyReturns()` answers `null` rather than
+         throwing on that same failure too, but unlike the session check, a
+         failed READ here is not treated as equivalent to "none" — see
+         `items`'s own comment above. */
       if (session.kind === "guest") {
         setState("guest");
         router.replace(`/sign-in?next=${encodeURIComponent("/account/returns")}`);
@@ -103,7 +114,7 @@ export function ReturnsPage({ program }: { program: RewardsProgram | null }) {
       setState("ready");
       void listMyReturns().then((result) => {
         if (cancelled) return;
-        setItems(result ?? []);
+        setItems(result);
         setFirstLoad("done");
       });
     });
@@ -133,13 +144,28 @@ export function ReturnsView({
   items,
 }: {
   program: RewardsProgram | null;
-  items: MyReturn[];
+  /** `null` is "could not be read" — see `ReturnsPage`'s own comment. It is a
+   *  DIFFERENT fact from `[]`, and this component is the one place that
+   *  distinction has to be kept, because it is the one place that would
+   *  otherwise print "Nothing sent back yet" over it. */
+  items: MyReturn[] | null;
 }) {
   return (
     <Shell>
       <ReturnsHeading title={program?.name ?? null} />
 
-      {items.length === 0 ? (
+      {items === null ? (
+        /* NOT `EmptyState`. "Nothing sent back yet" is a claim about this
+           shopper's account; this is a claim about the request, and the two
+           must never share a sentence — see `ReturnsPage`'s own comment on
+           `items` for the failure that made the two look the same before. */
+        <p
+          role="alert"
+          className="mt-8 border border-destructive-strong px-4 py-3 font-sans text-sm text-destructive-strong"
+        >
+          We couldn&apos;t load your returns just now. Try again in a moment.
+        </p>
+      ) : items.length === 0 ? (
         <div className="mt-8">
           <EmptyState
             icon={<Recycle aria-hidden="true" />}
