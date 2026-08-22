@@ -6,6 +6,8 @@ import {
   AccountHomeView,
   OrdersList,
   OrdersListSkeleton,
+  ReturnsView,
+  ReturnsSkeleton,
   RewardsView,
   RewardsSkeleton,
   StatusTimeline,
@@ -25,6 +27,10 @@ import {
   CUSTOMER_NO_NAME,
   LEDGER,
   LEDGER_CREDITS_ONLY,
+  PROGRAM,
+  RETURN_AWARDED,
+  RETURN_REQUESTED,
+  RETURN_SCHEDULED,
 } from "./fixtures";
 
 /**
@@ -300,6 +306,47 @@ export function AccountBench({ lineImages }: { lineImages: LineImageIndex }) {
           onLoadMore={noop}
           filter="all"
         />
+      </Case>
+
+      {/* ══════════════════════════════════════════════════════ THE RETURNS ═══
+          `ReturnsView`'s own header calls this out by name: it is exported and
+          prop-driven for the same reason `RewardsView` is, and until this
+          block existed a scheduled card, an awarded card, the skeleton-to-card
+          transition and the two-line skeleton's own reflow had never been
+          looked at — only asserted as substrings by `renderToStaticMarkup`. */}
+      <Case
+        label="Returns — the wait"
+        note="`ReturnsSkeleton`. Two lines reserved per card — the stage and the declared figure, the two facts every return has from the moment it exists — which is short of the four-line card a scheduled-and-awarded return below actually reaches. Hold a rule down the left edge of the cards here and in the next four cases."
+      >
+        <ReturnsSkeleton title="Spool Points" />
+      </Case>
+
+      <Case
+        label="Returns — a fresh request"
+        note="Just sent, nothing else has happened to it yet. Only the stage and the declared figure render — no pickup line, no award line — which is the shape the skeleton above is sized for."
+      >
+        <ReturnsView program={PROGRAM} items={[RETURN_REQUESTED]} />
+      </Case>
+
+      <Case
+        label="Returns — scheduled, with a driver"
+        note="The pickup line's own case, on its own before an award exists. A pickup CAN be scheduled before a driver is assigned to it — `returns-page.test.tsx` pins that — but this bench case is the one where both are present at once."
+      >
+        <ReturnsView program={PROGRAM} items={[RETURN_SCHEDULED]} />
+      </Case>
+
+      <Case
+        label="Returns — awarded"
+        note="Picked up AND awarded — the card's full four-line shape, and the one the two-line skeleton above settles DOWNWARD for rather than reserving. The award line is built from the programme's own words, the same way the rewards balance above is."
+      >
+        <ReturnsView program={PROGRAM} items={[RETURN_AWARDED]} />
+      </Case>
+
+      <Case
+        label="Returns — a return with no programme behind it"
+        note="Same return as the case above, but `program: null` — the day the public rewards read fails. `pointsAwarded` is still 80 underneath; the award line must render NOTHING rather than a naked '80' nobody can put a unit to, and the title falls back to the API's own word, 'Returns'."
+      >
+        <ReturnsView program={null} items={[RETURN_AWARDED]} />
       </Case>
 
       {/* ═════════════════════════════════════════════════ THE INSTALL BANNER ═══ */}

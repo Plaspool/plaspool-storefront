@@ -137,6 +137,15 @@ export * from "./account/order-status-page";
    sake: there is no per-customer voucher in this system to list. */
 export * from "./account/account-home";
 export * from "./account/rewards-page";
+/* `/account/returns` — a shopper's own return requests, and where each has
+   got to. Reads `listMyReturns` independently of Task 11's `ReturnsCta`; the
+   two only meet at the URL a shopper lands on after submitting. */
+export * from "./account/returns-page";
+/* `MyReturn` alone, not the rest of `returns-api.ts` — `/dev/account`'s bench
+   is the one place outside this package that needs to shape a return of its
+   own to hand to `ReturnsView`; `listMyReturns`, `requestReturn` and the rest
+   stay internal. */
+export type { MyReturn } from "./data/returns-api";
 /* ═══ NAMED, NOT `export *`, AND THAT IS NOT A STYLE CHOICE ═══
    `data/marketing.ts` and `data/points-api.ts` BOTH export a `pointsLabel`,
    with different signatures — `(quantity, program)` against `(balance,
@@ -149,3 +158,15 @@ export * from "./account/rewards-page";
    has a title before the customer's own calls resolve. */
 export { getRewardsProgram, listBanners } from "./data/marketing";
 export type { RewardsProgram, PublicBanner, BannerPlacement } from "./data/marketing";
+
+/* `/returns` — the real, linkable page behind Task 10's dialog. Named rather
+   than `export *` because those are the two exports the route needs;
+   `ReturnForm`, `ReturnFormGate`, `GuestPrompt` and `returns-api.ts` stay
+   internal to the package until something outside it needs them directly. */
+export { ReturnRequestPage, returnRequestMetadata } from "./returns/return-request-page";
+/* The dialog and the CTA that opens it, over `/returns` as a real link.
+   `export *` here rather than named, matching the general shape of this
+   file: neither `ReturnModal` nor `ReturnsCta` collides with anything else
+   this package exports. */
+export * from "./returns/return-modal";
+export * from "./returns/returns-cta";

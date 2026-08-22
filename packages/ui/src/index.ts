@@ -7,6 +7,7 @@ export * from "./neo";
 export * from "./primitives/button";
 export * from "./primitives/badge";
 export * from "./primitives/card";
+export * from "./primitives/dialog";
 export * from "./primitives/input";
 export * from "./primitives/label";
 export * from "./primitives/select";

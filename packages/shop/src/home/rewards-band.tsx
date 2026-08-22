@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Recycle } from "lucide-react";
 
 import { getRewardsProgram, pointsLabel, unitLabel } from "../data/marketing";
+import { listServiceAreas } from "../data/returns-api";
+import { ReturnsCta } from "../returns/returns-cta";
 
 /**
  * The returns programme, in the operator's own words.
@@ -29,14 +31,16 @@ import { getRewardsProgram, pointsLabel, unitLabel } from "../data/marketing";
  * null rather than throwing when the API is unreachable — so a marketing outage
  * costs this section and nothing else.
  *
- * THERE IS NO SIGN-UP LINK, and that is deliberate rather than an omission.
- * Customer accounts do not exist yet (the auth bundle is sequenced after this),
- * so a button promising to enrol somebody would be a button that cannot. The
- * band explains the arithmetic and points at the returns policy, which is real
- * and reachable today.
+ * THE BAND CARRIES A CTA INTO THE RETURN FORM, not just a policy link. Task 11
+ * put `ReturnsCta` here for the same reason the top bar carries one: this
+ * section is the shop's own explanation of the arithmetic, so it is also
+ * where somebody reads it and might want to act on it in the same breath.
+ * `ReturnsCta` opens the request dialog for a signed-in shopper and asks a
+ * guest to sign in FROM THE DIALOG rather than being refused here — this
+ * component still does not read the session itself, and does not need to.
  */
 export async function RewardsBand() {
-  const program = await getRewardsProgram();
+  const [program, areas] = await Promise.all([getRewardsProgram(), listServiceAreas()]);
   if (!program) return null;
 
   const { minUnitsPerReturn, pointsPerUnit } = program;
@@ -76,13 +80,25 @@ export async function RewardsBand() {
               {` ${pointsLabel(perReturn, program).toLowerCase()}.`}
             </p>
 
-            <p className="mt-4 text-sm text-muted-foreground">
+            {/* TWO LINKS, NOT A BUTTON. `NEO_SURFACE` marks the one thing a
+                screen most wants — this page's is the product cards' own "Add
+                to cart" — and no section of the home page raises a second one
+                over it. `ReturnsCta` is styled identically to the policy link
+                beside it: same underline, same weight, same restrained
+                register the rest of this band already keeps. */}
+            <p className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
               <Link
                 href="/shipping"
                 className="underline decoration-brand-line underline-offset-4 hover:decoration-foreground"
               >
                 How returns work
               </Link>
+              <ReturnsCta
+                program={program}
+                areas={areas ?? []}
+                label="Request a pickup"
+                className="underline decoration-brand-line underline-offset-4 hover:decoration-foreground"
+              />
             </p>
           </div>
         </div>
