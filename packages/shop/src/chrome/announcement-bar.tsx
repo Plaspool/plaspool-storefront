@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import { DELIVERY } from "../data/config";
 import { getRewardsProgram, listBanners, pointsLabel, unitLabel } from "../data/marketing";
+import { listServiceAreas } from "../data/returns-api";
+import { ReturnsCta } from "../returns/returns-cta";
 
 /**
  * One line above the nav.
@@ -30,15 +32,43 @@ import { getRewardsProgram, listBanners, pointsLabel, unitLabel } from "../data/
  * priority so the choice is the operator's rather than the database's insertion
  * order. Where a placement can only show one thing, showing the second-most
  * important one is worse than showing the standing line.
+ *
+ * ═══ A CTA CAN NOW OPEN A DIALOG, AND THE CONVENTION IS THE URL ═══
+ * An operator sets a banner's `ctaUrl` like any other link. `isReturnsCta`
+ * below is the one place that decides whether THIS particular URL means "open
+ * the return-request dialog instead of navigating" — `RETURNS_PATH` exactly,
+ * nothing else. A near miss — a trailing slash, a tracking query, any other
+ * path — deliberately falls through to the plain `Link` it always was: it is a
+ * real, working navigation, not a guess at what the operator meant. Reusing
+ * `ReturnsCta` (Task 10) here rather than reimplementing its interception is
+ * what keeps the history/back-button contract in one file.
+ *
+ * `listServiceAreas()` rides in the SAME `Promise.all` on `MARKETING_REVALIDATE`
+ * — the same window `listBanners`/`getRewardsProgram` already use — so it adds
+ * no new, shorter window for `ShopShell` to compose into every `(shop)` route.
+ * See that constant's own comment for the outage this guards against, and this
+ * task's report for the build figures that confirm it held.
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Still not dismissible — a dismissible bar needs storage and a state machine
  * for one sentence, and a banner an operator scheduled is one they want seen.
  */
+
+/** The one banner CTA this file treats specially. Named and centralised
+ *  rather than a string compared at the point of use. */
+export const RETURNS_PATH = "/returns";
+
+/** Whether this banner's CTA is the returns one. The convention, in one place
+ *  and named, rather than a string compared at the point of use. */
+export function isReturnsCta(ctaUrl: string | null): boolean {
+  return ctaUrl === RETURNS_PATH;
+}
+
 export async function AnnouncementBar() {
-  const [banners, program] = await Promise.all([
+  const [banners, program, areas] = await Promise.all([
     listBanners("top_bar"),
     getRewardsProgram(),
+    listServiceAreas(),
   ]);
   const [banner] = banners;
 
@@ -56,12 +86,26 @@ export async function AnnouncementBar() {
           {banner.ctaText && banner.ctaUrl ? (
             <>
               {" "}
-              <Link
-                href={banner.ctaUrl}
-                className="underline decoration-brand-ink/40 underline-offset-2 hover:decoration-brand-ink"
-              >
-                {banner.ctaText}
-              </Link>
+              {isReturnsCta(banner.ctaUrl) && program ? (
+                /* The dialog needs a live programme to show the form's
+                   arithmetic — the same guard `RewardsBand` uses before it
+                   renders anything at all. Absent one, this falls through to
+                   the plain `Link` below, which still goes to a real `/returns`
+                   page that explains why there is no form there. */
+                <ReturnsCta
+                  program={program}
+                  areas={areas ?? []}
+                  label={banner.ctaText}
+                  className="underline decoration-brand-ink/40 underline-offset-2 hover:decoration-brand-ink"
+                />
+              ) : (
+                <Link
+                  href={banner.ctaUrl}
+                  className="underline decoration-brand-ink/40 underline-offset-2 hover:decoration-brand-ink"
+                >
+                  {banner.ctaText}
+                </Link>
+              )}
             </>
           ) : null}
         </>
