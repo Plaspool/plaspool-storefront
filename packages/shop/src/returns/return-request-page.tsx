@@ -48,11 +48,15 @@ export async function ReturnRequestPage() {
         {program.name}
       </h1>
       <p className="mt-3 max-w-prose text-base leading-7 text-muted-foreground">
-        {/* The same sentence `ReturnModal` uses as its `DialogDescription` —
-            the page and the dialog are two presentations of one form, and
-            this is the one line of framing both need. Deliberately free of
-            any unit or points noun; the form's own arithmetic line under the
-            quantity field is where those are spelled, from `program`. */}
+        {/* Used to be shared verbatim with `ReturnModal`'s `DialogDescription`.
+            They diverged on purpose: the dialog's description has to stay
+            true across its sign-in and loading states too, where "how many
+            are you sending back" is not a question this page is asking yet
+            — see `ReturnModal`'s own header. This page only ever shows this
+            sentence directly above the real form, so it keeps the more
+            specific line. Deliberately free of any unit or points noun; the
+            form's own arithmetic line under the quantity field is where
+            those are spelled, from `program`. */}
         Tell us how many you&apos;re sending back and where to collect them.
       </p>
 

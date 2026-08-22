@@ -36,7 +36,10 @@ import type { RewardsProgram } from "../data/marketing";
  * permanently. So a session that could not be read renders NEITHER the form
  * NOR a sign-in prompt — only the skeleton of the form's own box, for as long
  * as the answer stays unknown. Re-checked every time the dialog opens, on the
- * chance the shopper signed in or out in another tab since the last time.
+ * chance the shopper signed in or out in another tab since the last time —
+ * and reset to "unknown" the instant it opens, so that re-check is honoured
+ * on screen and not just on the wire. See the reset below `session` itself
+ * for why that reset almost got lost to a lint fix.
  *
  * ═══ `onDone` CLOSES THIS DIALOG, AND ONLY FROM THE CONFIRMATION ═══
  * `ReturnForm`'s own header is explicit that `onDone` fires from the
@@ -52,24 +55,54 @@ export interface ReturnModalProps {
   areas: ServiceArea[];
 }
 
-/** The one line of framing this dialog needs, identical to `/returns`'s own
- *  intro paragraph — the page and the dialog are two presentations of one
- *  form. No unit or points noun here; the form's own arithmetic line is
- *  where those are spelled, from `program`. */
-const RETURNS_DESCRIPTION = "Tell us how many you're sending back and where to collect them.";
+/**
+ * The dialog's one line of framing, under the title — and it has to stay
+ * true across all THREE states below, not just the `customer` one that
+ * shows the form.
+ *
+ * This used to be borrowed verbatim from `/returns`'s own intro paragraph
+ * ("Tell us how many you're sending back..."), which was wrong here: that
+ * sentence is only true once the form is actually on screen, and it was
+ * rendering above a sign-in prompt and above a loading skeleton, describing
+ * content that was not there yet. The page keeps the more specific line,
+ * because the page only ever shows it directly above the real form — see
+ * its own header for why the two diverged. No unit or points noun either
+ * way; the form's own arithmetic line is where those are spelled, from
+ * `program`.
+ */
+const RETURNS_DESCRIPTION = "Request a pickup for what you're sending back.";
 
 export function ReturnModal({ open, onOpenChange, program, areas }: ReturnModalProps) {
   const [session, setSession] = React.useState<ShopSession["kind"]>("unknown");
 
+  /*
+   * RESET DURING RENDER, NOT INSIDE THE EFFECT BELOW.
+   *
+   * This is React's own sanctioned "adjust state when a prop changes"
+   * pattern — https://react.dev/learn/you-might-not-need-an-effect — and it
+   * exists here because a previous version of this file dropped the reset
+   * entirely to satisfy `react-hooks/set-state-in-effect`, which quietly
+   * inverted the doctrine above: without it, once `session` had been
+   * anything other than "unknown", every LATER open kept rendering that
+   * STALE answer for the whole round trip of the fresh read underneath it —
+   * a `guest` prompt with a live sign-in link shown to a shopper who had
+   * since signed in elsewhere, or worse, a `customer` form unmounting
+   * mid-type the moment the fresh read landed as `guest`. Exactly
+   * `readShopSession()`'s own stated failure mode, reached by a different
+   * route. Adjusting during render rather than in an effect means React
+   * folds this into the same render pass instead of committing a stale
+   * frame first, so the lint rule has nothing to object to.
+   */
+  const [wasOpen, setWasOpen] = React.useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setSession("unknown");
+  }
+
   React.useEffect(() => {
     if (!open) return;
-    /* Re-checked on every open rather than trusted from the last one — the
-       whole point of asking again is that it can have changed since. Not
-       reset to "unknown" first: `session` already starts there for the very
-       first open, and on a later one the last answer is still the best guess
-       available until this read lands, with `ReturnForm`'s own `unauthenticated`
-       branch as the backstop if a stale "customer" turns out to be wrong by
-       the time the shopper actually submits. */
+    // Re-checked on every open rather than trusted from the last one — the
+    // whole point of asking again is that it can have changed since.
     let cancelled = false;
     void readShopSession().then((result) => {
       if (!cancelled) setSession(result.kind);
@@ -107,7 +140,12 @@ function GuestPrompt() {
         Sign in to send a return request.
       </p>
       <p className="mt-0.5 font-sans text-sm text-muted-foreground">
-        Signing in will bring you back here.
+        {/* NOT "bring you back here". `next=/returns` lands on the standalone
+            page (Task 9) once signed in — not back on whatever page this
+            dialog was opened over, reopened. Same care `return-form.tsx`'s
+            own sign-in placement takes about not promising a return trip it
+            cannot actually deliver. */}
+        Signing in will take you to the returns page to send this.
       </p>
       <Link
         href={`/sign-in?next=${encodeURIComponent("/returns")}`}

@@ -31,13 +31,20 @@ import type { RewardsProgram } from "../data/marketing";
  * ═══ THE URL AND THE DIALOG ARE KEPT IN SYNC THROUGH HISTORY, BY HAND ═══
  * Opening the dialog pushes `/returns` as a new history entry, tagged
  * `{ returnsModal: true }`, so the address bar reads `/returns` for as long
- * as it is open, and so Back closes the dialog rather than leaving whatever
- * page it was opened over — `popstate` closes it directly, without touching
- * history again, because the browser has already moved it. Closing the
- * dialog through its OWN control (Escape, the overlay, the × button) is the
- * opposite direction: nothing has moved history yet, so `onOpenChange` steps
- * it back itself, guarded by the same tag, so a shopper who never opened this
- * dialog is never sent Back by closing some other dialog.
+ * as it is open. `popstate` reads that tag off whichever entry the browser
+ * just landed ON, in EITHER direction, rather than assuming which way it
+ * moved: landing on an entry WITHOUT the tag closes the dialog (Back, off
+ * the top of it), landing back ON the tagged entry reopens it (Forward, into
+ * it). Closing unconditionally — the first version of this file — left
+ * Forward showing the underlying page with the address bar still reading
+ * `/returns`, and made a Back past this dialog into an unrelated navigation
+ * take two presses instead of one, since the first press only reconciled
+ * state that a correct read of `popstate` would have reconciled already.
+ * Closing the dialog through its OWN control (Escape, the overlay, the ×
+ * button) is the opposite direction: nothing has moved history yet, so
+ * `onOpenChange` steps it back itself, guarded by the same tag, so a shopper
+ * who never opened this dialog is never sent Back by closing some other
+ * dialog.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 export interface ReturnsCtaProps {
@@ -51,7 +58,13 @@ export function ReturnsCta({ program, areas, label, className }: ReturnsCtaProps
   const [open, setOpen] = React.useState(false);
 
   React.useEffect(() => {
-    const onPop = () => setOpen(false);
+    // Reads the tag off the entry the browser just landed on, rather than
+    // assuming a `popstate` always means "closed" — see the file header for
+    // the two ways that assumption broke.
+    const onPop = (event: PopStateEvent) => {
+      const state = event.state as { returnsModal?: boolean } | null;
+      setOpen(Boolean(state?.returnsModal));
+    };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
