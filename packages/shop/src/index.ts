@@ -155,3 +155,9 @@ export type { RewardsProgram, PublicBanner, BannerPlacement } from "./data/marke
    and `returns-api.ts` stay internal to the package until something outside it
    needs them directly. */
 export { ReturnRequestPage } from "./returns/return-request-page";
+/* The dialog and the CTA that opens it, over `/returns` as a real link.
+   `export *` here rather than named, matching the general shape of this
+   file: neither `ReturnModal` nor `ReturnsCta` collides with anything else
+   this package exports. */
+export * from "./returns/return-modal";
+export * from "./returns/returns-cta";
