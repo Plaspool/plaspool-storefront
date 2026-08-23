@@ -35,6 +35,12 @@ function myReturn(over: Partial<MyReturn> = {}): MyReturn {
     pickupScheduledAt: null,
     driverName: null,
     createdAt: CREATED,
+    // The four prefill fields (`return-form.tsx`'s concern, not this page's)
+    // default to null here — this page never reads them.
+    customerName: null,
+    customerPhone: null,
+    pickupAddress: null,
+    serviceAreaId: null,
     ...over,
   };
 }

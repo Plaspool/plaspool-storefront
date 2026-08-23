@@ -34,6 +34,23 @@ export interface MyReturn {
   pickupScheduledAt: number | null;
   driverName: string | null;
   createdAt: number;
+  /**
+   * `customerName`, `customerPhone`, `pickupAddress` AND `serviceAreaId` —
+   * added by `plaspool-admin@a811cc9` so `return-form.tsx` can prefill a
+   * shopper's own fields from their most recent request instead of asking
+   * them to retype what they already told the returns desk. This is the
+   * shopper's OWN data, on a route that already derives identity from their
+   * session and can only ever answer that identity's rows.
+   *
+   * STILL NOT `driverPhone` AND NOT `revision` — that exclusion has not
+   * moved. A shopper is told who is coming, not how to ring them directly,
+   * and a revision is a concurrency token for a screen that can write, which
+   * this one cannot.
+   */
+  customerName: string | null;
+  customerPhone: string | null;
+  pickupAddress: string | null;
+  serviceAreaId: string | null;
 }
 
 export interface ReturnConfirmation {

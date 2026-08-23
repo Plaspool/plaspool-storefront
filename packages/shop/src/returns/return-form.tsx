@@ -5,10 +5,13 @@ import Link from "next/link";
 import { Check, Loader2 } from "lucide-react";
 import { Button, Input, Label, NEO_SURFACE, Textarea, cn } from "@plaspool/ui";
 
-import { ReturnRequestError, requestReturn } from "../data/returns-api";
-import type { ReturnConfirmation, ServiceArea } from "../data/returns-api";
+import { ReturnRequestError, listMyReturns, requestReturn } from "../data/returns-api";
+import type { MyReturn, ReturnConfirmation, ServiceArea } from "../data/returns-api";
 import { pointsLabel, unitLabel } from "../data/marketing";
 import type { RewardsProgram } from "../data/marketing";
+import { listSavedAddresses } from "../data/orders-api";
+import type { Address } from "../data/checkout-api";
+import { readSavedAddress } from "../checkout/saved-address";
 
 /**
  * Asking for a return.
@@ -78,6 +81,47 @@ import type { RewardsProgram } from "../data/marketing";
  * the one screen `requestId` is ever shown on would never be seen. `onDone`
  * fires only from the confirmation's own "Done" control; the standalone
  * `/returns` page passes no `onDone`, so its confirmation simply stays put.
+ *
+ * ═══ PREFILL: TWO SOURCES, ONE DELIBERATE PRECEDENCE, NEVER THE QUANTITY ═══
+ * On mount this form reads `listMyReturns()` and `listSavedAddresses()` —
+ * both cross-site, credentialed, and, like every other `/me/` read in this
+ * package, INCAPABLE OF THROWING (`null`/`[]` on any failure, a guest
+ * included). `resolveReturnPrefill` — exported for the same reason
+ * `placeError` is, so the precedence is testable without a DOM — decides
+ * between them: a previous return that actually carries the four contact
+ * fields wins outright, because it is what THIS shopper last told the
+ * returns desk; a saved delivery address (`checkout/saved-address.ts`,
+ * already proven at the checkout) is only the fallback. The two sources
+ * never mix field-by-field — one whole source wins, or the form stays blank
+ * and asks. Quantity is never touched by either source; it stays at the
+ * programme's own minimum, because a past return's count answers a
+ * different pickup, not this one.
+ *
+ * NEITHER FETCH GATES FIRST PAINT. Same stance `checkout-flow.tsx:202`
+ * documents for its own saved-address list: the form is interactive from the
+ * first render, and the prefill lands a beat later, into whichever fields
+ * are still blank.
+ *
+ * A REF, NOT ONLY THE FORM'S OWN STATE, GUARDS AGAINST CLOBBERING. A shopper
+ * can start typing before the two reads land — `prefillTouchedRef` is set
+ * synchronously by every prefillable field's own `onChange`, and the fetch's
+ * `.then()` checks it before calling a single setter. This is the same class
+ * of bug as the stale-session regression this project already fixed once: a
+ * late async answer overwriting state a person has since moved past. Once
+ * applied, every field stays a normal, editable control — nothing here is
+ * read-only — and editing one never re-runs the fetch (it has no dependency
+ * that changes on keystroke), so prefill fires at most once per mount.
+ *
+ * `prefillSource` IS WHY THE FORM SAYS SO. A form that fills itself in
+ * silently is unsettling and easy to submit stale, so one line under the
+ * quantity field names which source won — "your last return" or "your saved
+ * address" — never a programme noun, because the sentence names the SOURCE,
+ * not the scheme.
+ *
+ * NO SESSION BRANCH HERE ON PURPOSE. `ReturnFormGate`/`ReturnModal` already
+ * decide whether this form mounts at all; inside it, `"unknown"` and a guest
+ * both simply get two reads that answer nothing; there is nothing for this
+ * file to branch on that the reads do not already collapse for it.
  */
 
 /** The API's own floor for one request, mirrored so a quantity below it is
@@ -95,6 +139,108 @@ function belowMinimum(qty: number, program: RewardsProgram): boolean {
 function describedBy(...parts: Array<string | false | null | undefined>): string | undefined {
   const ids = parts.filter((part): part is string => Boolean(part));
   return ids.length ? ids.join(" ") : undefined;
+}
+
+/** A non-empty string once trimmed — the same bar `readSavedAddress` holds
+ *  a snapshot's fields to, applied here to a previous return's. */
+function hasText(value: string | null): value is string {
+  return value != null && value.trim() !== "";
+}
+
+/** Whether a previous return carries anything this form could prefill from.
+ *  The four contact fields only started being recorded once this feature
+ *  shipped (`plaspool-admin@a811cc9`) — an older row has all four `null` and
+ *  teaches this form nothing, so it is skipped rather than offered blank. */
+function hasPrefillDetails(item: MyReturn): boolean {
+  return (
+    hasText(item.customerName) ||
+    hasText(item.customerPhone) ||
+    hasText(item.pickupAddress) ||
+    hasText(item.serviceAreaId)
+  );
+}
+
+/**
+ * A saved delivery address, folded into the single textarea the return form
+ * offers for a pickup address.
+ *
+ * THE SAME SHAPE `settings-page.tsx` AND `checkout-flow.tsx` ALREADY RENDER
+ * A SAVED ADDRESS AS —
+ * `[line1, line2, city, region, postalCode].filter(Boolean).join(", ")` —
+ * so a shopper reads the same address written the same way wherever this
+ * shop shows it to them, rather than a third format invented for this one
+ * field. `name` is excluded on purpose: this form has its own separate Name
+ * field, so folding it in here would duplicate it inside the address text.
+ *
+ * Exported so it is testable on its own, the same reason `resolveReturnPrefill`
+ * below is.
+ */
+export function composePickupAddress(address: Address): string {
+  return [address.line1, address.line2, address.city, address.region, address.postalCode]
+    .filter((part): part is string => Boolean(part && part.trim()))
+    .join(", ");
+}
+
+/** What `resolveReturnPrefill` hands the form: which source won, and the
+ *  four fields it fills — `region` preselects the state select,
+ *  `serviceAreaId` the district. Quantity is deliberately absent; it is not
+ *  a field either source is allowed to touch. */
+export interface ReturnPrefill {
+  source: "previous-return" | "saved-address";
+  name: string;
+  phone: string;
+  pickupAddress: string;
+  region: string;
+  serviceAreaId: string;
+}
+
+/**
+ * Which of the two prefill sources wins, and what it fills in.
+ *
+ * Exported so the precedence — the load-bearing part, exactly like
+ * `placeError` above — is testable without a DOM. See the file header for
+ * why a previous return outranks a saved address, why the two never mix
+ * field-by-field, and why quantity is not here at all.
+ */
+export function resolveReturnPrefill(
+  returns: MyReturn[] | null,
+  savedAddress: Address | null,
+  areas: ServiceArea[],
+): ReturnPrefill | null {
+  // `returns` is already newest-first (`listMyReturns()`'s own contract) —
+  // the first match here is the most recent return that carries anything.
+  const prior = (returns ?? []).find(hasPrefillDetails);
+  if (prior) {
+    const serviceAreaId = prior.serviceAreaId ?? "";
+    // A stale id — the area was since renamed or withdrawn — resolves to no
+    // area at all; the state select is left for the shopper to set, and the
+    // district select simply shows nothing selected. Never a thrown error.
+    const area = areas.find((a) => a.id === serviceAreaId);
+    return {
+      source: "previous-return",
+      name: prior.customerName ?? "",
+      phone: prior.customerPhone ?? "",
+      pickupAddress: prior.pickupAddress ?? "",
+      region: area?.region ?? "",
+      serviceAreaId,
+    };
+  }
+
+  if (savedAddress) {
+    return {
+      source: "saved-address",
+      name: savedAddress.name,
+      phone: savedAddress.phone ?? "",
+      pickupAddress: composePickupAddress(savedAddress),
+      // The checkout's own "State" field, the same concept as an area's
+      // `region` — see the file header.
+      region: savedAddress.region ?? "",
+      // A saved address carries no district of its own to preselect.
+      serviceAreaId: "",
+    };
+  }
+
+  return null;
 }
 
 /*
@@ -221,6 +367,12 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
   const [placement, setPlacement] = React.useState<Placement | null>(null);
   const [confirmation, setConfirmation] = React.useState<ReturnConfirmation | null>(null);
 
+  /** Which prefill source won, once the two reads land and actually fill
+   *  something in — `null` until then, and also `null` for good on a mount
+   *  where neither source had anything. Drives the one-line "we filled this
+   *  in from…" note; see the file header. */
+  const [prefillSource, setPrefillSource] = React.useState<ReturnPrefill["source"] | null>(null);
+
   /* THE TWO BLOCK-LEVEL OUTCOMES — `already-open` AND `sign-in` — CAN LAND
      ENTIRELY OFF-SCREEN, SILENTLY. Both render at the TOP of the form; submit
      is at the BOTTOM. In the dialog (a scrolling `max-h` around a ~700px
@@ -240,6 +392,40 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
       blockAlertRef.current?.focus();
     }
   }, [placement]);
+
+  /* SET SYNCHRONOUSLY, INSIDE EVERY PREFILLABLE FIELD'S OWN `onChange` —
+     not `useState`, because a `useState` guard reads whatever the closure
+     captured at the last render, and the fetch below can resolve between a
+     keystroke and the render it causes. A ref is current the instant it is
+     written, which is what lets the effect's `.then()` below ask "has the
+     shopper started?" and get a live answer rather than a stale one. */
+  const prefillTouchedRef = React.useRef(false);
+  function touchPrefill() {
+    prefillTouchedRef.current = true;
+  }
+
+  /* THE PREFILL READ ITSELF — see the file header for the precedence, the
+     never-clobber guarantee and why there is no session branch here.
+     Fired once per mount; `areas` is a prop handed down whole from a parent
+     that fetches it once, so this does not refire on a keystroke. */
+  React.useEffect(() => {
+    let cancelled = false;
+    void Promise.all([listMyReturns(), listSavedAddresses()]).then(([returns, saved]) => {
+      if (cancelled || prefillTouchedRef.current) return;
+      const savedAddress = saved.map(readSavedAddress).find((a): a is Address => a !== null) ?? null;
+      const prefill = resolveReturnPrefill(returns, savedAddress, areas);
+      if (!prefill) return;
+      setName(prefill.name);
+      setPhone(prefill.phone);
+      setPickupAddress(prefill.pickupAddress);
+      setSelectedRegion(prefill.region);
+      setServiceAreaId(prefill.serviceAreaId);
+      setPrefillSource(prefill.source);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [areas]);
 
   const uid = React.useId();
   const id = (part: string) => `${uid}-${part}`;
@@ -453,8 +639,29 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
         )}
       </Field>
 
+      {/* ONE LINE, NAMING WHICHEVER SOURCE WON — see the file header. Sits
+          between quantity (never prefilled) and the four fields that are, so
+          it visibly brackets exactly the fields it is talking about. Stays
+          on screen even after the shopper edits one of those fields — see
+          the file header on why prefill is not read-only. */}
+      {prefillSource && (
+        <p className="font-sans text-sm text-muted-foreground">
+          {prefillSource === "previous-return"
+            ? "We filled this in from your last return."
+            : "We filled this in from your saved address."}
+        </p>
+      )}
+
       <Field id={id("name")} label="Name">
-        <Input id={id("name")} value={name} maxLength={NAME_MAX} onChange={(event) => setName(event.target.value)} />
+        <Input
+          id={id("name")}
+          value={name}
+          maxLength={NAME_MAX}
+          onChange={(event) => {
+            setName(event.target.value);
+            touchPrefill();
+          }}
+        />
       </Field>
 
       <Field id={id("phone")} label="Phone" required>
@@ -466,7 +673,10 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
           aria-required="true"
           aria-invalid={attempted && problems.phone ? true : undefined}
           aria-describedby={describedBy(attempted && problems.phone && id("phone-error"))}
-          onChange={(event) => setPhone(event.target.value)}
+          onChange={(event) => {
+            setPhone(event.target.value);
+            touchPrefill();
+          }}
         />
         {attempted && problems.phone && (
           <p id={id("phone-error")} className="mt-1.5 font-sans text-sm text-destructive-strong">
@@ -484,7 +694,10 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
           aria-required="true"
           aria-invalid={attempted && problems.pickupAddress ? true : undefined}
           aria-describedby={describedBy(attempted && problems.pickupAddress && id("address-error"))}
-          onChange={(event) => setPickupAddress(event.target.value)}
+          onChange={(event) => {
+            setPickupAddress(event.target.value);
+            touchPrefill();
+          }}
         />
         {attempted && problems.pickupAddress && (
           <p id={id("address-error")} className="mt-1.5 font-sans text-sm text-destructive-strong">
@@ -511,6 +724,7 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
             // change, and any server placement naming it no longer applies.
             setServiceAreaId("");
             clearFieldPlacement("serviceAreaId");
+            touchPrefill();
           }}
           className={NATIVE_SELECT_CLASSES}
         >
@@ -540,6 +754,7 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
           onChange={(event) => {
             setServiceAreaId(event.target.value);
             clearFieldPlacement("serviceAreaId");
+            touchPrefill();
           }}
           className={NATIVE_SELECT_CLASSES}
         >

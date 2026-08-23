@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { ReturnForm, placeError } from "./return-form";
+import { ReturnForm, composePickupAddress, placeError, resolveReturnPrefill } from "./return-form";
 import { ReturnRequestError } from "../data/returns-api";
+import type { MyReturn } from "../data/returns-api";
+import type { Address } from "../data/checkout-api";
 
 const PROGRAM = {
   name: "Cap Returns",
@@ -18,6 +20,44 @@ const AREAS = [
   { id: "msa_1", region: "FCT", name: "Utako" },
   { id: "msa_2", region: "Lagos", name: "Yaba" },
 ];
+
+/** A literal, never `Date.now()` — same house rule `returns-page.test.tsx`
+ *  documents for its own fixture. The value itself is never asserted on;
+ *  `resolveReturnPrefill` trusts `listMyReturns()`'s own newest-first order
+ *  rather than re-sorting by it. */
+const RETURN_CREATED = 1_755_600_000_000;
+
+/** A `MyReturn`, minus the four prefill fields — every case below sets only
+ *  the ones its own scenario needs, same shape `returns-page.test.tsx`'s own
+ *  `myReturn` fixture uses. */
+function myReturn(over: Partial<MyReturn> = {}): MyReturn {
+  return {
+    id: "mrr_test",
+    status: "requested",
+    qtyDeclared: 5,
+    qtyAccepted: null,
+    pointsAwarded: null,
+    pickupScheduledAt: null,
+    driverName: null,
+    createdAt: RETURN_CREATED,
+    customerName: null,
+    customerPhone: null,
+    pickupAddress: null,
+    serviceAreaId: null,
+    ...over,
+  };
+}
+
+const SAVED_ADDRESS: Address = {
+  name: "Adaeze Okonkwo",
+  line1: "14 Bourdillon Road",
+  line2: "Flat 3",
+  city: "Ikoyi",
+  region: "Lagos",
+  postalCode: "101233",
+  countryCode: "NG",
+  phone: "+2348012345678",
+};
 
 /** Today's actual shape in production — every district is the same state.
  *  See the file header on why a single state preselects and disables itself
@@ -147,5 +187,111 @@ describe("placeError — exhaustive over every ReturnFailure, the load-bearing p
       expect(result).toMatchObject({ field: null });
       expect("message" in result && result.message.length > 0).toBe(true);
     }
+  });
+});
+
+describe("composePickupAddress — folds a saved address into the one textarea the form offers", () => {
+  it("joins every present line the same way a saved address already renders elsewhere", () => {
+    // Same shape as `settings-page.tsx` and `checkout-flow.tsx`'s own
+    // `[line1, line2, city, region, postalCode].filter(Boolean).join(", ")` —
+    // a shopper reads the same address written the same way in both places.
+    expect(composePickupAddress(SAVED_ADDRESS)).toBe(
+      "14 Bourdillon Road, Flat 3, Ikoyi, Lagos, 101233",
+    );
+  });
+
+  it("drops a line the address does not have, rather than leaving an empty gap", () => {
+    const { line2: _dropped, ...withoutLine2 } = SAVED_ADDRESS;
+    expect(composePickupAddress(withoutLine2)).toBe("14 Bourdillon Road, Ikoyi, Lagos, 101233");
+  });
+});
+
+describe("resolveReturnPrefill — the two-source precedence, the load-bearing part", () => {
+  it("prefers a previous return over a saved address, even when both exist", () => {
+    const returns = [
+      myReturn({
+        customerName: "Bisi Adeyemi",
+        customerPhone: "08011112222",
+        pickupAddress: "9 Ademola Adetokunbo Crescent",
+        serviceAreaId: "msa_1",
+      }),
+    ];
+    const result = resolveReturnPrefill(returns, SAVED_ADDRESS, AREAS);
+    expect(result).toMatchObject({ source: "previous-return", name: "Bisi Adeyemi" });
+  });
+
+  it("skips a newer return that carries none of the four fields, and uses the next one that does", () => {
+    // `listMyReturns()` is already newest-first — index 0 here stands for the
+    // most recent request, and it predates the columns this feature reads.
+    const returns = [
+      myReturn(), // newest — nothing to prefill from
+      myReturn({
+        customerName: "Older Shopper",
+        customerPhone: "08033334444",
+        pickupAddress: "1 Old Road",
+        serviceAreaId: "msa_2",
+      }),
+    ];
+    const result = resolveReturnPrefill(returns, null, AREAS);
+    expect(result).toMatchObject({ source: "previous-return", name: "Older Shopper" });
+  });
+
+  it("resolves a previous return's serviceAreaId into both the state and the district", () => {
+    const returns = [
+      myReturn({ customerPhone: "0803", pickupAddress: "x", serviceAreaId: "msa_2" }),
+    ];
+    const result = resolveReturnPrefill(returns, null, AREAS);
+    expect(result).toMatchObject({ serviceAreaId: "msa_2", region: "Lagos" });
+  });
+
+  it("leaves the state blank, without touching submit, when a district no longer matches any served area", () => {
+    const returns = [
+      myReturn({ customerPhone: "0803", pickupAddress: "x", serviceAreaId: "msa_gone" }),
+    ];
+    const result = resolveReturnPrefill(returns, null, AREAS);
+    expect(result).toMatchObject({ serviceAreaId: "msa_gone", region: "" });
+  });
+
+  it("uses a previous return's blank name as blank, never falling through to the saved address's name", () => {
+    // The two sources never mix per-field — the WHOLE source wins, or it
+    // does not apply at all.
+    const returns = [
+      myReturn({ customerPhone: "0803", pickupAddress: "x", serviceAreaId: "msa_1", customerName: null }),
+    ];
+    const result = resolveReturnPrefill(returns, SAVED_ADDRESS, AREAS);
+    expect(result).toMatchObject({ source: "previous-return", name: "" });
+  });
+
+  it("falls back to the saved address when no previous return carries anything", () => {
+    const returns = [myReturn(), myReturn()]; // both bare
+    const result = resolveReturnPrefill(returns, SAVED_ADDRESS, AREAS);
+    expect(result).toEqual({
+      source: "saved-address",
+      name: "Adaeze Okonkwo",
+      phone: "+2348012345678",
+      pickupAddress: "14 Bourdillon Road, Flat 3, Ikoyi, Lagos, 101233",
+      region: "Lagos",
+      serviceAreaId: "",
+    });
+  });
+
+  it("treats a null return list — a failed read — the same as an empty one", () => {
+    // Both reads never throw; a failed read must read as "nothing here", not
+    // crash the precedence.
+    const result = resolveReturnPrefill(null, SAVED_ADDRESS, AREAS);
+    expect(result).toMatchObject({ source: "saved-address" });
+  });
+
+  it("prefills nothing when neither source has anything, rather than guessing", () => {
+    expect(resolveReturnPrefill(null, null, AREAS)).toBeNull();
+    expect(resolveReturnPrefill([], null, AREAS)).toBeNull();
+  });
+
+  it("never mentions the quantity — the programme minimum alone owns that field", () => {
+    const returns = [
+      myReturn({ customerPhone: "0803", pickupAddress: "x", serviceAreaId: "msa_1" }),
+    ];
+    const result = resolveReturnPrefill(returns, null, AREAS);
+    expect(result).not.toHaveProperty("qtyDeclared");
   });
 });

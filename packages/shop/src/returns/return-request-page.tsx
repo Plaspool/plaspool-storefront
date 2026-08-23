@@ -9,9 +9,18 @@ import { listServiceAreas } from "../data/returns-api";
  *
  * A Server Component: the programme and the district list are both public,
  * cacheable reads (`MARKETING_REVALIDATE`), so both are fetched here rather
- * than inside `ReturnForm`, which stays a client component that fetches
- * nothing until it is actually submitted. `Promise.all` because the two
- * reads are independent of each other.
+ * than inside `ReturnForm`. `Promise.all` because the two reads are
+ * independent of each other.
+ *
+ * ═══ `ReturnForm` NO LONGER FETCHES NOTHING ═══
+ * It now reads `listMyReturns()`/`listSavedAddresses()` on mount, to prefill
+ * itself — see its own file header. Those stayed OUT of this Server
+ * Component on purpose: both are cookie-identified, per-customer reads, the
+ * opposite of the public, cacheable pair above, and baking one shopper's own
+ * data into a page this Worker can cache is exactly the mistake `orders-api.ts`
+ * and every other `/me/` client in this package already avoids by staying
+ * client-side. `ReturnForm` stays interactive on first paint regardless —
+ * neither fetch gates its render.
  *
  * ═══ NO PROGRAMME OR FORM AT ALL WHEN `getRewardsProgram()` IS NULL ═══
  * The same rule `RewardsBand` follows on the home page: a surface explaining

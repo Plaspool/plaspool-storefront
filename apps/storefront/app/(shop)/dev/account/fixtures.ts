@@ -162,6 +162,12 @@ function myReturn(
     pickupScheduledAt: null,
     driverName: null,
     createdAt: AUG_20 - daysAgo * DAY,
+    // The four prefill fields `return-form.tsx` reads default to null here —
+    // this bench is for `ReturnsView`'s own states, which never read them.
+    customerName: null,
+    customerPhone: null,
+    pickupAddress: null,
+    serviceAreaId: null,
     ...extra,
   };
 }
