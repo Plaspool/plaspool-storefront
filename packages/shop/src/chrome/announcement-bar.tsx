@@ -64,6 +64,28 @@ export function isReturnsCta(ctaUrl: string | null): boolean {
   return ctaUrl === RETURNS_PATH;
 }
 
+/**
+ * The CTA's own look, shared by both branches below so they cannot drift.
+ *
+ * A SMALL WHITE BUTTON, STILL UNDERLINED. The admin's own banner preview
+ * (`Stage` in `MarketingBanners.tsx`) draws a top-bar CTA as a filled pill —
+ * `.btn.btn--sm.btn--outline` on its dark `--accent` bar resolves to
+ * `--paper-raised` (white) with `--ink-2` (near-black) text. This mirrors
+ * that in the storefront's own tokens — `bg-background`/`text-foreground`
+ * are white-on-near-black in the pinned-light theme the same way — rather
+ * than reproduce it pixel-for-pixel in a second design system's units. The
+ * underline stays because a shape alone reads as decoration; the underline
+ * is what still reads as "this goes somewhere" the instant a shopper's eye
+ * lands on it, same as the plain-text version this replaces.
+ *
+ * NOT `NEO_SURFACE`. That treatment is one real call to action per screen,
+ * and the page underneath this bar already has its own. This is chrome, so
+ * it is styled directly rather than borrowing the one raised look the shop
+ * spends on the thing it actually wants clicked.
+ */
+const CTA_BUTTON_CLASSES =
+  "inline-flex items-center whitespace-nowrap rounded-md bg-background px-3 py-1 font-medium text-foreground underline decoration-foreground/40 underline-offset-2 hover:decoration-foreground";
+
 export async function AnnouncementBar() {
   const [banners, program, areas] = await Promise.all([
     listBanners("top_bar"),
@@ -96,13 +118,10 @@ export async function AnnouncementBar() {
                   program={program}
                   areas={areas ?? []}
                   label={banner.ctaText}
-                  className="underline decoration-brand-ink/40 underline-offset-2 hover:decoration-brand-ink"
+                  className={CTA_BUTTON_CLASSES}
                 />
               ) : (
-                <Link
-                  href={banner.ctaUrl}
-                  className="underline decoration-brand-ink/40 underline-offset-2 hover:decoration-brand-ink"
-                >
+                <Link href={banner.ctaUrl} className={CTA_BUTTON_CLASSES}>
                   {banner.ctaText}
                 </Link>
               )}
