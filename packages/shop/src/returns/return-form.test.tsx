@@ -19,8 +19,28 @@ const AREAS = [
   { id: "msa_2", region: "Lagos", name: "Yaba" },
 ];
 
+/** Today's actual shape in production — every district is the same state.
+ *  See the file header on why a single state preselects and disables itself
+ *  rather than being hidden. */
+const SINGLE_REGION_AREAS = [
+  { id: "msa_3", region: "Federal Capital Territory", name: "Utako" },
+  { id: "msa_4", region: "Federal Capital Territory", name: "Wuse 2" },
+];
+
 const html = () =>
   renderToStaticMarkup(<ReturnForm program={PROGRAM} areas={AREAS} />);
+
+const singleRegionHtml = () =>
+  renderToStaticMarkup(<ReturnForm program={PROGRAM} areas={SINGLE_REGION_AREAS} />);
+
+/** The opening `<select …>` tag whose `id` ends `-${idSuffix}` — how a test
+ *  tells the state select's markup apart from the district select's without
+ *  a DOM. `React.useId()`'s own prefix is opaque and not this suite's to
+ *  hardcode, so this matches on the suffix this file itself chose. */
+function selectTag(markup: string, idSuffix: string): string {
+  const match = markup.match(new RegExp(`<select[^>]*id="[^"]*-${idSuffix}"[^>]*>`));
+  return match ? match[0] : "";
+}
 
 it("asks for no email — the address is the session's and cannot be typed", () => {
   // The security property, pinned where it can regress. The API refuses an
@@ -29,11 +49,51 @@ it("asks for no email — the address is the session's and cannot be typed", () 
   expect(html()).not.toMatch(/name="email"/);
 });
 
-it("groups the districts by region", () => {
-  const markup = html();
-  expect(markup).toContain("FCT");
-  expect(markup).toContain("Lagos");
+it("renders both the state and district selects, with their options, server-side", () => {
+  // The whole reason this is a native <select> rather than @plaspool/ui's
+  // Radix one — see the file header. A Radix Select renders zero options
+  // under renderToStaticMarkup; a plain <select> renders all of them,
+  // proven here rather than assumed.
+  const markup = singleRegionHtml();
+  expect(markup).toContain("Choose a state");
+  expect(markup).toContain("Federal Capital Territory");
+  expect(markup).toContain("Choose a district");
   expect(markup).toContain("Utako");
+  expect(markup).toContain("Wuse 2");
+});
+
+it("lists every distinct state, sorted, and leaves district empty and disabled until one is chosen", () => {
+  const markup = html(); // AREAS: Lagos's area is listed before FCT's, in source order.
+  const stateSelect = selectTag(markup, "region");
+  const districtSelect = selectTag(markup, "area");
+
+  // More than one state served, so this is a real, open choice. Matched as
+  // `disabled=""` — the exact rendered attribute — rather than bare
+  // "disabled", which the select's own `disabled:cursor-not-allowed`
+  // Tailwind class would match whether or not the control actually is.
+  expect(stateSelect).not.toContain('disabled=""');
+  expect(markup.indexOf(">FCT<")).toBeGreaterThan(-1);
+  expect(markup.indexOf(">FCT<")).toBeLessThan(markup.indexOf(">Lagos<"));
+
+  // No state chosen yet, so the district select is disabled and offers no
+  // district from either state — not even the placeholder's neighbours.
+  expect(districtSelect).toContain('disabled=""');
+  expect(markup).not.toContain("Utako");
+  expect(markup).not.toContain("Yaba");
+});
+
+it("settles a single state rather than presenting it as a choice", () => {
+  const markup = singleRegionHtml();
+  const stateSelect = selectTag(markup, "region");
+  const districtSelect = selectTag(markup, "area");
+
+  // Disabled so it reads as settled rather than as a choice — but still
+  // shown, and still carrying the one option, so the shopper sees which
+  // state they are in rather than have it hidden from them.
+  expect(stateSelect).toContain('disabled=""');
+  expect(markup).toContain("Federal Capital Territory");
+  // Immediately usable — not gated behind a state nobody had to choose.
+  expect(districtSelect).not.toContain('disabled=""');
 });
 
 it("spells no programme noun of its own — every word comes from the program", () => {

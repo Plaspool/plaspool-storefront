@@ -18,20 +18,39 @@ import type { RewardsProgram } from "../data/marketing";
  * fallback. Where the two differ, it is because the API differs, not because
  * this form invented its own idiom.
  *
- * ═══ THE DISTRICT PICKER IS A NATIVE `<select>`, NOT `@plaspool/ui`'s `Select` ═══
+ * ═══ STATE AND DISTRICT ARE BOTH NATIVE `<select>`S, NOT `@plaspool/ui`'s `Select` ═══
  * That `Select` is Radix: it portals its listbox and renders it only once
  * opened on the client, so under `renderToStaticMarkup` — this file's own test
- * harness — it emits zero options, and the district grouping this form's own
- * test asserts on would have nothing to assert against. (NOT because it makes
- * the form work without JavaScript — it does not. There is no `name`
- * attribute anywhere in this form and no `action`, so a shopper with no
- * script running cannot submit any of it regardless of what this one field is
- * made of; that is not this select's problem to solve.) There is no
- * form-select precedent to violate either: the only Radix `Select` in this
+ * harness — it emits zero options, and neither the state list nor the
+ * districts this form's own test asserts on would have anything to assert
+ * against. (NOT because it makes the form work without JavaScript — it does
+ * not. There is no `name` attribute anywhere in this form and no `action`, so
+ * a shopper with no script running cannot submit any of it regardless of what
+ * these two fields are made of; that is not their problem to solve.) There is
+ * no form-select precedent to violate either: the only Radix `Select` in this
  * package is `listing/sort-select.tsx`, a sort control where client-only is
  * fine, and the checkout's address form uses `<Input>` throughout, even for
  * "State". A native select is also the better mobile control, which is where
  * most of this shop's traffic is.
+ *
+ * ═══ STATE NARROWS DISTRICT; THE DISTRICT'S `id` IS STILL THE ONLY THING SENT ═══
+ * `areas` carries `region` (the state) alongside `name` (the district) for
+ * every row the API answers with. The state select's own value is never
+ * submitted — it exists only to cut the district list down to one state's
+ * worth, and changing it clears whatever district was chosen, since a
+ * district from the old state is no longer a valid answer. `serviceAreaId`
+ * is still the district's `id`, exactly as the API's `POST /me/returns`
+ * expects; nothing about the wire format changes.
+ *
+ * ═══ ONE STATE SETTLES ITSELF RATHER THAN BEING OFFERED AS A CHOICE ═══
+ * Production serves 28 districts today, all "Federal Capital Territory" —
+ * see `return-form.test.tsx`. With exactly one distinct `region`, it is
+ * preselected on mount and the state select is `disabled`: a control with
+ * one legal answer is not a decision, and asking a shopper to make it is
+ * friction with nothing behind it. It is not hidden, though — a shopper
+ * should still see which state their pickup is in. `disabled` alone is what
+ * "settled" looks like here; a second state appearing turns the select back
+ * into a real, open choice automatically, with no branch of its own.
  *
  * ═══ NO EMAIL FIELD ═══
  * The pickup address belongs to the signed-in session, not to whatever a
@@ -185,6 +204,14 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
   const [phone, setPhone] = React.useState("");
   const [pickupAddress, setPickupAddress] = React.useState("");
   const [serviceAreaId, setServiceAreaId] = React.useState("");
+  /* Lazily initialised from `areas`, the same pattern `qty` above uses on
+     `program` — both are props available at mount, never fetched inside this
+     client component. See the file header: exactly one region settles itself
+     here rather than waiting on an effect to catch up after first paint. */
+  const [selectedRegion, setSelectedRegion] = React.useState(() => {
+    const distinct = [...new Set(areas.map((area) => area.region))];
+    return distinct.length === 1 ? distinct[0] : "";
+  });
 
   const [sending, setSending] = React.useState(false);
   /* Client-side validation appears only after a submit attempt — reporting a
@@ -217,21 +244,30 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
   const uid = React.useId();
   const id = (part: string) => `${uid}-${part}`;
 
-  const byRegion = React.useMemo(() => {
-    const grouped = new Map<string, ServiceArea[]>();
-    for (const area of areas) {
-      const list = grouped.get(area.region);
-      if (list) list.push(area);
-      else grouped.set(area.region, [area]);
-    }
-    return grouped;
-  }, [areas]);
+  /** Every distinct state served, sorted — the state select's own options. */
+  const regions = React.useMemo(
+    () => [...new Set(areas.map((area) => area.region))].sort((a, b) => a.localeCompare(b)),
+    [areas],
+  );
+
+  /** Only the districts in whichever state is currently chosen — the
+   *  district select's options. Empty (so the select offers nothing beyond
+   *  its own placeholder) until `selectedRegion` names one. */
+  const districtsInRegion = React.useMemo(
+    () => areas.filter((area) => area.region === selectedRegion),
+    [areas, selectedRegion],
+  );
 
   /** No district can be chosen at all. Task 9's brief calls for the select
    *  itself to render `disabled` here; a "choose a district" nag beside a
    *  control nobody can fill in is a dead end, so submit is disabled too
    *  rather than letting a shopper reach a guaranteed generic API refusal. */
   const noAreas = areas.length === 0;
+
+  /** More than one state actually exists to choose between. Below this, the
+   *  state select is `disabled` — either nothing is served at all, or one
+   *  state is and choosing it is not a real decision. See the file header. */
+  const regionIsAChoice = regions.length > 1;
 
   const qtyNumber = Number(qty);
   const problems = {
@@ -457,14 +493,44 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
         )}
       </Field>
 
+      <Field id={id("region")} label="State" required>
+        {/* NATIVE, ON PURPOSE — see the file header. Disabled once there is
+            only one legal answer, so it reads as settled rather than as a
+            choice; still shown, so the shopper still sees which state they
+            are in. */}
+        <select
+          id={id("region")}
+          value={selectedRegion}
+          disabled={noAreas || !regionIsAChoice}
+          aria-required="true"
+          aria-describedby={describedBy(noAreas && id("area-empty"))}
+          onChange={(event) => {
+            setSelectedRegion(event.target.value);
+            // The district just chosen belonged to the old state — it is not
+            // a valid answer under the new one, so it does not survive the
+            // change, and any server placement naming it no longer applies.
+            setServiceAreaId("");
+            clearFieldPlacement("serviceAreaId");
+          }}
+          className={NATIVE_SELECT_CLASSES}
+        >
+          <option value="">Choose a state</option>
+          {regions.map((region) => (
+            <option key={region} value={region}>
+              {region}
+            </option>
+          ))}
+        </select>
+      </Field>
+
       <Field id={id("area")} label="District" required>
-        {/* NATIVE, ON PURPOSE — see the file header. `optgroup` groups by
-            region without any script running, so the grouping this form's
-            own test asserts on survives with JavaScript off. */}
+        {/* NATIVE, ON PURPOSE — see the file header. Options come from
+            `districtsInRegion`, so they are always exactly one state's
+            worth, server-rendered same as the state select above. */}
         <select
           id={id("area")}
           value={serviceAreaId}
-          disabled={noAreas}
+          disabled={noAreas || !selectedRegion}
           aria-required="true"
           aria-invalid={fieldMessage("serviceAreaId") ? true : undefined}
           aria-describedby={describedBy(
@@ -478,14 +544,10 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
           className={NATIVE_SELECT_CLASSES}
         >
           <option value="">Choose a district</option>
-          {[...byRegion.entries()].map(([region, list]) => (
-            <optgroup key={region} label={region}>
-              {list.map((area) => (
-                <option key={area.id} value={area.id}>
-                  {area.name}
-                </option>
-              ))}
-            </optgroup>
+          {districtsInRegion.map((area) => (
+            <option key={area.id} value={area.id}>
+              {area.name}
+            </option>
           ))}
         </select>
         {noAreas && (
