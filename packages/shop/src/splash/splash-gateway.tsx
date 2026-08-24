@@ -7,6 +7,7 @@ import { cn } from "@plaspool/ui";
 
 import PlaSpoolSplash from "./splash-engine";
 import type { SplashHandle } from "./splash-engine";
+import { SPLASH_DESTINATION, SPLASH_ENABLED } from "./config";
 
 /**
  * `/shop` — the opening sequence, and then the shop.
@@ -34,7 +35,9 @@ import type { SplashHandle } from "./splash-engine";
  * editing it silently un-tests it.
  */
 
-const DESTINATION = "/store";
+/** From `./config`, so the redirect and the animation cannot drift onto
+ *  different destinations. */
+const DESTINATION = SPLASH_DESTINATION;
 
 /** The engine's ceiling. `forge` runs 1560 ms; with the default hold the exit
  *  begins around 2580 ms and `onDone` lands around 2760 ms. */
@@ -77,6 +80,20 @@ export function SplashGateway({ destination = DESTINATION }: SplashGatewayProps)
   }, []);
 
   React.useEffect(() => {
+    /*
+     * CONFIGURED OFF — hand over at once and mount nothing.
+     *
+     * `app/shop/page.tsx` already redirects on the server when this is false,
+     * so in the shipping app this branch never runs. It exists so the flag is
+     * honoured wherever the component is mounted — the dev harness, a future
+     * route — rather than being true only of the one caller that remembers to
+     * check. See `./config`.
+     */
+    if (!SPLASH_ENABLED) {
+      router.replace(destination);
+      return;
+    }
+
     let settled = false;
     let handle: SplashHandle | null = null;
 
@@ -215,7 +232,13 @@ export function SplashGateway({ destination = DESTINATION }: SplashGatewayProps)
         `aria-hidden` on the whole stack: the engine hides its own visual layer
         anyway, and the heading and link above are already the accessible
         content of this route. Announcing the mark twice would be worse.
+
+        NOT RENDERED AT ALL WHEN THE SPLASH IS OFF. It is an opaque, fixed,
+        full-screen layer, so leaving it mounted with nothing drawing into it
+        would cover the page with a blank sheet until the redirect landed —
+        see `./config`.
       */}
+      {SPLASH_ENABLED && (
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 z-50 flex flex-col items-center justify-center gap-7 bg-background"
@@ -250,6 +273,7 @@ export function SplashGateway({ destination = DESTINATION }: SplashGatewayProps)
           <p className="font-sans text-sm text-muted-foreground">{TAGLINE}</p>
         </div>
       </div>
+      )}
     </>
   );
 }
