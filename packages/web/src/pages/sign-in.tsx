@@ -1,27 +1,54 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { createAuthClient } from "@neondatabase/auth/next";
 import { Button, Input, Label, Separator, cn, NEO_SURFACE } from "@plaspool/ui";
 import {
   completeSignIn,
   getShopCustomer,
-  signOutEverywhere,
   type ShopCustomer,
   type SignInFailureReason,
 } from "@plaspool/shop";
 
+import {
+  bridgeCallbackUrl,
+  isBridgeReturn,
+  safeDestination,
+} from "./sign-in-destination";
+
 /**
  * `/sign-in` — the one page a customer uses to keep their basket, addresses
- * and order history across devices.
+ * and order history across devices. It is a DOORWAY, never a destination.
  *
  * ═══════════════════════════════════════════════════════════════════════════
- * WHY THE BRIDGE RUNS FROM HERE.
+ * WHY THE BRIDGE RUNS FROM HERE, AND WHY THE CALLBACK COMES BACK HERE.
  *
- * Neon Auth lands the customer back on this page after both paths that grant
- * it a session — the Google OAuth callback, and the magic-link click — so a
- * `useEffect` here that fires once a Neon session exists but the shop session
- * does not covers both without hooking either flow separately.
+ * The Neon → shop handshake exists in exactly one place: the `useEffect`
+ * below. It can only live in one place, because the assertion it exchanges is
+ * single-use. So this page has to be on the return path of BOTH flows that
+ * grant a Neon session — the Google OAuth callback and the magic-link click.
+ *
+ * IT ONCE WAS, AND THEN QUIETLY STOPPED BEING. When `next` was added so a
+ * shopper bounced here from `/account/settings` would be returned there, the
+ * destination was handed to Neon as its `callbackURL` directly. Neon obeyed:
+ * Google returned the shopper to `/returns`, a page that does not bridge. They
+ * arrived holding a live Neon session and no `__Host-shop_session`, so every
+ * `readShopSession()` in the shop called them a guest — the header offered
+ * "Sign in", the returns form offered `GuestPrompt` — and signing in again
+ * just repeated the loop. Nothing logged an error; both halves were behaving
+ * exactly as written.
+ *
+ * `bridgeCallbackUrl` is the repair. Neon is always sent back HERE, with the
+ * real destination riding along as `next`, and this page forwards on once the
+ * shop session it just minted actually exists.
+ *
+ * ═══ AND A RESOLVED SESSION IS A DEPARTURE, NOT A PAGE ═══
+ * This used to render a "You're signed in" panel — a heading, an email, and a
+ * "Sign out" button. `/sign-in` sits outside both `(shop)` and `(site)`, so it
+ * carries no nav and no footer: a shopper who signed in from the header landed
+ * in a room with one door, and that door logged them out. There is no signed-in
+ * state of this page any more. Resolving a session means leaving.
  *
  * ONE ATTEMPT PER MOUNT. `attempted` is a ref, not state, because it must
  * survive without triggering a re-render, and it is never reset — a genuine
@@ -50,6 +77,7 @@ type FormState =
   | { kind: "failed"; reason: SignInFailureReason };
 
 export default function SignInPage() {
+  const router = useRouter();
   const session = authClient.useSession();
   /**
    * Where to go back to after signing in.
@@ -61,17 +89,24 @@ export default function SignInPage() {
    * moment they were redirected, and nothing carried it.
    *
    * READ FROM `location` RATHER THAN `useSearchParams` so this component does
-   * not need a Suspense boundary it did not previously have, and RESTRICTED TO
-   * A SAME-SITE PATH: `next` arrives in a URL anybody can hand somebody else,
-   * and a value like `https://evil.example` would turn this page into an open
-   * redirect off the back of a real sign-in. Only a path beginning with a
-   * single `/` is honoured — `//host` is a protocol-relative URL, not a path.
+   * not need a Suspense boundary it did not previously have. The validation
+   * itself — same-site only, and never back to this page — lives in
+   * `safeDestination`, where it is unit-testable without a DOM; see that
+   * module for the open redirect and the redirect loop it is holding shut.
    */
   const returnTo = React.useMemo(() => {
-    if (typeof window === "undefined") return "/sign-in";
-    const next = new URLSearchParams(window.location.search).get("next");
-    return next && /^\/(?!\/)/.test(next) ? next : "/sign-in";
+    if (typeof window === "undefined") return safeDestination(null);
+    return safeDestination(new URLSearchParams(window.location.search).get("next"));
   }, []);
+  /**
+   * Whether this page load is the TAIL of a sign-in round trip rather than the
+   * head of one — the difference between showing a form and finishing a
+   * handshake, which has to be decided at first paint. See `BRIDGE_FLAG`.
+   */
+  const returning = React.useMemo(
+    () => typeof window !== "undefined" && isBridgeReturn(window.location.search),
+    [],
+  );
   const [customer, setCustomer] = React.useState<ShopCustomer | null | undefined>(undefined);
   const [form, setForm] = React.useState<FormState>({ kind: "idle" });
   const [email, setEmail] = React.useState("");
@@ -106,8 +141,25 @@ export default function SignInPage() {
     });
   }, [customer, session.data, session.isPending]);
 
+  /**
+   * A SESSION IS A DEPARTURE. The moment one resolves — bridged just now, or
+   * already live when the page mounted — the shopper leaves for wherever they
+   * were headed. `replace` and not `push`, so Back goes to the page they came
+   * from rather than to a sign-in page that would immediately bounce them
+   * forward again.
+   */
+  React.useEffect(() => {
+    if (!customer) return;
+    router.replace(returnTo);
+  }, [customer, returnTo, router]);
+
   const handleGoogle = React.useCallback(() => {
-    void authClient.signIn.social({ provider: "google", callbackURL: returnTo });
+    void authClient.signIn.social({
+      provider: "google",
+      /* Back HERE, carrying the destination — never straight to the
+         destination. See the file header for what that cost. */
+      callbackURL: bridgeCallbackUrl(returnTo),
+    });
   }, [returnTo]);
 
   const handleSendLink = React.useCallback(
@@ -120,7 +172,9 @@ export default function SignInPage() {
       try {
         const { error } = await authClient.signIn.magicLink({
           email: address,
-          callbackURL: returnTo,
+          /* The same round trip the Google button takes, for the same
+             reason — the link has to land on the page that bridges. */
+          callbackURL: bridgeCallbackUrl(returnTo),
         });
         if (error) {
           setForm({ kind: "failed", reason: "network" });
@@ -134,18 +188,34 @@ export default function SignInPage() {
     [email, returnTo],
   );
 
-  const handleSignOut = React.useCallback(async () => {
-    await signOutEverywhere();
-    setCustomer(null);
-    attempted.current = false;
-  }, []);
-
   const working = form.kind === "bridging" || form.kind === "sending_link";
+
+  /**
+   * Nobody is signed in anywhere, and both probes have said so.
+   *
+   * THE HANG THIS PREVENTS. `returning` is read off the URL, so a hand-typed
+   * or stale `?bridge=1` claims a handshake that is not happening. Without
+   * this, such a visit would sit on "Signing you in…" forever, because the
+   * effect above returns early when there is no Neon session to bridge FROM
+   * and nothing else would ever move `form` off `idle`.
+   */
+  const noSessionAnywhere = customer === null && !session.isPending && !session.data;
+
+  /**
+   * The handshake is the whole page: either it is running, or it finished and
+   * the redirect above is on its way. A failure is NOT one of these — that
+   * falls back to the form with its reason, which is the only state a shopper
+   * can actually act on.
+   */
+  const finishing =
+    form.kind !== "failed" &&
+    !noSessionAnywhere &&
+    (Boolean(customer) || form.kind === "bridging" || returning);
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-col gap-8 px-4 py-16 sm:py-24">
-      {customer ? (
-        <SignedInPanel customer={customer} onSignOut={handleSignOut} />
+      {finishing ? (
+        <FinishingPanel arrived={Boolean(customer)} />
       ) : (
         <>
           <div>
@@ -254,40 +324,32 @@ function LinkSentPanel({
   );
 }
 
-function SignedInPanel({
-  customer,
-  onSignOut,
-}: {
-  customer: ShopCustomer;
-  onSignOut: () => void;
-}) {
-  const [signingOut, setSigningOut] = React.useState(false);
-
+/**
+ * The only thing this page shows once a session is in play: the handshake
+ * running, and then the shopper leaving.
+ *
+ * ═══ TEXT RATHER THAN A SKELETON, DELIBERATELY ═══
+ * The house rule is that a known layout loads as its own shape, never as a
+ * line of prose. This is the documented exception: nothing is arriving to be
+ * drawn here. The wait is a PROCESS the shopper is watching — two round trips
+ * between Neon and the commerce API — and the page they are waiting for is a
+ * different page. A skeleton of a form nobody is going to fill in would be a
+ * shape that never resolves.
+ *
+ * `role="status"` so a screen reader is told the same thing the sighted
+ * shopper is, without stealing focus mid-navigation.
+ */
+function FinishingPanel({ arrived }: { arrived: boolean }) {
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-          You&apos;re signed in
-        </h1>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Signed in as <span className="font-medium text-foreground">{customer.email}</span>.
-        </p>
-      </div>
-      <Button
-        type="button"
-        variant="outline"
-        disabled={signingOut}
-        onClick={() => {
-          setSigningOut(true);
-          onSignOut();
-        }}
-        className={cn(
-          "h-12 w-full justify-center border-2 border-foreground bg-background text-base text-foreground hover:bg-background",
-          NEO_SURFACE,
-        )}
-      >
-        {signingOut ? "Signing out…" : "Sign out"}
-      </Button>
+    <div role="status" className="flex flex-col gap-2">
+      <h1 className="font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+        {arrived ? "You're signed in" : "Signing you in…"}
+      </h1>
+      <p className="text-sm leading-6 text-muted-foreground">
+        {arrived
+          ? "Taking you back to the shop."
+          : "One moment while we finish setting up your account."}
+      </p>
     </div>
   );
 }

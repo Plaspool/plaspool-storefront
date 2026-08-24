@@ -2,11 +2,12 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { LifeBuoy, LogOut, Package, Settings, User } from "lucide-react";
 import { SheetClose, cn } from "@plaspool/ui";
 
 import { Avatar } from "./avatar";
+import { signInHref } from "./sign-in-href";
 import { readShopSession, signOutEverywhere, type ShopSession } from "../data/auth-api";
 
 /**
@@ -22,6 +23,8 @@ import { readShopSession, signOutEverywhere, type ShopSession } from "../data/au
  */
 export function MobileAccountLinks({ linkClassName }: { linkClassName: string }) {
   const router = useRouter();
+  /* The same return path the dropdown carries — see `sign-in-href.ts`. */
+  const signIn = signInHref(usePathname());
   const [session, setSession] = React.useState<ShopSession>({ kind: "unknown" });
   const [signingOut, setSigningOut] = React.useState(false);
   const customer = session.kind === "customer" ? session.customer : null;
@@ -44,12 +47,13 @@ export function MobileAccountLinks({ linkClassName }: { linkClassName: string })
    * BUT A SKELETON HERE WAS A DEAD END. The probe never retries, so on a failed
    * one it shimmered forever: a loading state that cannot finish is worse than
    * an honest neutral control. "Account" points at `/sign-in`, which resolves
-   * the session itself, so it is correct whichever the answer turns out to be.
+   * the session itself and forwards a shopper who already has one straight
+   * back here, so it is correct whichever the answer turns out to be.
    */
   if (session.kind === "unknown") {
     return (
       <SheetClose asChild>
-        <Link href="/sign-in" className={linkClassName}>
+        <Link href={signIn} className={linkClassName}>
           <User aria-hidden="true" className="h-4 w-4" />
           Account
         </Link>
@@ -60,7 +64,7 @@ export function MobileAccountLinks({ linkClassName }: { linkClassName: string })
   if (!customer) {
     return (
       <SheetClose asChild>
-        <Link href="/sign-in" className={linkClassName}>
+        <Link href={signIn} className={linkClassName}>
           <User aria-hidden="true" className="h-4 w-4" />
           Sign in
         </Link>
