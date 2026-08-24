@@ -74,6 +74,7 @@ export * from "./components/card-add-button";
 // nothing outside `./splash` should mount it directly.
 export * from "./splash/splash-gateway";
 export * from "./splash/metadata";
+export * from "./splash/config";
 
 // Product detail. The gallery, buy box and sticky buy bar land with Task 10,
 // which needs the cart; these are the parts below them that do not.
