@@ -4,6 +4,39 @@ import * as React from "react"
 import Link from "next/link"
 import { buttonVariants, cn } from "@plaspool/ui"
 import { BrandLogo } from "@plaspool/brand"
+import { AccountMenu } from "@plaspool/shop"
+
+/**
+ * ═══ THE ACCOUNT CONTROL IS `AccountMenu`, NOT A "SIGN IN" LINK ═══
+ * The marketing nav had no way into `/sign-in` at all, so the home page — the
+ * page most visitors land on — was the one place a shopper could not sign in.
+ *
+ * WHAT IT IS NOT IS A BARE `<Link href="/sign-in">Sign in</Link>`. The session
+ * lives in a cookie on the commerce API's registrable domain, so this origin
+ * cannot read it while rendering: a hardcoded "Sign in" would be served to
+ * everybody, including the shopper who signed in a minute ago, and a failed
+ * probe would leave it there permanently. That exact bug is written up at
+ * length in `account-menu.tsx`'s own header — it was fixed once already in the
+ * shop nav, and putting a plain link here would reintroduce it on the busiest
+ * page in the store. `AccountMenu` keeps "not yet known" separate from
+ * "definitely nobody", so it shows a guest "Sign in", a signed-in shopper
+ * their own name and menu, and neither claim before it knows.
+ *
+ * AT EVERY WIDTH, for the reason `ShopNav` gives beside its own copy: identity
+ * belongs in the header on a phone exactly as it does on a desktop, and
+ * hiding it behind the hamburger means a shopper cannot tell whether they are
+ * signed in without opening a menu. It costs one 40px control until `xl`.
+ * The mobile panel below therefore carries no account row of its own — and
+ * could not reuse `MobileAccountLinks` if it wanted to, since that component
+ * is built from `SheetClose` and this menu is a plain toggled div, not a
+ * Radix sheet.
+ *
+ * The slate classes are the override this nav needs: `AccountMenu` is styled
+ * in the shop's own tokens, and `cn` is tailwind-merge, so what is passed in
+ * wins over what the component sets.
+ */
+const ACCOUNT_IN_MARKETING_NAV =
+  "text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:ring-blue-900 focus-visible:ring-offset-white"
 
 export default function Nav() {
     const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
@@ -15,6 +48,13 @@ export default function Nav() {
                     <Link href="/" className="flex items-center" aria-label="PlaSpool home">
                       <BrandLogo variant="lockup" tone="light" className="h-8" />
                     </Link>
+                    {/* The right-hand cluster: the desktop links, the account
+                        control at every width, and the hamburger below `md`.
+                        DOM order puts `AccountMenu` between them so it is the
+                        rightmost control on desktop, where the hamburger is
+                        hidden, and sits to the left of the hamburger on a
+                        phone, where the links are. */}
+                    <div className="flex items-center gap-1 md:gap-4">
                     <div className="hidden md:flex items-center space-x-8">
                       <Link href="/#about" className="text-slate-600 hover:text-slate-900 font-medium tracking-wide">
                         About
@@ -45,6 +85,8 @@ export default function Nav() {
                       {/* <Button className="bg-blue-900 hover:bg-blue-800">Contact Us</Button> */}
                     </div>
 
+                    <AccountMenu className={ACCOUNT_IN_MARKETING_NAV} />
+
                     {/* Mobile menu button */}
                     <div className="md:hidden">
                       <button
@@ -67,6 +109,7 @@ export default function Nav() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
                       </button>
+                    </div>
                     </div>
                   </div>
                 </div>
