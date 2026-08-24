@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { Link } from "../components/link";
 import { Check, Loader2 } from "lucide-react";
 import { Button, Input, Label, NEO_SURFACE, Textarea, cn } from "@plaspool/ui";
 

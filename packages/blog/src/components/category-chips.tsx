@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "./link";
 
 /**
  * The category row — "All" plus one chip per category, as LINKS.

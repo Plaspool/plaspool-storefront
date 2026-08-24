@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
+import { Link } from "../components/link";
 import { Separator, cn } from "@plaspool/ui";
 import { BrandLogo } from "@plaspool/brand";
 

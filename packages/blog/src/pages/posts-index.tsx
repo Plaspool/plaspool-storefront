@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "../components/link";
 
 import { listPosts, listCategories, listFeaturedPosts, selectFeatured } from "../data/posts";
 import { PostCard } from "../components/post-card";

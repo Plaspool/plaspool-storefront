@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "./link";
 import { Badge, cn } from "@plaspool/ui";
 
 import type { Product } from "../data/types";

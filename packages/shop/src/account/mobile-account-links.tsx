@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { Link } from "../components/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LifeBuoy, LogOut, Package, Settings, User } from "lucide-react";
 import { SheetClose, cn } from "@plaspool/ui";

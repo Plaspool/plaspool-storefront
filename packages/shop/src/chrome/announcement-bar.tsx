@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "../components/link";
 
 import { DELIVERY } from "../data/config";
 import { getRewardsProgram, listBanners, pointsLabel, unitLabel } from "../data/marketing";

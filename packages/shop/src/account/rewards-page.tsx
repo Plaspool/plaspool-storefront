@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { Link } from "../components/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Gift } from "lucide-react";
 import { Button, NEO_SURFACE, Skeleton, SkeletonRegion, TextSkeleton, cn } from "@plaspool/ui";

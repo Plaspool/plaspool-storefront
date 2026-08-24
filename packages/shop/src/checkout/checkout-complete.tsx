@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { Link } from "../components/link";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Clock, Link as LinkIcon, ShoppingCart, XCircle } from "lucide-react";
 import { Button, NEO_SURFACE, cn } from "@plaspool/ui";

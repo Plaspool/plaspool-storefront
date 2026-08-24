@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "./link";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@plaspool/ui";
 

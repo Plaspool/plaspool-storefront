@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "../components/link";
 import { Recycle } from "lucide-react";
 
 import { getRewardsProgram, pointsLabel, unitLabel } from "../data/marketing";
