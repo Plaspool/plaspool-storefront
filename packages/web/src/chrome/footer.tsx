@@ -20,14 +20,14 @@ export default function Footer() {
             <h4 className="font-semibold tracking-wide">Products</h4>
             <ul className="space-y-2 text-slate-400">
               <li>
-                <Link href="/shop" className="hover:text-white font-mono text-sm">
+                <Link href="/store" prefetch={false} className="hover:text-white font-mono text-sm">
                   PLA Filaments
                 </Link>
               </li>
               <li>
-                <a href="/shop" className="hover:text-white font-mono text-sm">
+                <Link href="/store" prefetch={false} className="hover:text-white font-mono text-sm">
                   Bulk Orders
-                </a>
+                </Link>
               </li>
             </ul>
           </div>

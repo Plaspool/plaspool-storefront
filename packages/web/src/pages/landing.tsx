@@ -42,10 +42,15 @@ export default function PlaspoolLanding() {
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-4">
-                <a href="/shop">
-                <Button size="lg" className="bg-blue-800 text-gray-200 hover:bg-blue-700 font-mono">
-                  Shop Filaments <ArrowRight className="ml-2 w-4 h-4" />
-                </Button></a>
+                {/* `asChild` so this renders ONE anchor styled as a button.
+                    It was a <Button> nested inside an <a>, which is invalid
+                    HTML and breaks keyboard activation — the same trap
+                    `nav.tsx` documents beside its own CTA. */}
+                <Button asChild size="lg" className="bg-blue-800 text-gray-200 hover:bg-blue-700 font-mono">
+                  <Link href="/store" prefetch={false}>
+                    Shop Filaments <ArrowRight className="ml-2 w-4 h-4" />
+                  </Link>
+                </Button>
                 <a href="#specs">
                 <Button
                   size="lg"
@@ -365,11 +370,12 @@ export default function PlaspoolLanding() {
             filament that performs consistently.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="/shop">
-            <Button size="lg" className="bg-white w-full text-blue-900 hover:bg-slate-100 font-mono">
-              Shop Now <ArrowRight className="ml-2 w-4 h-4" />
+            {/* One anchor styled as a button — see the hero CTA above. */}
+            <Button asChild size="lg" className="bg-white w-full text-blue-900 hover:bg-slate-100 font-mono">
+              <Link href="/store" prefetch={false}>
+                Shop Now <ArrowRight className="ml-2 w-4 h-4" />
+              </Link>
             </Button>
-            </a>
             {/* <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10 font-mono">
               Request Samples
             </Button> */}

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { LifeBuoy, LogOut, Package, Settings, User } from "lucide-react";
 import {
   Button,
@@ -15,6 +15,7 @@ import {
 } from "@plaspool/ui";
 
 import { Avatar } from "./avatar";
+import { signInHref } from "./sign-in-href";
 import { readShopSession, signOutEverywhere, type ShopSession } from "../data/auth-api";
 
 /**
@@ -62,6 +63,13 @@ const ACCOUNT_SLOT = "h-10 w-10 shrink-0 xl:w-36 xl:justify-start xl:gap-2 xl:px
 
 export function AccountMenu({ className }: { className?: string }) {
   const router = useRouter();
+  /* So signing in returns the shopper to the page they were looking at rather
+     than to a fixed landing page — see `sign-in-href.ts`. `usePathname` and
+     not `useSearchParams`: this control sits in `ShopShell`, so it renders on
+     every shop route, and `useSearchParams` would opt all of them out of
+     static rendering to preserve a filter. */
+  const pathname = usePathname();
+  const signIn = signInHref(pathname);
   const [session, setSession] = React.useState<ShopSession>({ kind: "unknown" });
   const [signingOut, setSigningOut] = React.useState(false);
   const customer = session.kind === "customer" ? session.customer : null;
@@ -96,8 +104,9 @@ export function AccountMenu({ className }: { className?: string }) {
    * slot existed. Avoiding a lie is not worth removing the door.
    *
    * "Account" pointing at `/sign-in` claims nothing either way — that page
-   * resolves the session itself and shows a signed-in visitor their account
-   * rather than a form. The label is the neutral one; only the resolved states
+   * resolves the session itself, and a visitor who turns out to already have
+   * one is forwarded straight back here rather than shown a form or a
+   * dead-end panel. The label is the neutral one; only the resolved states
    * say "Sign in" or name a person.
    */
   if (session.kind === "unknown") {
@@ -109,7 +118,7 @@ export function AccountMenu({ className }: { className?: string }) {
         aria-label="Account"
         className={cn(ACCOUNT_SLOT, "focus-visible:ring-brand focus-visible:ring-offset-background", className)}
       >
-        <Link href="/sign-in">
+        <Link href={signIn}>
           <User aria-hidden="true" className="h-4 w-4" />
           <span className="hidden xl:inline">Account</span>
         </Link>
@@ -126,7 +135,7 @@ export function AccountMenu({ className }: { className?: string }) {
         aria-label="Sign in"
         className={cn(ACCOUNT_SLOT, "focus-visible:ring-brand focus-visible:ring-offset-background", className)}
       >
-        <Link href="/sign-in">
+        <Link href={signIn}>
           <User aria-hidden="true" className="h-4 w-4" />
           <span className="hidden xl:inline">Sign in</span>
         </Link>
