@@ -42,7 +42,10 @@ export default function NotFound() {
               <Link href="/">Home</Link>
             </Button>
             <Button asChild variant="outline">
-              <Link href="/shop">Shop filaments</Link>
+              {/* The one `/shop` link left in the browser. `prefetch={false}`
+                  because the splash is a page that exists to be left — warming
+                  its payload buys nothing. See `nav.tsx` for the full note. */}
+              <Link href="/shop" prefetch={false}>Shop filaments</Link>
             </Button>
             <Button asChild variant="outline">
               <Link href="/posts">Blog</Link>

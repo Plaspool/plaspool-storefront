@@ -7,6 +7,33 @@ import { BrandLogo } from "@plaspool/brand"
 import { AccountMenu } from "@plaspool/shop"
 
 /**
+ * ═══ "THE SHOP" MEANS `/store` HERE, AND IS NOT PREFETCHED ═══
+ * Every link in this nav that means "the shop" pointed at `/shop`, which is
+ * not a page: it is the splash gateway, and its whole job is to play the mark
+ * for 2.8s and then `router.replace()` to `/store`. `splash-gateway.tsx` says
+ * so in its own header — "every internal link that means 'the shop' points at
+ * `/store`" — and the shop's own chrome obeys that. This nav did not.
+ *
+ * The cost showed up in the Worker logs as bursts of `GET /shop?_rsc=…`.
+ * Next prefetches a `<Link>` when it enters the viewport, so three of these
+ * (two here, one in the footer) fired on every home-page visit, each pulling
+ * 14kB of RSC payload for a page the shopper leaves seconds after arriving —
+ * and the gateway then prefetches `/store` itself on top of that. On a
+ * `*.workers.dev` host none of it is absorbed by Cloudflare's cache: that
+ * hostname bypasses the CDN, so the `s-maxage=31536000` on the response is
+ * inert and every prefetch is a real Worker invocation.
+ *
+ * `prefetch={false}` AS WELL AS THE RETARGET, because the two alone pull in
+ * opposite directions: `/store`'s payload is 53kB against `/shop`'s 14kB, so
+ * retargeting on its own would have made every home-page visit heavier, not
+ * lighter — paid by the majority who never click through. False means the
+ * click is a fetch rather than a paint, which is still faster than the 2.8s
+ * animation it replaces.
+ *
+ * `/shop` IS NOT DEAD. It is the installed app's `start_url` — see
+ * `app/manifest.ts`, which is emphatic about why. The splash is the PWA's
+ * opening animation; it was never meant to sit in the browser's funnel.
+ *
  * ═══ THE ACCOUNT CONTROL IS `AccountMenu`, NOT A "SIGN IN" LINK ═══
  * The marketing nav had no way into `/sign-in` at all, so the home page — the
  * page most visitors land on — was the one place a shopper could not sign in.
@@ -59,7 +86,7 @@ export default function Nav() {
                       <Link href="/#about" className="text-slate-600 hover:text-slate-900 font-medium tracking-wide">
                         About
                       </Link>
-                      <Link href="/shop" className="whitespace-nowrap text-slate-600 hover:text-slate-900 font-medium tracking-wide">
+                      <Link href="/store" prefetch={false} className="whitespace-nowrap text-slate-600 hover:text-slate-900 font-medium tracking-wide">
                         Products
                       </Link>
                       {/* `pwa-hide` — the installed app is the shop, not the
@@ -74,7 +101,8 @@ export default function Nav() {
                           a <button> nested in an anchor is invalid HTML and breaks
                           keyboard activation. */}
                       <Link
-                        href="/shop"
+                        href="/store"
+                        prefetch={false}
                         className={cn(
                           buttonVariants(),
                           "whitespace-nowrap bg-slate-800 text-white hover:bg-slate-700"
@@ -124,7 +152,8 @@ export default function Nav() {
                       About
                     </Link>
                     <Link onClick={() => setMobileMenuOpen(false)}
-                      href="/shop"
+                      href="/store"
+                      prefetch={false}
                       className="block px-3 py-2 rounded-md text-base font-medium text-slate-900 hover:bg-slate-100"
                     >
                       Products
@@ -142,7 +171,8 @@ export default function Nav() {
                       Contact us
                     </Link>
                     <Link onClick={() => setMobileMenuOpen(false)}
-                      href="/shop"
+                      href="/store"
+                      prefetch={false}
                       className="block px-3 py-2 rounded-md text-base font-medium text-slate-900 hover:bg-slate-100"
                     >
                       Shop Filaments
