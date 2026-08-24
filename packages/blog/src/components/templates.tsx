@@ -3,7 +3,7 @@ import { CoverImg } from "./cover-img";
 import { BLOG_DEFAULT_TEMPLATE, SHOW_READING_TIME } from "../data/config";
 import type { PublicPostDetail, ReadingTemplate } from "../data/types";
 
-import Link from "next/link";
+import { Link } from "./link";
 
 /**
  * The four reading layouts, ported from the admin app's

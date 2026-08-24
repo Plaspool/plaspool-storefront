@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "../components/link";
 import { ShoppingCart } from "lucide-react";
 import { Button, NEO_SURFACE, cn } from "@plaspool/ui";
 

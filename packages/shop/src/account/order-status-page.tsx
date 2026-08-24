@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { Link } from "../components/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { ArrowLeft, PackageX } from "lucide-react";
 import { Button, Skeleton, SkeletonRegion, TextSkeleton, cn } from "@plaspool/ui";

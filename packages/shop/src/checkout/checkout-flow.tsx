@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { Link } from "../components/link";
 import { AlertTriangle, ArrowLeft, Loader2, ShieldAlert } from "lucide-react";
 import { Button, Input, Label, NEO_SURFACE, Skeleton, SkeletonRegion, cn } from "@plaspool/ui";
 

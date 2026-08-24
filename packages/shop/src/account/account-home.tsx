@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { Link } from "../components/link";
 import { useRouter } from "next/navigation";
 import { ChevronRight, Gift, LifeBuoy, LogOut, Package, Recycle, UserCog } from "lucide-react";
 import { Button, Skeleton, SkeletonRegion, TextSkeleton, cn } from "@plaspool/ui";

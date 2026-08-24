@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "./link";
 import { ArrowRight } from "lucide-react";
 
 import { CoverImg } from "./cover-img";

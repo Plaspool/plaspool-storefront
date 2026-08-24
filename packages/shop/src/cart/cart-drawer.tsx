@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "../components/link";
 import { ShoppingCart, Trash2 } from "lucide-react";
 import {
   Badge,

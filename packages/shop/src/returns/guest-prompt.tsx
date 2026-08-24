@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "../components/link";
 
 /**
  * A shopper met before any form is mounted, because they have not signed in

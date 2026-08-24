@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "../components/link";
 import { cn } from "@plaspool/ui";
 
 import { listProducts, STANDARD_TIERS } from "../data/catalog";

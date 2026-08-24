@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "../components/link";
 import { listPosts, imageUrl, type PublicPost } from "@plaspool/blog";
 import { cn } from "@plaspool/ui";
 

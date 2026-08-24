@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import Link from "next/link";
+import { Link } from "../components/link";
 import { useSearchParams } from "next/navigation";
 import { SearchX } from "lucide-react";
 import { Button } from "@plaspool/ui";

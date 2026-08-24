@@ -1,6 +1,6 @@
 import { listCategories } from "../data/posts";
 
-import Link from "next/link";
+import { Link } from "../components/link";
 
 import type { Metadata } from "next";
 
