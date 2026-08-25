@@ -20,8 +20,13 @@ import type { Badge } from "./types";
  * something — a colour sold out between the grid and the buy box. "New" is
  * context; it will still be true tomorrow, and the product page repeats it.
  * So the more perishable fact wins the one slot.
+ *
+ * "Sale" sits between them. A cut price is set by a person and ends when they
+ * say so — less perishable than the last five spools, more actionable than
+ * novelty — and it is the one badge the buy box PROVES on arrival, with the
+ * struck-through reference price beside the real one.
  */
-const PRIORITY: Badge[] = ["Low stock", "New", "Bulk sale"];
+const PRIORITY: Badge[] = ["Low stock", "Sale", "New", "Bulk sale"];
 
 /**
  * The single badge to render, or `null` when the product has earned none.
