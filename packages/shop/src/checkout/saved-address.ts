@@ -28,6 +28,10 @@ export const BLANK_ADDRESS: Address = {
   postalCode: "",
   countryCode: NIGERIA,
   phone: "",
+  /* `null` rather than `""` like the text fields above: a district is a KEY
+     the picker chose, and "none chosen" is the absence of one, not an empty
+     string the API would store as if it were an opinion. */
+  district: null,
 };
 
 /**
@@ -76,5 +80,11 @@ export function readSavedAddress(saved: SavedAddress): Address | null {
        the snapshot happens to hold. */
     countryCode: (str("countryCode") ?? NIGERIA).toUpperCase(),
     phone: str("phone") ?? "",
+    /* Snapshots written since the district picker existed carry the key the
+       shopper chose; older ones simply lack it. Either way it rides along —
+       the checkout's own stale-district guard drops a key the public areas
+       list no longer offers, so a district deactivated since the last order
+       cannot be resubmitted silently. */
+    district: str("district") ?? null,
   };
 }

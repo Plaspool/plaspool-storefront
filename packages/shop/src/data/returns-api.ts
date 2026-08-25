@@ -23,6 +23,14 @@ export interface ServiceArea {
   id: string;
   region: string;
   name: string;
+  /**
+   * The stable handle a rename does not move — what checkout submits as the
+   * address's `district` and what the shop's delivery table prices by.
+   * OPTIONAL because this response is ISR-cached: a copy rendered before the
+   * API gained the field is still being served somewhere, and the checkout
+   * simply offers no district picker off such a copy rather than breaking.
+   */
+  key?: string;
 }
 
 export interface MyReturn {

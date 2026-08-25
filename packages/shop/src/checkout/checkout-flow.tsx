@@ -9,6 +9,7 @@ import { EmptyState } from "../components/empty-state";
 import { formatNaira } from "../data/money";
 import { readShopSession } from "../data/auth-api";
 import { listSavedAddresses, type SavedAddress } from "../data/orders-api";
+import { listServiceAreas, type ServiceArea } from "../data/returns-api";
 import { BLANK_ADDRESS, NEW_ADDRESS, keyOfSaved, readSavedAddress } from "./saved-address";
 import { getPointsBalance } from "../data/points-api";
 import type { PointsBalance } from "../data/points-api";
@@ -81,6 +82,11 @@ function errorCopy(error: CheckoutError): { title: string; body: string } {
       };
     case "no_shipping_address":
       return { title: "No delivery address on file", body: "Enter a delivery address before choosing a delivery option." };
+    case "outside_delivery_area":
+      return {
+        title: "We don't deliver to that district yet",
+        body: "Pick a different district — or leave the district blank to use your state's standard delivery.",
+      };
     case "unresolved_lines":
       return { title: "An item in the cart is no longer available", body: "Go back to the cart and remove it, then try again." };
     case "currency_mismatch":
@@ -134,6 +140,16 @@ function ErrorBanner({
   );
 }
 
+/** Classed to match `Input` exactly — the same string `return-form.tsx` keeps
+ *  for its native selects, for the same reason: the select sits among Inputs
+ *  in one form and must read as family, not as a browser default beside them. */
+const NATIVE_SELECT_CLASSES =
+  "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm";
+
+/** Case- and space-insensitive: the State field is free text, and "lagos"
+ *  must find the areas filed under "Lagos". */
+const normRegion = (value: string) => value.trim().toLowerCase();
+
 function Field({
   id,
   label,
@@ -165,6 +181,28 @@ export function CheckoutFlow() {
   const [error, setError] = React.useState<CheckoutError | null>(null);
 
   const [address, setAddress] = React.useState<Address>(BLANK_ADDRESS);
+
+  /**
+   * The served districts, for the OPTIONAL district picker under the State
+   * field. Districts are where per-district delivery pricing keys from: the
+   * picker submits `ServiceArea.key`, the API prices delivery by it, and a
+   * switched-off district is refused with `outside_delivery_area`.
+   *
+   * PUBLIC AND COOKIELESS, fetched for guests and customers alike — and an
+   * empty list (fetch failed, or nothing served) renders NO picker rather
+   * than a dead control: a district is never required, so the form without
+   * one is simply the form as it was before districts existed.
+   */
+  const [serviceAreas, setServiceAreas] = React.useState<ServiceArea[]>([]);
+  React.useEffect(() => {
+    let cancelled = false;
+    void listServiceAreas().then((areas) => {
+      if (!cancelled && areas) setServiceAreas(areas.filter((area) => area.key));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [shippingOptions, setShippingOptions] = React.useState<ShippingOption[]>([]);
   const [selectedShippingId, setSelectedShippingId] = React.useState<string | null>(null);
@@ -223,6 +261,39 @@ export function CheckoutFlow() {
     setChosenAddress(NEW_ADDRESS);
     setAddress((current) => ({ ...current, ...patch }));
   }, [touchAddress]);
+
+  /** The districts filed under the typed State — the picker's options. The
+   *  State field is free text, so this is a loose match; a state that matches
+   *  nothing simply renders no picker, and the address prices at the zone. */
+  const districtChoices = React.useMemo(
+    () =>
+      serviceAreas.filter((area) => normRegion(area.region) === normRegion(address.region ?? "")),
+    [serviceAreas, address.region],
+  );
+
+  /**
+   * ═══ WHAT IS SENT MUST BE WHAT IS SHOWN ═══
+   * The district can arrive from outside the picker — a saved address's
+   * snapshot, or a State edit that orphans the chosen key under a different
+   * state. A key the picker no longer offers would render as "(none)" while
+   * still riding the submit, so the parcel and the page would disagree about
+   * the delivery price. Dropped silently instead: null is always safe — it
+   * means the state's zone rate.
+   *
+   * ONLY once the areas have actually loaded: an empty list is the fetch
+   * failing, not the district being wrong, and stripping a saved address's
+   * district because the network hiccuped would quietly change its price.
+   */
+  React.useEffect(() => {
+    if (serviceAreas.length === 0 || !address.district) return;
+    if (districtChoices.some((area) => area.key === address.district)) return;
+    setAddress((current) => (current.district ? { ...current, district: null } : current));
+  }, [serviceAreas.length, districtChoices, address.district]);
+
+  /** For the review step: the district's display name, never its key. */
+  const districtName = address.district
+    ? serviceAreas.find((area) => area.key === address.district)?.name ?? null
+    : null;
 
   /**
    * The customer's points balance, and how many of them they have chosen to
@@ -705,6 +776,28 @@ export function CheckoutFlow() {
                 />
               </Field>
             </div>
+            {districtChoices.length > 0 && (
+              <Field id="co-district" label="District">
+                {/* OPTIONAL, AND ONLY WHERE IT MEANS SOMETHING: rendered when
+                    the typed State matches a state with served districts, and
+                    absent otherwise — a picker with no options would read as a
+                    broken required field. Choosing one prices delivery for
+                    that district; leaving it is the state's standard rate. */}
+                <select
+                  id="co-district"
+                  value={address.district ?? ""}
+                  onChange={(e) => editAddress({ district: e.target.value || null })}
+                  className={NATIVE_SELECT_CLASSES}
+                >
+                  <option value="">Choose a district (optional)</option>
+                  {districtChoices.map((area) => (
+                    <option key={area.id} value={area.key}>
+                      {area.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
             <Field id="co-postal" label="Postal code">
               <Input
                 id="co-postal"
@@ -847,7 +940,11 @@ export function CheckoutFlow() {
                   </div>
                   <p className="mt-1 font-sans text-sm text-muted-foreground">
                     {address.name}, {address.line1}
-                    {address.line2 ? `, ${address.line2}` : ""}, {address.city}, {address.region}{" "}
+                    {address.line2 ? `, ${address.line2}` : ""}
+                    {/* The district is part of where the parcel goes AND why
+                        delivery costs what the line below says — its name (not
+                        its key) belongs in the address the customer confirms. */}
+                    {districtName ? `, ${districtName}` : ""}, {address.city}, {address.region}{" "}
                     {address.postalCode}
                   </p>
                   <p className="mt-2 font-sans text-sm text-muted-foreground">{email}</p>

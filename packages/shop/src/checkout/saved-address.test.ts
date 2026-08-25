@@ -34,7 +34,15 @@ const COMPLETE = {
 
 describe("a complete address", () => {
   it("comes through whole", () => {
-    expect(readSavedAddress(saved(COMPLETE))).toEqual(COMPLETE);
+    // `district: null` is the reader's own addition: this snapshot predates
+    // the district picker, and "none named" is null, not absent — the form
+    // binds a controlled select to it.
+    expect(readSavedAddress(saved(COMPLETE))).toEqual({ ...COMPLETE, district: null });
+  });
+
+  it("carries the district key a newer snapshot holds", () => {
+    const out = readSavedAddress(saved({ ...COMPLETE, district: "lagos-ikoyi" }));
+    expect(out?.district).toBe("lagos-ikoyi");
   });
 
   it("fills the genuinely optional fields with empty strings, not undefined", () => {
@@ -50,6 +58,8 @@ describe("a complete address", () => {
       postalCode: "",
       countryCode: "NG",
       phone: "",
+      // Null, not "": a district is a chosen KEY, and none was chosen.
+      district: null,
     });
   });
 });
@@ -117,6 +127,7 @@ describe("BLANK_ADDRESS", () => {
       postalCode: "",
       countryCode: "NG",
       phone: "",
+      district: null,
     });
   });
 });
