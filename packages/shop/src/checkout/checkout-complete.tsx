@@ -58,25 +58,23 @@ function referenceToIntentId(reference: string): string {
 
 /*
  * ═══════════════════════════════════════════════════════════════════════════
- * ⚠️  THE POLL WINDOW IS COUPLED TO THE ADMIN'S SWEEP CRON. Changing either
- *     one alone is the trap.
+ * ⚠️  THIS PAGE IS COUPLED TO THE ADMIN'S SWEEP CRON. Changing either one
+ *     alone is the trap.
  *
- * 12 attempts × 5s = SIXTY SECONDS before this settles on "still confirming".
- * That number is not arbitrary: the order is created by the outbox sweep in
- * `plaspool-admin`, not by the webhook — Vercel freezes the function after it
- * responds — so this window has to outlast the gap between sweeps.
+ * THE CRON RUNS EVERY TEN MINUTES — the owner's cost decision, 2026-08-25: a
+ * 1-minute cron kept Neon's free-tier compute awake 24/7 and exhausted its
+ * monthly hours in about a week. This page took the decision's other half in
+ * the same change, and deliberately did NOT stretch its poll to ten minutes:
  *
- * The cron currently runs every minute, which is inside this window, so a
- * customer watches the page flip from pending to confirmed. **If that cadence
- * is slowed** — and there is a live reason to slow it, since a 1-minute cron
- * keeps Neon's free-tier compute awake 24/7 and exhausts its monthly hours in
- * about a week — **this window must widen to match.** Leaving them mismatched
- * means every single order times out on screen, which reads as a failure to
- * the one person least able to tell the difference.
- *
- * The honest alternative at a slower cadence is to stop polling early and say
- * "we will email you when it is confirmed", which is true and calm, rather than
- * spinning for a minute and then looking broken.
+ * 12 attempts × 5s = SIXTY SECONDS of polling. The first attempt (and any
+ * after an error) goes through `confirm`, which asks PAYSTACK directly and
+ * applies the answer through the webhook path — so a captured payment still
+ * resolves on screen in seconds, sweep or no sweep. What the sweep gates is
+ * the ORDER row and its email, not this intent read. Past the window this
+ * settles EARLY on the honest "we'll email you when it's confirmed" — true
+ * and calm — rather than spinning out a ten-minute gap and looking broken.
+ * The `pending` copy below is written for that cadence; if the cron moves
+ * again, move the copy with it.
  *
  * The counterpart comment lives on `GET /admin/sweep` in the admin repo.
  * ═══════════════════════════════════════════════════════════════════════════
@@ -218,7 +216,7 @@ export function CheckoutComplete() {
         <EmptyState
           icon={<Clock aria-hidden="true" />}
           title="Still confirming your payment"
-          body="Paystack is taking longer than usual to tell us how this went. This is not a decline — refresh in a minute to check again, and keep the email you get from Paystack as your record either way."
+          body="This is not a decline — confirmation is just taking longer than usual. We'll email your order confirmation once it's through, usually within about ten minutes, so you don't need to keep this page open. Keep the email you get from Paystack as your record either way."
           action={
             <Button
               type="button"
