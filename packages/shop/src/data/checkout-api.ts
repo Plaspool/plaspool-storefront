@@ -93,6 +93,14 @@ export interface FrozenTotals {
   shipping: ShippingOption | null;
   /** Empty for almost every order. See `Adjustment`. */
   adjustments: Adjustment[];
+  /**
+   * What the tax line IS — zone, label ("VAT") and rate — frozen with the
+   * number it explains. OPTIONAL because this type ignored it until the shop
+   * registered for VAT (2026-08-25) and there was no line to label; the wire
+   * has always carried it. The label is the API's own wording, rendered
+   * verbatim like an adjustment's.
+   */
+  tax?: { zone: string; label: string; rateBps: number } | null;
   subtotal: ApiMoney;
   adjustmentTotal: ApiMoney;
   shippingTotal: ApiMoney;

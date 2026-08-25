@@ -965,7 +965,11 @@ export function CheckoutFlow() {
                   </div>
                   {totals.taxTotal.amount > 0 && (
                     <div className="flex items-center justify-between py-1">
-                      <span className="font-sans text-sm text-muted-foreground">Tax</span>
+                      {/* The API's own label ("VAT") — the customer is told
+                          WHAT the line is, not the generic word for it. */}
+                      <span className="font-sans text-sm text-muted-foreground">
+                        {totals.tax?.label || "Tax"}
+                      </span>
                       <span className="font-mono text-sm tabular-nums text-foreground">
                         {formatNaira(majorUnits(totals.taxTotal))}
                       </span>
