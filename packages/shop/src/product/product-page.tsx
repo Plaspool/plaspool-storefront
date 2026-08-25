@@ -26,8 +26,11 @@ export async function productMetadata({
   const product = await getProduct(slug);
   if (!product) return {};
   return {
-    title: `${product.name} — PlaSpool`,
-    description: product.summary,
+    /* Owner-written SEO copy wins VERBATIM — they wrote the whole title, so
+       nothing is appended to it. The fallbacks are what this page always
+       said: the name with the brand, and the derived summary. */
+    title: product.seoTitle ?? `${product.name} — PlaSpool`,
+    description: product.seoDescription ?? product.summary,
     alternates: { canonical: `/store/products/${slug}` },
   };
 }

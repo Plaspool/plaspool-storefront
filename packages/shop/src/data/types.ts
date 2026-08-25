@@ -77,7 +77,7 @@ export type DescriptionBlock =
   | { kind: "table"; caption: string; head: string[]; rows: string[][] }
   | { kind: "figure"; colourHex: string; caption: string };
 
-export type Badge = "Bulk sale" | "New" | "Low stock";
+export type Badge = "Bulk sale" | "New" | "Low stock" | "Sale";
 
 export interface Product {
   slug: string;
@@ -112,6 +112,14 @@ export interface Product {
   badges: Badge[];
   /** One line under the title. Not marketing — what the material is for. */
   summary: string;
+  /**
+   * Owner-written search-engine copy (the admin's "Search engine listing"),
+   * or null to fall back to `name` and `summary`. `seoTitle` is used VERBATIM
+   * as the page <title> when present — the owner wrote the whole title, so
+   * nothing is appended to it.
+   */
+  seoTitle: string | null;
+  seoDescription: string | null;
   /** Exactly four, shown in the buy box. */
   features: string[];
   overviewClaims: OverviewClaim[];

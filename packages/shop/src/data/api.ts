@@ -71,6 +71,14 @@ export interface ApiVariant {
   colorHex: string | null;
   /** Null is a real state — a variant created but not yet priced. */
   price: ApiMoney | null;
+  /**
+   * MINOR UNITS, like `price.amount`, in the price's own currency. The
+   * struck-through reference figure; null means "not on sale". The admin
+   * stores whatever the owner typed, so whether it actually DRAWS is decided
+   * at render time by `compareAt > amount` — a reference at or below the real
+   * price is stored honestly and never shown.
+   */
+  compareAtMinor?: number | null;
   /** Null when the variant has no inventory row at all, which is not zero. */
   available: number | null;
   backorderable: boolean;
@@ -93,6 +101,10 @@ export interface ApiProduct {
   coverImageUrl: string | null;
   imageUrls: string[];
   publishedAt: number | null;
+  /** Owner-written <title>/<meta description> copy; null falls back to the
+   *  title and the derived summary. Optional: an older API omits them. */
+  seoTitle?: string | null;
+  seoDescription?: string | null;
   /**
    * Present on BOTH the list and the detail response.
    *
@@ -365,7 +377,10 @@ export function coloursFrom(variants: ApiVariant[]): Colour[] {
  * renders it.
  */
 export function sizesFrom(variants: ApiVariant[]): SizeOption[] {
-  const byLabel = new Map<string, { label: string; grams: number | null; minor: number }>();
+  const byLabel = new Map<
+    string,
+    { label: string; grams: number | null; minor: number; compareMinor: number | null }
+  >();
   for (const variant of variants) {
     if (!variant.price) continue;
     const label = (variant.optionValues.Weight ?? variant.optionValues.weight ?? "").trim();
@@ -374,10 +389,22 @@ export function sizesFrom(variants: ApiVariant[]): SizeOption[] {
     const grams = variant.weightGrams ?? gramsFrom(label);
     const existing = byLabel.get(key);
     if (existing) {
-      existing.minor = Math.min(existing.minor, variant.price.amount);
+      /* THE COMPARE-AT TRAVELS WITH THE PRICE THAT WON. A size aggregates
+         colours at the cheapest quote, and striking through one variant's
+         reference beside another variant's price would pair numbers that were
+         never about the same thing. */
+      if (variant.price.amount < existing.minor) {
+        existing.minor = variant.price.amount;
+        existing.compareMinor = variant.compareAtMinor ?? null;
+      }
       existing.grams = existing.grams ?? grams;
     } else {
-      byLabel.set(key, { label, grams, minor: variant.price.amount });
+      byLabel.set(key, {
+        label,
+        grams,
+        minor: variant.price.amount,
+        compareMinor: variant.compareAtMinor ?? null,
+      });
     }
   }
   return [...byLabel.entries()]
@@ -388,9 +415,10 @@ export function sizesFrom(variants: ApiVariant[]): SizeOption[] {
       /* MINOR UNITS BECOME WHOLE NAIRA HERE AND NOWHERE ELSE. `Math.round`
          rather than a truncation, and no float arithmetic survives the call. */
       priceNaira: Math.round(s.minor / 100),
-      /* No `compare_at` column exists, so there is no reference price to strike
-         through. Null renders nothing, which is the honest state. */
-      compareAtNaira: null,
+      /* Same conversion, same place. Whether it DRAWS is `Price`'s render-time
+         `compareAt > amount` — a reference at or below the price is carried
+         honestly and never shown. */
+      compareAtNaira: s.compareMinor == null ? null : Math.round(s.compareMinor / 100),
     }))
     .sort((a, b) => a.priceNaira - b.priceNaira);
 }
@@ -639,6 +667,13 @@ export function badgesFrom(variants: ApiVariant[], publishedAt: number | null, n
     const backorderable = variants.some((v) => v.backorderable);
     if (total > 0 && total <= LOW_STOCK_AT && !backorderable) badges.push("Low stock");
   }
+  /* The SAME `compareAt > price` rule the buy box renders by, so the card's
+     claim and the page's strikethrough can never disagree: a badge is emitted
+     only when at least one sellable variant would actually draw the line. */
+  const onSale = variants.some(
+    (v) => v.price !== null && v.compareAtMinor != null && v.compareAtMinor > v.price.amount,
+  );
+  if (onSale) badges.push("Sale");
   return badges;
 }
 
@@ -713,6 +748,10 @@ export function toProduct(api: ApiProduct, ctx: AdaptContext): Product | null {
     bulkTiers: STANDARD_TIERS,
     badges: badgesFrom(variants, api.publishedAt, ctx.now),
     summary: deriveSummary(description),
+    /* `''` never arrives — the admin normalises empty to NULL at the write
+       boundary — but `?? null` also covers an older API omitting the fields. */
+    seoTitle: api.seoTitle ?? null,
+    seoDescription: api.seoDescription ?? null,
     features: [],
     overviewClaims: [],
     description,
