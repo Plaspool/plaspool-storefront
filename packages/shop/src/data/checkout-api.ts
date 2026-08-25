@@ -41,6 +41,14 @@ export interface Address {
   /** ISO-3166-1 alpha-2, UPPERCASE. */
   countryCode: string;
   phone?: string | null;
+  /**
+   * A served-area KEY (`ServiceArea.key`), CHOSEN from the district picker —
+   * never typed, never parsed out of `line1`. `null` is the ordinary value:
+   * no district named, priced at the state's zone rate. Unlike the other
+   * optional fields this one is never `""` — it is an identifier, not text,
+   * and the picker writes `null` for "none" rather than an empty string.
+   */
+  district?: string | null;
 }
 
 export interface ShippingOption {
@@ -122,6 +130,7 @@ export type CheckoutError =
   | { code: "empty_cart" }
   | { code: "insufficient_stock"; shortfalls: Shortfall[] }
   | { code: "no_shipping_address" }
+  | { code: "outside_delivery_area" }
   | { code: "unresolved_lines"; variantIds: string[] }
   | { code: "currency_mismatch" }
   | { code: "gone" }
@@ -137,6 +146,13 @@ function classify(status: number, body: Record<string, unknown> | null): Checkou
   const detail = typeof body?.detail === "string" ? body.detail : undefined;
   if (status === 410 || errorCode === "gone") return { code: "gone" };
   if (status === 400 && detail === "baseRevision") return { code: "bad_revision" };
+  /* Two spellings of one refusal: the address step refuses at the door (400
+     bad_request with this detail), and the freeze refuses a district switched
+     off mid-checkout (409 with this as its own error code). Same meaning,
+     same screenful of copy, one code. */
+  if (errorCode === "outside_delivery_area" || detail === "outside_delivery_area") {
+    return { code: "outside_delivery_area" };
+  }
   if (status === 400 && detail && ["email", "shipping", "optionId"].includes(detail)) {
     return { code: "field", field: detail };
   }
