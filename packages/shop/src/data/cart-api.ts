@@ -67,9 +67,17 @@ export interface ApiCartLine {
   qty: number;
   /** False when the variant has gone away or out of stock since it was added. */
   available: boolean;
-  sku: string;
+  /**
+   * ═══ EVERYTHING BELOW IS NULLABLE, AND A LIVE RESPONSE PROVED IT ═══
+   * `sku` and `optionValues` were declared non-null here while the API sends
+   * null for both on a line whose variant it can no longer resolve — the same
+   * response that carries `available: false`. A type that cannot describe the
+   * broken case is a type that reads as a guarantee at every call site, which
+   * is how an unbuyable line came to be counted like an ordinary one.
+   */
+  sku: string | null;
   title: string | null;
-  optionValues: Record<string, string>;
+  optionValues: Record<string, string> | null;
   unit: ApiMoney | null;
   /** What the API believes is on the shelf. Null when nothing tracks it. */
   inStock: number | null;

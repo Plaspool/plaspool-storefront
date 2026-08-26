@@ -10,6 +10,7 @@ import { QuantityStepper } from "../components/quantity-stepper";
 import { ProductPhoto } from "../components/product-photo";
 import { formatNaira } from "../data/money";
 import { useCart } from "../cart/cart-context";
+import { UnsellableNotice } from "../cart/unsellable-notice";
 import type { CartLineKey, ResolvedLine } from "../cart/types";
 
 /**
@@ -55,6 +56,41 @@ export function CartPage() {
     );
   }
 
+  /* ═══ A STUCK BASKET IS NOT AN EMPTY ONE, AND MUST NOT SAY IT IS ═══
+     `resolved` alone said "empty" for a cart still holding a line nothing can
+     buy — the same claim the badge was contradicting one page up. Printing the
+     notice ABOVE an "Your cart is empty" heading would not fix that, it would
+     just move the contradiction into a single viewport: one paragraph naming
+     the item that is blocking checkout, the next saying there is no item.
+
+     So when the only thing left is unbuyable, this page names it and offers the
+     Remove that no other control in the store can reach — and does not claim
+     the basket is empty until it actually is. */
+  if (cart.resolved.length === 0 && cart.unsellable.length > 0) {
+    return (
+      <div className="mx-auto max-w-xl px-4 py-16 sm:px-6">
+        <h1 className="mb-6 font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+          Your cart
+        </h1>
+        <UnsellableNotice
+          lines={cart.unsellable}
+          pending={cart.pending}
+          onRemove={cart.removeLineId}
+        />
+        <p className="mt-6 font-sans text-sm text-muted-foreground">
+          Nothing else is in your cart yet.
+        </p>
+        <Button
+          asChild
+          variant="outline"
+          className="mt-4 focus-visible:ring-brand focus-visible:ring-offset-background"
+        >
+          <Link href="/store">Browse the store</Link>
+        </Button>
+      </div>
+    );
+  }
+
   if (cart.resolved.length === 0) {
     return (
       <div className="mx-auto max-w-xl px-4 py-16 sm:px-6">
@@ -76,6 +112,12 @@ export function CartPage() {
     <div className="mx-auto grid max-w-5xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_320px] lg:py-16">
       <div>
         <h1 className="mb-6 font-sans text-2xl font-bold text-foreground">Your cart</h1>
+        <UnsellableNotice
+          lines={cart.unsellable}
+          pending={cart.pending}
+          onRemove={cart.removeLineId}
+          className="mb-6"
+        />
         <ul className="flex flex-col divide-y divide-brand-line border-y border-brand-line">
           {cart.resolved.map((line) => (
             <li key={line.key} className="flex gap-4 py-5">
@@ -142,14 +184,26 @@ export function CartPage() {
               </span>
             </div>
           )}
-          <Button
-            asChild
-            className={cn("mt-4 w-full h-12 text-base", NEO_SURFACE)}
-          >
-            <Link href="/checkout">Checkout</Link>
-          </Button>
+          {/* `/checkout` refuses this exact cart with `unresolved_lines`, whose
+              own copy is "go back to the cart and remove it" — so an enabled
+              button here sends the shopper on a round trip back to the notice
+              already on this page. Disabled, with that notice as the reason. */}
+          {cart.unsellable.length > 0 ? (
+            <Button type="button" disabled className={cn("mt-4 w-full h-12 text-base", NEO_SURFACE)}>
+              Checkout
+            </Button>
+          ) : (
+            <Button
+              asChild
+              className={cn("mt-4 w-full h-12 text-base", NEO_SURFACE)}
+            >
+              <Link href="/checkout">Checkout</Link>
+            </Button>
+          )}
           <p className="mt-3 text-center text-xs text-muted-foreground">
-            Delivery and tax are calculated at checkout.
+            {cart.unsellable.length > 0
+              ? "Remove the unavailable item above to continue."
+              : "Delivery and tax are calculated at checkout."}
           </p>
         </div>
       </aside>
