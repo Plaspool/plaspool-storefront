@@ -5,6 +5,7 @@ import { Link } from "../components/link";
 import { cn } from "@plaspool/ui";
 
 import { HERO_COLOURS as COLOURS } from "../data/catalog";
+import type { CategoryLink } from "../data/catalog";
 import { SpoolImage } from "../components/spool-image";
 
 /**
@@ -47,7 +48,7 @@ const SLIDES: Slide[] = [
 const BUTTON_FOCUS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
-export function HeroCarousel() {
+export function HeroCarousel({ primary }: { primary: CategoryLink }) {
   const [index, setIndex] = React.useState(0);
   const [paused, setPaused] = React.useState(false);
 
@@ -109,14 +110,14 @@ export function HeroCarousel() {
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link
-                href="/store/pla"
+                href={primary.href}
                 className={cn(
                   "inline-flex h-11 items-center justify-center rounded-md bg-brand px-6 font-sans text-sm font-medium text-brand-ink",
                   "transition-colors hover:bg-brand-hover motion-reduce:transition-none",
                   BUTTON_FOCUS,
                 )}
               >
-                Shop PLA
+                {primary.label}
               </Link>
               {/* WAS `#bulk`, LABELLED "Bulk pricing". That anchor was the bulk
                   band, which now renders nothing because there is no discount
