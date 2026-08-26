@@ -146,7 +146,7 @@ export function applyFilters(products: Product[], f: Filters): Product[] {
       /* `?? ""` and not template interpolation: a null material would stringify
          to the literal "null" and make every unclassified product a hit for the
          search term "null". */
-      const haystack = `${p.name} ${p.summary} ${p.material ?? ""}`.toLowerCase();
+      const haystack = `${p.name} ${p.overview} ${p.material ?? ""}`.toLowerCase();
       if (!haystack.includes(query)) return false;
     }
     return true;

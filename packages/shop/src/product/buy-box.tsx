@@ -14,6 +14,7 @@ import { ColourSwatches } from "../components/colour-swatches";
 import { RatingStars } from "../components/rating-stars";
 import { QuantityStepper } from "../components/quantity-stepper";
 import { BulkTierTable } from "../components/bulk-tier-table";
+import { NextTierHint } from "./next-tier-hint";
 import { AddToCartButton } from "../cart/add-to-cart";
 import type { CartLineKey } from "../cart/types";
 import { useCart } from "../cart/cart-context";
@@ -138,7 +139,7 @@ export function BuyBox({
         <h1 className="font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
           {product.name}
         </h1>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">{product.summary}</p>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">{product.overview}</p>
       </div>
 
       {showRating && (
@@ -223,6 +224,9 @@ export function BuyBox({
           label={product.name}
           className="mt-2"
         />
+        {/* Computed from `bulkTiers` alone — no request per key press. Renders
+            nothing without a ladder or on the top rung. */}
+        <NextTierHint tiers={product.bulkTiers} quantity={quantity} className="mt-2" />
       </div>
 
       <BulkTierTable

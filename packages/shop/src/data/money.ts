@@ -1,4 +1,9 @@
+import { applyBps, tierFor } from "./bulk";
 import type { BulkTier, Colour, Product, Review, RatingSummary, SizeOption } from "./types";
+
+/* Re-exported so the ladder has ONE implementation while call sites keep
+   importing their pricing helpers from one module. `bulk.ts` owns it. */
+export { tierFor };
 
 /**
  * `₦18,500` — sign, comma groups, no decimals.
@@ -14,21 +19,23 @@ export function formatNaira(amount: number): string {
   return `${amount < 0 ? "-" : ""}₦${grouped}`;
 }
 
-/** The best tier this quantity has reached, or null below the first rung. */
-export function tierFor(tiers: BulkTier[], qty: number): BulkTier | null {
-  let best: BulkTier | null = null;
-  for (const tier of tiers) {
-    if (qty >= tier.minQty && (!best || tier.minQty > best.minQty)) best = tier;
-  }
-  return best;
-}
-
-/** Tiers apply per line, matching the tier table shown in the buy box. Two
- *  lines of four spools do not combine into a single tier of eight. */
+/**
+ * The unit price a quantity would earn, IN WHOLE NAIRA, for the product page.
+ *
+ * ═══ "TIERS APPLY PER LINE" WAS TRUE AND IS NOT ANY MORE ═══
+ * That was this file's rule while the ladder was a storefront policy constant.
+ * The API now sums quantity PER PRODUCT, ACROSS VARIANTS — three black spools
+ * plus two white of the same product is five, and both lines take the 5-rung —
+ * so nothing may present this as what a cart line will cost. It answers one
+ * question only: "if I bought N of this, what would each one be?", which is
+ * exactly what the buy box asks before a basket exists.
+ *
+ * Anything with a server line behind it reads `effectiveUnit` instead.
+ */
 export function unitPriceFor(basePrice: number, tiers: BulkTier[], qty: number): number {
   const tier = tierFor(tiers, qty);
   if (!tier) return basePrice;
-  return Math.round(basePrice * (1 - tier.discountPct / 100));
+  return applyBps(basePrice, tier.percentBps);
 }
 
 export function lineTotal(basePrice: number, tiers: BulkTier[], qty: number): number {

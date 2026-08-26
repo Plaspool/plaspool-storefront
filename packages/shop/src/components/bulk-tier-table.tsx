@@ -1,14 +1,20 @@
 import { cn } from "@plaspool/ui";
 
 import type { BulkTier } from "../data/types";
+import { percentFromBps } from "../data/bulk";
 import { formatNaira, savingsFor, tierFor, unitPriceFor } from "../data/money";
 
 /**
  * The quantity ladder. Hairline rules and no card chrome, per the design
  * system: this is a datasheet, not a widget.
  *
- * Tiers apply per line, which is what `unitPriceFor` already assumes — two
- * lines of four spools do not combine into a tier of eight.
+ * ═══ QUANTITY IS SUMMED PER PRODUCT, ACROSS VARIANTS ═══
+ * This table used to say tiers applied per line. They do not: the API totals
+ * every line of the same product, so three black spools plus two white is five
+ * and both lines take the 5-rung. The `quantity` handed in here is the buy
+ * box's, so this is a PROJECTION of what N would earn — a basket already
+ * holding some of this product reaches a rung sooner than the table implies,
+ * never later, so the figures below are a floor rather than a promise.
  */
 
 const CELL = "px-2 py-2.5 align-middle";
@@ -68,7 +74,7 @@ export function BulkTierTable({ tiers, basePrice, quantity }: BulkTierTableProps
                   </th>
                   <td className={cn(CELL, "text-right font-mono tabular-nums text-muted-foreground")}>
                     {/* U+2212, not a hyphen: it is a minus sign. */}
-                    −{tier.discountPct}%
+                    −{percentFromBps(tier.percentBps)}%
                   </td>
                   <td className={cn(CELL, "text-right font-mono font-bold tabular-nums text-foreground")}>
                     {formatNaira(unitPriceFor(basePrice, tiers, tier.minQty))}

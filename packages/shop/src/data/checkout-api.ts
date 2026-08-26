@@ -1,5 +1,5 @@
 import { COMMERCE_API_BASE } from "./config";
-import type { ApiMoney } from "./cart-api";
+import type { ApiMoney, TotalsLine } from "./cart-api";
 
 /**
  * The checkout client — the storefront's half of the commerce API's checkout
@@ -58,14 +58,12 @@ export interface ShippingOption {
   taxable: boolean;
 }
 
-export interface TotalsLine {
-  variantId: string;
-  qty: number;
-  unit: ApiMoney;
-  lineTotal: ApiMoney;
-  taxable: boolean;
-  taxAmount: ApiMoney;
-}
+/* `TotalsLine` and `bulkOf` LIVE IN `cart-api.ts` and are re-exported here.
+   The cart's own `preview` carries the identical per-line shape, and this
+   module already imports from that one — putting the type here as well would
+   have meant either a duplicate definition or a cycle. */
+export { bulkOf } from "./cart-api";
+export type { TotalsLine } from "./cart-api";
 
 /**
  * A line that moves the total and must appear on the invoice. Today the only

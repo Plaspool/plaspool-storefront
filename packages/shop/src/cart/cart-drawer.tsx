@@ -20,6 +20,7 @@ import { Price } from "../components/price";
 import { QuantityStepper } from "../components/quantity-stepper";
 import { ProductPhoto } from "../components/product-photo";
 import { formatNaira } from "../data/money";
+import { BulkLinePrice } from "./bulk-line-price";
 import { useCart } from "./cart-context";
 import { UnsellableNotice } from "./unsellable-notice";
 import type { CartLineKey, ResolvedLine } from "./types";
@@ -49,7 +50,8 @@ function CartLineRow({
   onQtyChange: (qty: number) => void;
   onRemove: () => void;
 }) {
-  const { product, colour, size, qty, unitPrice, total, tier } = line;
+  const { product, colour, size, qty, unitPrice, effectiveUnitPrice, bulkPercentBps, bulkQty, total } =
+    line;
   const descriptor = lineDescriptor(product.name, colour.name, size.label);
 
   return (
@@ -86,21 +88,13 @@ function CartLineRow({
 
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <QuantityStepper value={qty} onChange={onQtyChange} label={descriptor} />
-          <div className="flex items-center gap-1.5">
-            {tier && (
-              <Badge
-                variant="outline"
-                className="gap-1 whitespace-nowrap border-transparent bg-brand-soft px-1.5 py-0 text-[11px] font-semibold text-brand"
-              >
-                <span className="font-mono tabular-nums">−{tier.discountPct}%</span>
-                <span className="font-sans">bulk</span>
-              </Badge>
-            )}
-            <span className="whitespace-nowrap font-mono text-xs tabular-nums text-muted-foreground">
-              {formatNaira(unitPrice)}
-            </span>
-            <span className="whitespace-nowrap font-sans text-xs text-muted-foreground">each</span>
-          </div>
+          <BulkLinePrice
+            unitPrice={unitPrice}
+            effectiveUnitPrice={effectiveUnitPrice}
+            bulkPercentBps={bulkPercentBps}
+            bulkQty={bulkQty}
+            lineQty={qty}
+          />
         </div>
 
         <Button

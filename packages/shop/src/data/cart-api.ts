@@ -83,11 +83,87 @@ export interface ApiCartLine {
   inStock: number | null;
 }
 
+export interface TotalsLine {
+  variantId: string;
+  qty: number;
+  /** The LIST price. Not what they pay when a bulk rung applied — see
+   *  `effectiveUnit`, and read `bulkOf` rather than either directly. */
+  unit: ApiMoney;
+  /**
+   * `effectiveUnit × qty`, NOT `unit × qty`.
+   *
+   * Recomputing a line total from `unit` shows a number the customer is not
+   * charged. Nothing in this storefront may recompute a total the API has
+   * quoted — `bulk.ts` exists only to project what a quantity WOULD earn on a
+   * product page, where no line exists yet.
+   */
+  lineTotal: ApiMoney;
+  taxable: boolean;
+  taxAmount: ApiMoney;
+  /**
+   * ═══ THE THREE BULK FIELDS, ABSENT ON ANYTHING FROZEN BEFORE THEY SHIPPED ═══
+   * Old orders are stored without them, permanently — a frozen total is the
+   * record of what was actually charged, so there is no backfill. Read them
+   * through `bulkOf`, never directly, or the order history crashes on its own
+   * history.
+   */
+
+  /**
+   * Total quantity across EVERY line of the same product, which is what the
+   * rung was chosen on. NOT this line's `qty` — that difference is the whole
+   * explanation for a line reading "2 × black, 10% off".
+   */
+  bulkQty?: number;
+  /** The rung that applied, in basis points. `0` is no discount. */
+  bulkPercentBps?: number;
+  /** What they actually pay per unit. */
+  effectiveUnit?: ApiMoney;
+}
+
+/**
+ * The bulk facts of a frozen line, with the defaults a pre-bulk line needs.
+ *
+ * `effectiveUnit` falling back to `unit` is the load-bearing one: it is what
+ * every price on an old order renders from, and the alternative is `undefined`
+ * reaching a formatter.
+ */
+export function bulkOf(line: TotalsLine): {
+  qty: number;
+  percentBps: number;
+  effectiveUnit: ApiMoney;
+  /** Whether to show a strike-through and an explanation at all. A rung of 0 is
+   *  not a discount, and must render exactly like a legacy line. */
+  discounted: boolean;
+} {
+  const percentBps = line.bulkPercentBps ?? 0;
+  return {
+    qty: line.bulkQty ?? line.qty,
+    percentBps,
+    effectiveUnit: line.effectiveUnit ?? line.unit,
+    discounted: percentBps > 0,
+  };
+}
+
 export interface ApiCartPreview {
   currency: string;
   subtotal: ApiMoney;
   grandTotal: ApiMoney;
   shipping: ApiMoney | null;
+  /**
+   * PER-LINE TOTALS, and the only place the cart learns what a line actually
+   * costs once a bulk rung applies. `lines` on the cart itself carries `unit`
+   * — the LIST price — and nothing else about the discount.
+   *
+   * Defaulted to `[]` by `previewLines` rather than declared optional at every
+   * call site, because a cart read before the admin deploy has no such array.
+   */
+  lines?: TotalsLine[];
+}
+
+/** The preview's per-line totals, keyed by variant, or an empty map when the
+ *  API has not sent any — which is every response until the bulk deploy. */
+export function previewLines(preview: ApiCartPreview | null): Map<string, TotalsLine> {
+  return new Map((preview?.lines ?? []).map((l) => [l.variantId, l]));
 }
 
 /**

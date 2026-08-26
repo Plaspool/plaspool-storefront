@@ -38,6 +38,7 @@ export * from "./components/product-grid";
 // without a provider or a browser.
 export * from "./cart/types";
 export * from "./cart/sellable";
+export * from "./cart/bulk-line-price";
 export * from "./cart/cart-context";
 export * from "./cart/cart-drawer";
 export * from "./cart/unsellable-notice";
@@ -88,6 +89,7 @@ export * from "./splash/config";
 // which needs the cart; these are the parts below them that do not.
 export * from "./product/product-tabs";
 export * from "./product/overview-tab";
+export * from "./product/next-tier-hint";
 export * from "./product/description-tab";
 export * from "./product/parameters-tab";
 export * from "./product/reviews-tab";

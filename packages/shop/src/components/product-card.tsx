@@ -3,6 +3,7 @@ import { Badge, cn } from "@plaspool/ui";
 
 import type { Product } from "../data/types";
 import { availableColours, cheapestSize, firstInStockColour, priceFrom } from "../data/money";
+import { bulkAffordance } from "../data/bulk";
 import { primaryBadge } from "../data/badges";
 import { CardAddButton } from "./card-add-button";
 import { ProductPhoto } from "./product-photo";
@@ -125,6 +126,16 @@ export function ProductCard({ product, className }: ProductCardProps) {
         size="sm"
         className="mt-1.5"
       />
+
+      {/* THE LADDER'S BEST OFFER, or nothing. A listing has no quantity to
+          reason about, so `bulkAffordance` names the deepest rung and what
+          reaches it rather than saying "bulk discount available" — which names
+          neither a saving nor a quantity and so changes nobody's basket. */}
+      {bulkAffordance(product.bulkTiers) && (
+        <p className="mt-1 font-sans text-xs text-brand">
+          {bulkAffordance(product.bulkTiers)}
+        </p>
+      )}
     </div>
   );
 }

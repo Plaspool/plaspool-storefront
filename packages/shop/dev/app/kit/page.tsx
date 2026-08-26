@@ -20,7 +20,6 @@ import {
   QuantityStepper,
   RatingStars,
   SpoolImage,
-  STANDARD_TIERS,
   type Colour,
 } from "@plaspool/shop";
 
@@ -55,6 +54,15 @@ const WIDE_COLOURS: Colour[] = [
   COLOURS["cobalt-blue"],
   COLOURS["ash-grey"],
   COLOURS["magenta"], // out of stock
+];
+
+/* A REAL LADDER, because the shop's own comes from the API now and
+   `STANDARD_TIERS` is an empty array — the table demoed as nothing. These are
+   the rungs the admin resolves by default, in basis points. */
+const DEMO_TIERS = [
+  { minQty: 3, percentBps: 500 },
+  { minQty: 5, percentBps: 1000 },
+  { minQty: 10, percentBps: 1500 },
 ];
 
 const BASE_PRICE = 18_500;
@@ -445,7 +453,7 @@ export default function KitPage() {
               <h3 className="mb-3 font-sans text-sm font-semibold text-foreground">
                 quantity = <span className="font-mono tabular-nums">{quantity}</span>
               </h3>
-              <BulkTierTable tiers={STANDARD_TIERS} basePrice={BASE_PRICE} quantity={quantity} />
+              <BulkTierTable tiers={DEMO_TIERS} basePrice={BASE_PRICE} quantity={quantity} />
             </div>
           ))}
         </div>
@@ -453,7 +461,7 @@ export default function KitPage() {
           <h3 className="mb-3 font-sans text-sm font-semibold text-foreground">
             No quantity supplied
           </h3>
-          <BulkTierTable tiers={STANDARD_TIERS} basePrice={BASE_PRICE} />
+          <BulkTierTable tiers={DEMO_TIERS} basePrice={BASE_PRICE} />
         </div>
       </Kit>
 
