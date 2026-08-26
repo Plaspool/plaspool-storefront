@@ -149,12 +149,15 @@
     /* Firefox */
   }
 
-  /* Table overflow scroll - mobile only */
-  @media (max-width: 768px) {
-    table {
-      @apply overflow-x-auto block whitespace-nowrap;
-    }
-  }
+  /* NO GLOBAL `table { display: block }` HERE.
+     It used to live here to make wide tables scroll on phones, and it broke
+     every table the app draws: `display: block` stops the element being a
+     table box, so `width: 100%` no longer stretches the columns and rows
+     shrink to their text — which is why the bulk-tier ladder sat squeezed
+     against the left edge on mobile and tablet with its highlighted row
+     ending mid-row. Tables that need to scroll wrap themselves in an
+     `overflow-x-auto` parent (see `bulk-tier-table.tsx` and the blog's
+     `.doc-table-wrap`), which scrolls without destroying the layout. */
 
   /* Blog list styling */
   article ul li {
