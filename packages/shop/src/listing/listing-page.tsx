@@ -103,18 +103,36 @@ export async function CategoryPage({
 
   const categoryEmpty = base.length === 0;
 
-  /* A category with nothing in it yet (`support` today) is not a filter that
-     matched nothing; that second state lives in FilteredGrid with the
-     filters themselves. */
+  /* A category with nothing in it yet is not a filter that matched nothing;
+     that second state lives in FilteredGrid with the filters themselves.
+
+     ═══ IT NAMES NO MATERIAL, AND THE ACTION IS NOT A CATEGORY ═══
+     This used to read "we're still bringing support materials to market,
+     browse PLA and PETG in the meantime" over a button to `/store/pla`. Every
+     noun in that sentence was a guess about a catalogue that has since become
+     a single `filament` category: `support` does not exist, neither does
+     `pla`, and the button 404'd.
+
+     `/store/all` is the one destination that cannot go stale — it is not a
+     category slug, so no admin edit can remove it — and when the EMPTY
+     category IS `all`, there is nowhere useful left to send anybody, so the
+     action drops rather than pointing the shopper back at the page they are
+     already looking at. `EmptyState.action` is optional for exactly this. */
   const categoryEmptyState = (
     <EmptyState
       icon={<PackageSearch aria-hidden="true" className="h-6 w-6" />}
       title="No products in this category yet"
-      body="We're still bringing support materials to market. Browse PLA and PETG in the meantime."
+      body={
+        isAll
+          ? "Nothing is listed in the shop yet. Please check back soon."
+          : "Nothing is listed here yet. Browse everything we make in the meantime."
+      }
       action={
-        <Button asChild>
-          <Link href="/store/pla">Browse PLA</Link>
-        </Button>
+        isAll ? undefined : (
+          <Button asChild>
+            <Link href="/store/all">Browse all filament</Link>
+          </Button>
+        )
       }
     />
   );

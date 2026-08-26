@@ -120,6 +120,43 @@ export async function getCategory(slug: string, fresh = false): Promise<Category
   return (await listCategories(fresh)).find((c) => c.slug === slug) ?? null;
 }
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE SHOP'S FRONT DOOR — DERIVED, BECAUSE THE HARDCODED ONE ROTTED.
+ *
+ * The hero's primary button pointed at `/store/pla` and said "Shop PLA". That
+ * was true while the catalogue had a category per material. It stopped being
+ * true when the categories collapsed to a single `filament`, and nothing
+ * noticed: the href was a string literal, so there was no build error, no test
+ * failure and no 404 until somebody clicked the biggest button on the home
+ * page and got "We couldn't find that page".
+ *
+ * A LINK BUILT FROM A SLUG NOBODY VERIFIED IS A LINK THAT ROTS SILENTLY.
+ * This asks the catalogue instead, so the button can only ever point at a
+ * category that exists — and its LABEL comes from the same answer, because a
+ * button reading "Shop PLA" that lands on Filament is a different bug wearing
+ * the first one's clothes.
+ *
+ * `position` order, so the owner decides what the front door opens onto by
+ * ordering categories in the admin rather than by editing a component.
+ *
+ * FALLS BACK TO `/store/all`, which is not a category and therefore cannot go
+ * missing: `categoryParams` prerenders it and `metaFor` answers for it
+ * directly. An empty catalogue still gets a working button.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export interface CategoryLink {
+  href: string;
+  label: string;
+}
+
+export async function primaryCategoryLink(fresh = false): Promise<CategoryLink> {
+  const [first] = await listCategories(fresh);
+  return first
+    ? { href: `/store/${first.slug}`, label: `Shop ${first.name}` }
+    : { href: "/store/all", label: "Browse all filament" };
+}
+
 export async function categoryPaths(): Promise<{ category: string }[]> {
   return (await listCategories()).map((c) => ({ category: c.slug }));
 }

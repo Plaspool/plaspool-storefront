@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { primaryCategoryLink } from "../data/catalog";
 import { HeroCarousel } from "./hero-carousel";
 import { CategoryTiles } from "./category-tiles";
 import { FeaturedProducts } from "./featured-products";
@@ -35,10 +36,15 @@ export const storeHomeMetadata: Metadata = {
   alternates: { canonical: "/store" },
 };
 
-export function StoreHomePage() {
+/* ASYNC ONLY FOR THE HERO'S LINK, AND IT COSTS NOTHING EXTRA: `CategoryTiles`
+   below and `ShopShell` around this both call `listCategories()` already, so
+   this is the same cached fetch on the same 300s window rather than a third
+   request or a shorter window for the route. */
+export async function StoreHomePage() {
+  const primary = await primaryCategoryLink();
   return (
     <>
-      <HeroCarousel />
+      <HeroCarousel primary={primary} />
       <CategoryTiles />
       <FeaturedProducts />
       <WhyShop />
