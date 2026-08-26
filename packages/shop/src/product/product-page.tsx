@@ -39,13 +39,21 @@ export async function productParams(): Promise<{ slug: string }[]> {
   return productPaths();
 }
 
-export async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
+export async function ProductPage({
+  params,
+  fresh = false,
+}: {
+  params: Promise<{ slug: string }>;
+  /* See `CategoryPage` — a prop rather than a `searchParams` read, so the
+     prerendered product page keeps its cache and only `/preview` skips it. */
+  fresh?: boolean;
+}) {
   // Next 15: page params are a promise.
   const { slug } = await params;
-  const product = await getProduct(slug);
+  const product = await getProduct(slug, fresh);
   if (!product) notFound();
 
-  const category = await getCategory(product.categorySlug);
+  const category = await getCategory(product.categorySlug, fresh);
 
   /* Reviews are fetched HERE, on the server, rather than in the tab that
      shows them: the approved reviews then arrive in the HTML — visible to a

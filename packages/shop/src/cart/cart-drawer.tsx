@@ -23,6 +23,7 @@ import { formatNaira } from "../data/money";
 import { useCart } from "./cart-context";
 import { UnsellableNotice } from "./unsellable-notice";
 import type { CartLineKey, ResolvedLine } from "./types";
+import { lineDescriptor, variantDescriptor } from "./line-descriptor";
 
 /**
  * The one cart overlay for the whole store, mounted once (in `ShopShell`) and
@@ -49,7 +50,7 @@ function CartLineRow({
   onRemove: () => void;
 }) {
   const { product, colour, size, qty, unitPrice, total, tier } = line;
-  const descriptor = `${product.name}, ${colour.name}, ${size.label}`;
+  const descriptor = lineDescriptor(product.name, colour.name, size.label);
 
   return (
     <li className="flex gap-3 py-4">
@@ -77,7 +78,7 @@ function CartLineRow({
               </Link>
             </SheetClose>
             <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
-              {colour.name} · {size.label}
+              {variantDescriptor(colour.name, size.label)}
             </p>
           </div>
           <Price amount={total} size="sm" className="shrink-0" />

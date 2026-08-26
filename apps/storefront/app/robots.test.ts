@@ -93,7 +93,7 @@ describe("robots.txt — everyone else", () => {
     expect(wildcard?.allow).toBe("/");
   });
 
-  it.each(["/account", "/api/", "/cart", "/checkout", "/dev/", "/sign-in"])(
+  it.each(["/account", "/api/", "/cart", "/checkout", "/dev/", "/preview/", "/sign-in"])(
     "keeps %s out of the index",
     (path) => {
       const d = wildcard?.disallow;

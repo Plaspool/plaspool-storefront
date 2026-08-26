@@ -54,9 +54,45 @@ import type { Category, Product } from "./types";
  * ones somebody remembered. Pass `[]` deliberately if a fetch should genuinely
  * only ever expire on time; nothing does today.
  */
-async function getJson<T>(path: string, revalidate: number, tags: string[]): Promise<T | null> {
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * `fresh` — THE OWNER LOOKING AT THEIR OWN EDIT, AND NOBODY ELSE'S CACHE.
+ *
+ * A revalidate window is a promise about the worst case, and `/api/revalidate`
+ * is a push that only fires if something remembers to fire it. Neither answers
+ * "I changed a price ten seconds ago and I want to SEE it", which is what an
+ * owner does dozens of times while setting a shop up.
+ *
+ * `fresh` makes ONE request skip the cache: `cache: "no-store"` instead of the
+ * window, so the answer comes from the commerce API every time. It reaches the
+ * pages through `?fresh=1` on a catalogue URL.
+ *
+ * ═══ WHY THIS IS SAFER THAN THE PURGE ENDPOINT NEXT DOOR ═══
+ * `POST /api/revalidate` EVICTS: one call makes the next request for every
+ * catalogue page miss cache and re-render, which is the amplification its own
+ * comment records as a denial-of-wallet risk. This evicts NOTHING. It renders
+ * fresh for the caller and leaves every cached entry exactly where it was, so
+ * the cost of abusing it is one render per request — the same as any dynamic
+ * page — and no shopper's response gets slower for it.
+ *
+ * It is unauthenticated for the same reason that endpoint is, and it is worth
+ * a rate-limiting rule on the query if it is ever noticed being hammered.
+ *
+ * `no-store` REPLACES the window rather than joining it: Next rejects a fetch
+ * carrying both, so this is a branch and not an extra option.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+async function getJson<T>(
+  path: string,
+  revalidate: number,
+  tags: string[],
+  fresh = false,
+): Promise<T | null> {
   try {
-    const res = await fetch(`${COMMERCE_API_BASE}${path}`, { next: { revalidate, tags } });
+    const res = await fetch(
+      `${COMMERCE_API_BASE}${path}`,
+      fresh ? { cache: "no-store" } : { next: { revalidate, tags } },
+    );
     if (!res.ok) return null;
     return (await res.json()) as T;
   } catch {
@@ -66,21 +102,22 @@ async function getJson<T>(path: string, revalidate: number, tags: string[]): Pro
 
 // ----------------------------------------------------------------- categories
 
-async function fetchCategories(): Promise<ApiCategory[]> {
+async function fetchCategories(fresh = false): Promise<ApiCategory[]> {
   const body = await getJson<{ items: ApiCategory[] }>(
     "/api/shop/categories",
     CATALOG_LIST_REVALIDATE,
     [CATALOG_TAG],
+    fresh,
   );
   return body?.items ?? [];
 }
 
-export async function listCategories(): Promise<Category[]> {
-  return (await fetchCategories()).map(toCategory);
+export async function listCategories(fresh = false): Promise<Category[]> {
+  return (await fetchCategories(fresh)).map(toCategory);
 }
 
-export async function getCategory(slug: string): Promise<Category | null> {
-  return (await listCategories()).find((c) => c.slug === slug) ?? null;
+export async function getCategory(slug: string, fresh = false): Promise<Category | null> {
+  return (await listCategories(fresh)).find((c) => c.slug === slug) ?? null;
 }
 
 export async function categoryPaths(): Promise<{ category: string }[]> {
@@ -97,8 +134,8 @@ export async function categoryPaths(): Promise<{ category: string }[]> {
  * response could put two spools published seconds apart on different sides of
  * the "New" boundary.
  */
-async function context(): Promise<AdaptContext> {
-  const categories = await fetchCategories();
+async function context(fresh = false): Promise<AdaptContext> {
+  const categories = await fetchCategories(fresh);
   return {
     categorySlugByName: new Map(categories.map((c) => [c.name.trim().toLowerCase(), c.slug])),
     now: Date.now(),
@@ -114,12 +151,15 @@ async function context(): Promise<AdaptContext> {
  * and then a detail response per product was `1 + N` subrequests against a
  * 50-subrequest cap, i.e. a catalogue-size ceiling rather than a slow path.
  */
-export async function listProducts(): Promise<Product[]> {
+export async function listProducts(fresh = false): Promise<Product[]> {
   const [list, ctx] = await Promise.all([
-    getJson<{ items: ApiProduct[] }>("/api/shop/products", CATALOG_LIST_REVALIDATE, [
-      CATALOG_TAG,
-    ]),
-    context(),
+    getJson<{ items: ApiProduct[] }>(
+      "/api/shop/products",
+      CATALOG_LIST_REVALIDATE,
+      [CATALOG_TAG],
+      fresh,
+    ),
+    context(fresh),
   ]);
   const items = list?.items ?? [];
 
@@ -144,7 +184,7 @@ export async function listProducts(): Promise<Product[]> {
     .filter((p): p is Product => p !== null);
 }
 
-async function fetchProduct(slug: string): Promise<ApiProduct | null> {
+async function fetchProduct(slug: string, fresh = false): Promise<ApiProduct | null> {
   const body = await getJson<{ product: ApiProduct }>(
     `/api/shop/products/${encodeURIComponent(slug)}`,
     CATALOG_DETAIL_REVALIDATE,
@@ -153,22 +193,23 @@ async function fetchProduct(slug: string): Promise<ApiProduct | null> {
        slugs it may not know; `productTag` so editing one spool can reach that
        spool's page without discarding every cached listing in the shop. */
     [CATALOG_TAG, productTag(slug)],
+    fresh,
   );
   return body?.product ?? null;
 }
 
-export async function getProduct(slug: string): Promise<Product | null> {
+export async function getProduct(slug: string, fresh = false): Promise<Product | null> {
   /* No ratings fetched here. The product PAGE renders the full review list and
      its own aggregate beside this call (`product-page.tsx`), so asking for a
      star summary as well would be the same numbers twice. `toProduct` leaves
      `rating` at zero, which the page never reads. */
-  const [detail, ctx] = await Promise.all([fetchProduct(slug), context()]);
+  const [detail, ctx] = await Promise.all([fetchProduct(slug, fresh), context(fresh)]);
   if (!detail) return null;
   return toProduct(detail, ctx);
 }
 
-export async function listProductsByCategory(slug: string): Promise<Product[]> {
-  return (await listProducts()).filter((p) => p.categorySlug === slug);
+export async function listProductsByCategory(slug: string, fresh = false): Promise<Product[]> {
+  return (await listProducts(fresh)).filter((p) => p.categorySlug === slug);
 }
 
 /**
@@ -184,8 +225,8 @@ export async function listProductsByCategory(slug: string): Promise<Product[]> {
  * The list endpoint returns newest-first, and `listProducts` preserves that
  * order, so this is a slice rather than a sort.
  */
-export async function listFeaturedProducts(limit = 4): Promise<Product[]> {
-  return (await listProducts()).slice(0, limit);
+export async function listFeaturedProducts(limit = 4, fresh = false): Promise<Product[]> {
+  return (await listProducts(fresh)).slice(0, limit);
 }
 
 export async function productPaths(): Promise<{ slug: string }[]> {

@@ -12,6 +12,7 @@ import { formatNaira } from "../data/money";
 import { useCart } from "../cart/cart-context";
 import { UnsellableNotice } from "../cart/unsellable-notice";
 import type { CartLineKey, ResolvedLine } from "../cart/types";
+import { lineDescriptor, variantDescriptor } from "../cart/line-descriptor";
 
 /**
  * `/cart` — the full-page basket, next to the drawer rather than instead of
@@ -141,7 +142,7 @@ export function CartPage() {
                       {line.product.name}
                     </Link>
                     <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
-                      {line.colour.name} · {line.size.label}
+                      {variantDescriptor(line.colour.name, line.size.label)}
                     </p>
                   </div>
                   <Price amount={line.total} size="sm" className="shrink-0" />
@@ -150,7 +151,7 @@ export function CartPage() {
                   <QuantityStepper
                     value={line.qty}
                     onChange={(qty) => cart.setQty(toKey(line), qty)}
-                    label={`${line.product.name}, ${line.colour.name}, ${line.size.label}`}
+                    label={lineDescriptor(line.product.name, line.colour.name, line.size.label)}
                   />
                   <Button
                     type="button"
