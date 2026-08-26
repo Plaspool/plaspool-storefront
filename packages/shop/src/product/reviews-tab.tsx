@@ -9,7 +9,7 @@ import { listReviewsFromBrowser, starsFromAggregate } from "../data/reviews";
 import type { PublicReview, ReviewAggregate } from "../data/reviews";
 import { RatingStars } from "../components/rating-stars";
 import { EmptyState } from "../components/empty-state";
-import { ReviewForm } from "./review-form";
+import { ReviewFormGate } from "./review-form-gate";
 
 /**
  * Real customer reviews: the aggregate, the distribution, the approved
@@ -227,7 +227,7 @@ export function ReviewsTab({
       )}
 
       <div className="mt-10 border-t border-brand-line pt-8">
-        <ReviewForm productSlug={productSlug} productName={productName} />
+        <ReviewFormGate productSlug={productSlug} productName={productName} />
       </div>
     </div>
   );
