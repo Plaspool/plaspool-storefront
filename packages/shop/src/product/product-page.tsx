@@ -30,7 +30,7 @@ export async function productMetadata({
        nothing is appended to it. The fallbacks are what this page always
        said: the name with the brand, and the derived summary. */
     title: product.seoTitle ?? `${product.name} — PlaSpool`,
-    description: product.seoDescription ?? product.summary,
+    description: product.seoDescription ?? product.overview,
     alternates: { canonical: `/store/products/${slug}` },
   };
 }

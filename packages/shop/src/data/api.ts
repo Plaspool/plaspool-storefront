@@ -1,5 +1,4 @@
 import { COMMERCE_API_BASE } from "./config";
-import { STANDARD_TIERS } from "./policy";
 import type {
   Badge,
   Category,
@@ -112,6 +111,39 @@ export interface ApiProduct {
   seoTitle?: string | null;
   seoDescription?: string | null;
   /**
+   * The shop owner's summary, or the server's own trim of the description's
+   * first block to 300 characters on a word boundary. Which of the two it is,
+   * is deliberately not visible here, and deliberately not this file's business.
+   *
+   * ALWAYS A STRING — never null, never absent. Empty when the owner wrote
+   * nothing and the description has no prose to derive from, which is a real
+   * answer ("there is no summary") rather than a missing one.
+   */
+  overview: string;
+  /**
+   * The derived value the ADMIN EDITOR renders as a placeholder under the
+   * summary box. DELIBERATELY UNREAD: `overview` already accounts for it, so
+   * preferring this would be preferring the admin's draft state to its answer.
+   * Declared so the field is documented as ignored rather than merely missing.
+   */
+  overviewFallback?: string | null;
+  /**
+   * The resolved quantity ladder: store-wide default, per-product override and
+   * the on/off switch all applied server-side. Ascending by `minQty`.
+   *
+   * An empty array means no bulk discount on this product, which is a complete
+   * answer. Absent means the deploy has not landed — read the same way, because
+   * the alternative is inventing a discount the till will not honour.
+   */
+  bulkTiers?: { minQty: number; percentBps: number }[] | null;
+  /**
+   * INFORMATIONAL, AND READ BY NOTHING. The switch is already reflected in
+   * `bulkTiers`; consulting it here would be a second rule, and a product whose
+   * ladder survived a `false` would lose its discount in the shop while the
+   * till still applied it. Declared so that is a documented decision.
+   */
+  bulkDiscountEnabled?: boolean | null;
+  /**
    * Present on BOTH the list and the detail response.
    *
    * This said "Detail responses only" and had been wrong since
@@ -211,23 +243,6 @@ export function docToBlocks(doc: DocNode | null): DescriptionBlock[] {
   return blocks;
 }
 
-/**
- * The one line under the title, taken from the product's FIRST PARAGRAPH.
- *
- * Derived rather than invented, and rather than left blank. The API has no
- * `summary` field, but it does have the product's own prose — so this is the
- * seller's words, trimmed, not marketing this file made up. Blank when there is
- * no prose, which the buy box renders as nothing.
- */
-export function deriveSummary(blocks: DescriptionBlock[], limit = 160): string {
-  const first = blocks.find((b) => b.kind === "paragraph");
-  if (!first || first.kind !== "paragraph") return "";
-  const text = first.text.trim();
-  if (text.length <= limit) return text;
-  const cut = text.slice(0, limit);
-  const space = cut.lastIndexOf(" ");
-  return `${cut.slice(0, space > 80 ? space : limit).trimEnd()}…`;
-}
 
 // -------------------------------------------------------------------- fields
 
@@ -851,11 +866,21 @@ export function toProduct(api: ApiProduct, ctx: AdaptContext): Product | null {
           },
         ],
     sizes,
-    /* A POLICY CONSTANT, NOT PRODUCT DATA — `policy.ts` sets out why, and why
-       every product currently gets the same ladder. */
-    bulkTiers: STANDARD_TIERS,
+    /* THE API'S RESOLVED LADDER, OR NONE. This was `STANDARD_TIERS`, a
+       storefront policy constant — the ladder is product data now and the
+       server has already applied the default, the override and the switch.
+       Absent or null reads as no discount rather than as a default, because a
+       ladder invented here would price a spool differently from the till. */
+    bulkTiers: api.bulkTiers ?? [],
     badges: badgesFrom(variants, api.publishedAt, ctx.now),
-    summary: deriveSummary(description),
+    /* ═══ THE SERVER'S SUMMARY, USED AS SENT ═══
+       NEVER RE-TRIMMED. It arrives already cut to 300 characters on a word
+       boundary; the `deriveSummary` this replaced cut at 160, so a second pass
+       would visibly truncate a line the owner wrote whole and the admin
+       previews whole. There is no fallback and there must not be one — deriving
+       a summary here is how the storefront and the admin come to show different
+       words for the same product. */
+    overview: api.overview,
     /* `''` never arrives — the admin normalises empty to NULL at the write
        boundary — but `?? null` also covers an older API omitting the fields. */
     seoTitle: api.seoTitle ?? null,

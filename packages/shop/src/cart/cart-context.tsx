@@ -2,7 +2,16 @@
 
 import * as React from "react";
 
-import { addLine, createCart, majorUnits, readCart, removeLine, setLineQty } from "../data/cart-api";
+import {
+  addLine,
+  bulkOf,
+  createCart,
+  majorUnits,
+  previewLines,
+  readCart,
+  removeLine,
+  setLineQty,
+} from "../data/cart-api";
 import { lineKey } from "./line-key";
 import { partitionLines } from "./sellable";
 import type { VariantMatch } from "./sellable";
@@ -376,15 +385,30 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
     [view.lines, byVariant],
   );
 
-  const resolved = React.useMemo<ResolvedLine[]>(
-    () =>
-      /* A MAP, NOT A FILTER. Every reason to leave a line out has already been
-         applied in `partitionLines`; a second `continue` here is how the two
-         projections drifted apart the first time. */
-      split.sellable.map(({ line, entry, colour, size }) => {
+  const resolved = React.useMemo<ResolvedLine[]>(() => {
+    /* THE PREVIEW IS WHERE THE DISCOUNT LIVES. `cart.lines[]` carries `unit`,
+       which is the LIST price and says nothing about a rung; the per-line
+       totals — `effectiveUnit`, `bulkPercentBps`, `bulkQty`, `lineTotal` —
+       are on `preview.lines[]`. Empty until the admin's bulk deploy lands, and
+       `bulkOf` supplies the pre-bulk defaults for every line until then. */
+    const totals = previewLines(view.preview);
+
+    /* A MAP, NOT A FILTER. Every reason to leave a line out has already been
+       applied in `partitionLines`; a second `continue` here is how the two
+       projections drifted apart the first time. */
+    return split.sellable.map(({ line, entry, colour, size }) => {
         /* THE SERVER'S PRICE, not `size.priceNaira`. The two agree today, and
            when they stop agreeing the server is the one that takes the money. */
         const unitPrice = majorUnits(line.unit);
+        const frozen = totals.get(line.variantId);
+        /* NO PREVIEW LINE IS THE PRE-BULK WORLD, spelled out rather than faked
+           through `bulkOf` with a stand-in line: the defaults are the same ones
+           an old order falls back to — no rung, and the list price is what they
+           pay. */
+        const bulk = frozen
+          ? bulkOf(frozen)
+          : { qty: line.qty, percentBps: 0, effectiveUnit: line.unit, discounted: false };
+        const effectiveUnitPrice = majorUnits(bulk.effectiveUnit);
         return {
           key: lineKey({ productSlug: entry.slug, colourId: colour.id, sizeId: size.id }),
           product: entry,
@@ -392,16 +416,21 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
           size,
           qty: line.qty,
           unitPrice,
-          total: unitPrice * line.qty,
+          effectiveUnitPrice,
+          bulkPercentBps: bulk.percentBps,
+          bulkQty: bulk.qty,
+          /* THE SERVER'S LINE TOTAL where there is one. `effectiveUnit × qty`
+             is the fallback rather than the rule, and `unitPrice × qty` is
+             never either — that is the number the customer is not charged. */
+          total: frozen ? majorUnits(frozen.lineTotal) : effectiveUnitPrice * line.qty,
           /* No tier: the shop currently offers no bulk discounts (see
              `policy.ts`), and even if it did, that would be a storefront policy
              constant with nothing behind it in the API, so the cart could not
              claim one the till will not honour. */
           tier: null,
         };
-      }),
-    [split],
-  );
+      });
+  }, [split, view.preview]);
 
   const lines = React.useMemo<CartLine[]>(
     () =>

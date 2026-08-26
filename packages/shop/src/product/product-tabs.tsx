@@ -62,7 +62,7 @@ export function ProductTabs({
     {
       id: "overview",
       label: "Overview",
-      panel: <OverviewTab claims={product.overviewClaims} summary={product.summary} />,
+      panel: <OverviewTab claims={product.overviewClaims} summary={product.overview} />,
     },
     {
       id: "description",

@@ -14,7 +14,7 @@ function product(over: Partial<Product> = {}): Product {
   return {
     slug: "spool",
     name: "Spool",
-    summary: "A spool",
+    overview: "A spool",
     material: "PLA",
     diameterMm: 1.75,
     featured: false,
@@ -125,7 +125,7 @@ describe("applyFilters", () => {
   /* `${p.material}` would stringify null to the literal "null" and make every
      unclassified product a hit for the search term "null". */
   it("does not match the literal string \"null\" against a null material", () => {
-    const unclassified = product({ slug: "mystery", material: null, name: "Mystery", summary: "" });
+    const unclassified = product({ slug: "mystery", material: null, name: "Mystery", overview: "" });
     expect(applyFilters([unclassified], parseFilters({ q: "null" }))).toEqual([]);
   });
 

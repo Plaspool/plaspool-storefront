@@ -14,9 +14,9 @@ import {
 import type { BulkTier, Product, Review } from "./types";
 
 const TIERS: BulkTier[] = [
-  { minQty: 3, discountPct: 5 },
-  { minQty: 6, discountPct: 10 },
-  { minQty: 12, discountPct: 15 },
+  { minQty: 3, percentBps: 500 },
+  { minQty: 6, percentBps: 1000 },
+  { minQty: 12, percentBps: 1500 },
 ];
 
 describe("formatNaira", () => {
@@ -54,14 +54,14 @@ describe("tierFor", () => {
   });
 
   it("picks the best rung reached, not the first one matched", () => {
-    expect(tierFor(TIERS, 3)?.discountPct).toBe(5);
-    expect(tierFor(TIERS, 5)?.discountPct).toBe(5);
-    expect(tierFor(TIERS, 6)?.discountPct).toBe(10);
-    expect(tierFor(TIERS, 100)?.discountPct).toBe(15);
+    expect(tierFor(TIERS, 3)?.percentBps).toBe(500);
+    expect(tierFor(TIERS, 5)?.percentBps).toBe(500);
+    expect(tierFor(TIERS, 6)?.percentBps).toBe(1000);
+    expect(tierFor(TIERS, 100)?.percentBps).toBe(1500);
   });
 
   it("is order-independent — a ladder given descending still resolves the best", () => {
-    expect(tierFor([...TIERS].reverse(), 7)?.discountPct).toBe(10);
+    expect(tierFor([...TIERS].reverse(), 7)?.percentBps).toBe(1000);
   });
 });
 

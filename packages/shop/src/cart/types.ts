@@ -48,7 +48,27 @@ export interface ResolvedLine {
   colour: Colour;
   size: SizeOption;
   qty: number;
+  /** The LIST price per unit, as the server quotes it. Struck through when a
+   *  bulk rung applied. */
   unitPrice: number;
+  /**
+   * What they actually pay per unit — the server's `effectiveUnit`, or the list
+   * price when no rung applied or the API predates bulk discounts.
+   */
+  effectiveUnitPrice: number;
+  /** The rung that applied, in basis points. `0` is no discount. */
+  bulkPercentBps: number;
+  /**
+   * Units of this PRODUCT across every line, which is what earned the rung —
+   * NOT this line's `qty`. It is the only thing that explains a line reading
+   * "2 × black, 10% off".
+   */
+  bulkQty: number;
+  /**
+   * `effectiveUnit × qty`, TAKEN FROM THE SERVER rather than multiplied here.
+   * A line total recomputed from `unitPrice` is a number the customer is not
+   * charged.
+   */
   total: number;
   tier: BulkTier | null;
 }

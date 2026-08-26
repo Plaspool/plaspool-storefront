@@ -9,6 +9,7 @@ import { Price } from "../components/price";
 import { QuantityStepper } from "../components/quantity-stepper";
 import { ProductPhoto } from "../components/product-photo";
 import { formatNaira } from "../data/money";
+import { BulkLinePrice } from "../cart/bulk-line-price";
 import { useCart } from "../cart/cart-context";
 import { UnsellableNotice } from "../cart/unsellable-notice";
 import type { CartLineKey, ResolvedLine } from "../cart/types";
@@ -147,6 +148,18 @@ export function CartPage() {
                   </div>
                   <Price amount={line.total} size="sm" className="shrink-0" />
                 </div>
+                {/* The per-unit price and, when a bulk rung applied, the
+                    struck-through list price and the quantity that earned it.
+                    The `Price` above is the LINE total — the server's
+                    `lineTotal`, never `unitPrice × qty`. */}
+                <BulkLinePrice
+                  unitPrice={line.unitPrice}
+                  effectiveUnitPrice={line.effectiveUnitPrice}
+                  bulkPercentBps={line.bulkPercentBps}
+                  bulkQty={line.bulkQty}
+                  lineQty={line.qty}
+                />
+
                 <div className="flex items-center justify-between gap-3">
                   <QuantityStepper
                     value={line.qty}

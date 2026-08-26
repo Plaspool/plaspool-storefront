@@ -26,9 +26,23 @@ export interface SizeOption {
 }
 
 /** A quantity ladder. `minQty` ascending, no duplicates. */
+/**
+ * One rung of the quantity ladder, as the API resolves it.
+ *
+ * `percentBps` IS BASIS POINTS — 10000 is 100%, so 1000 is 10%. This field was
+ * `discountPct` (a whole-number percentage) while the ladder was a storefront
+ * policy constant; the two differ by a factor of a hundred, so anything still
+ * reading the old spelling quotes a 1000% discount. `percentFromBps` in
+ * `bulk.ts` is the one place that conversion happens.
+ *
+ * The ladder arrives ASCENDING BY `minQty` and ALREADY RESOLVED: the store-wide
+ * default, any per-product override and the on/off switch have all been applied
+ * server-side. An empty ladder means this product has no bulk discount, which is
+ * a complete answer and never a reason to substitute one of our own.
+ */
 export interface BulkTier {
   minQty: number;
-  discountPct: number;
+  percentBps: number;
 }
 
 export interface PrintingParameters {
@@ -110,8 +124,16 @@ export interface Product {
   coverImageUrl: string | null;
   imageUrls: string[];
   badges: Badge[];
-  /** One line under the title. Not marketing — what the material is for. */
-  summary: string;
+  /**
+   * One line under the title — the API's `overview`.
+   *
+   * ALWAYS A STRING, and used exactly as sent. The server decides whether it is
+   * the owner's own summary or a trim of the description, and has already cut
+   * it to 300 characters on a word boundary; nothing downstream may trim it
+   * again. This was `summary`, derived here from the description's first
+   * paragraph, which is the hack the field replaces.
+   */
+  overview: string;
   /**
    * Owner-written search-engine copy (the admin's "Search engine listing"),
    * or null to fall back to `name` and `summary`. `seoTitle` is used VERBATIM
