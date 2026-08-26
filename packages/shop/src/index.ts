@@ -90,6 +90,7 @@ export * from "./splash/config";
 export * from "./product/product-tabs";
 export * from "./product/overview-tab";
 export * from "./product/next-tier-hint";
+export * from "./product/review-form-gate";
 export * from "./product/description-tab";
 export * from "./product/parameters-tab";
 export * from "./product/reviews-tab";

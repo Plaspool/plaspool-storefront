@@ -21,10 +21,17 @@ import type { SubmitError } from "../data/reviews";
  * Where the two could drift the API wins, and its refusal renders here as an
  * error rather than being second-guessed.
  *
- * There is no account yet — the auth bundle is sequenced after this — so the
- * name and email are typed. The email is never published (the public
- * projection cannot return it) and the form says so where it asks, because
- * "why do you want my email" is the question that stops someone submitting.
+ * ═══ THE REVIEWER IS THE SIGNED-IN ACCOUNT, AND IS NEVER TYPED ═══
+ * This form used to ask for a name and an email, and its own header explained
+ * why: "there is no account yet — the auth bundle is sequenced after this".
+ * The auth bundle landed. Asking again made a shopper hand over an email the
+ * shop already had, into a public product page, to identify themselves as
+ * somebody the session already identified — and nothing stopped them typing
+ * somebody else's.
+ *
+ * So the fields are gone and `author` arrives as a prop. `ReviewFormGate` is
+ * what decides there is one: only a confirmed guest is turned away, and this
+ * component is never mounted without an account behind it.
  */
 
 /** The API's own floor: "not left holding a single character by accident". */
@@ -106,16 +113,21 @@ function StarPicker({
 export interface ReviewFormProps {
   productSlug: string;
   productName: string;
+  /**
+   * WHO IS WRITING, FROM THE SESSION — never from a field on this page.
+   *
+   * `name` is published beside the review; `email` is not, and the public
+   * projection cannot return it. Both come from the account, so a reviewer
+   * cannot put somebody else's name on their words by typing one.
+   */
+  author: { name: string; email: string };
   className?: string;
 }
 
-export function ReviewForm({ productSlug, productName, className }: ReviewFormProps) {
+export function ReviewForm({ productSlug, productName, author, className }: ReviewFormProps) {
   const [rating, setRating] = React.useState(0);
   const [title, setTitle] = React.useState("");
   const [body, setBody] = React.useState("");
-  const [authorName, setAuthorName] = React.useState("");
-  const [authorEmail, setAuthorEmail] = React.useState("");
-
   const [sending, setSending] = React.useState(false);
   const [error, setError] = React.useState<SubmitError | null>(null);
   const [done, setDone] = React.useState(false);
@@ -136,10 +148,11 @@ export function ReviewForm({ productSlug, productName, className }: ReviewFormPr
         : bodyLength < BODY_MIN
           ? `A little more — ${BODY_MIN} characters at least.`
           : null,
-    authorName: authorName.trim() ? null : "Tell us what to call you.",
-    authorEmail: /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(authorEmail.trim())
-      ? null
-      : "We need a valid email address.",
+    /* NO `authorName`/`authorEmail` RULES. They came from a field a shopper
+       could leave blank or mistype; they come from the account now, and the
+       gate does not mount this without one. A validation message about the
+       reviewer's own identity would be the form asking them to correct
+       something they cannot see or reach from here. */
   };
   const valid = Object.values(problems).every((problem) => problem === null);
 
@@ -151,7 +164,14 @@ export function ReviewForm({ productSlug, productName, className }: ReviewFormPr
 
     setSending(true);
     try {
-      await submitReview({ productSlug, rating, title, body, authorName, authorEmail });
+      await submitReview({
+        productSlug,
+        rating,
+        title,
+        body,
+        authorName: author.name,
+        authorEmail: author.email,
+      });
       setDone(true);
     } catch (err) {
       setError(err instanceof ReviewSubmitError ? err.kind : "failed");
@@ -241,54 +261,8 @@ export function ReviewForm({ productSlug, productName, className }: ReviewFormPr
         )}
       </div>
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        <div>
-          <label
-            htmlFor={id("name")}
-            className="mb-2 block font-sans text-sm font-semibold text-foreground"
-          >
-            Name
-          </label>
-          <Input
-            id={id("name")}
-            value={authorName}
-            maxLength={120}
-            autoComplete="name"
-            aria-invalid={attempted && problems.authorName ? true : undefined}
-            onChange={(event) => setAuthorName(event.target.value)}
-            placeholder="Shown with your review"
-          />
-          {attempted && problems.authorName && (
-            <p className="mt-1.5 text-sm text-destructive-strong">{problems.authorName}</p>
-          )}
-        </div>
-
-        <div>
-          <label
-            htmlFor={id("email")}
-            className="mb-2 block font-sans text-sm font-semibold text-foreground"
-          >
-            Email
-          </label>
-          <Input
-            id={id("email")}
-            type="email"
-            value={authorEmail}
-            maxLength={254}
-            autoComplete="email"
-            aria-invalid={attempted && problems.authorEmail ? true : undefined}
-            aria-describedby={id("email-note")}
-            onChange={(event) => setAuthorEmail(event.target.value)}
-            placeholder="you@example.com"
-          />
-          <p id={id("email-note")} className="mt-1.5 text-xs text-muted-foreground">
-            Never published — only so we can reach you about the review.
-          </p>
-          {attempted && problems.authorEmail && (
-            <p className="mt-1.5 text-sm text-destructive-strong">{problems.authorEmail}</p>
-          )}
-        </div>
-      </div>
+      {/* The name and email fields stood here. They are the account's now —
+          see this file's header. */}
 
       {error && (
         <p role="alert" className="text-sm text-destructive-strong">
