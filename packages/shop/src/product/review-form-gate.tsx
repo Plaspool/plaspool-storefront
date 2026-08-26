@@ -76,20 +76,13 @@ export function ReviewFormGate({
     return <ReviewGuestPrompt next={signInHref(pathname)} />;
   }
 
-  /* A NAME IS PUBLISHED BESIDE THE REVIEW, and the account may not have one —
-     `ShopCustomer.name` is nullable. The email must not stand in for it: it is
-     the one field the public projection cannot return, and printing it under a
-     review would publish the address this change exists to stop sending. */
-  const name = session.customer.name?.trim();
-  if (!name) return <ReviewNeedsNamePrompt />;
-
+  /* NO NAME CHECK. This used to send an account with no name to settings,
+     because the storefront supplied `authorName` and a published review needed
+     one. The API derives the author itself now, so whether a nameless account
+     may review is ITS rule — and a second copy of it here would eventually
+     refuse somebody the server would have accepted. */
   return (
-    <ReviewForm
-      productSlug={productSlug}
-      productName={productName}
-      author={{ name, email: session.customer.email }}
-      className={className}
-    />
+    <ReviewForm productSlug={productSlug} productName={productName} className={className} />
   );
 }
 
@@ -120,30 +113,6 @@ export function ReviewGuestPrompt({ next }: { next: string }) {
       </p>
       <Link href={next} className={PANEL_LINK}>
         Continue
-      </Link>
-    </div>
-  );
-}
-
-/**
- * A signed-in shopper whose account carries no name.
- *
- * SENT TO SETTINGS RATHER THAN GIVEN A FIELD. A field here would be the typed
- * name coming back through a side door, on the one page where it is least
- * checkable; setting it on the account fixes it once, for every review and
- * every order.
- */
-export function ReviewNeedsNamePrompt() {
-  return (
-    <div className={PANEL}>
-      <p className="font-sans text-sm font-semibold text-foreground">
-        Add a name to your account to review.
-      </p>
-      <p className="mt-0.5 font-sans text-sm text-muted-foreground">
-        Reviews are published under it, so we need something to show other printers.
-      </p>
-      <Link href="/account/settings" className={PANEL_LINK}>
-        Account settings
       </Link>
     </div>
   );
