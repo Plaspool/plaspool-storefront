@@ -62,7 +62,13 @@ export interface ApiMoney {
 export interface ApiVariant {
   id: string;
   sku: string;
-  /** Free text, `{ Colour, Weight, Diameter }` in this catalogue. */
+  /**
+   * FREE TEXT, AND THE KEYS ARE WHATEVER THE OWNER TYPED. `{ Colour, Weight,
+   * Diameter }` is this catalogue's convention, but the admin does not enforce
+   * it and live data has arrived as `{ Size, Color }`. Never read a key off
+   * this object directly — go through `option()` and the `*_KEYS` lists, which
+   * document why in full.
+   */
   optionValues: Record<string, string>;
   position: number;
   /** Null on every live variant today; the weight is in `optionValues`. */
@@ -255,12 +261,64 @@ export function materialFrom(tags: string[]): Material | null {
   return null;
 }
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * READING A FREE-TEXT AXIS, IN ONE PLACE, FROM A LIST OF ACCEPTED SPELLINGS.
+ *
+ * `optionValues` is free text — the admin lets a shop owner name a variant
+ * axis whatever they type — and this file has to find it by key. That
+ * asymmetry has exactly one failure mode, and it is not a small one:
+ *
+ *   A product whose weight axis was labelled `Size` rather than `Weight`
+ *   produced no sizes from `sizesFrom`, so `toProduct` returned null, so the
+ *   product disappeared from EVERY catalogue surface and its own page 404'd —
+ *   while the category tile beside it still read "1 product", because that
+ *   count is computed server-side and never passes through here.
+ *
+ * Nothing threw. Nothing logged. The shop just had no products in it, and the
+ * only way to see why was to diff the live payload against these key names.
+ *
+ * SO THE SPELLINGS LIVE IN ONE CONSTANT PER AXIS AND ARE READ BY ONE FUNCTION.
+ * They used to be a `??` chain repeated at five call sites, which is five
+ * chances for a sixth spelling to be added to four of them — and a `Colour`
+ * that reaches the swatch list but not `variantIdsFrom` is a swatch that
+ * accepts a click and silently does nothing.
+ *
+ * ORDER IS PRECEDENCE. The British spellings this catalogue was built on stay
+ * first, so a variant carrying both is read the way it always was; the
+ * American and `Size` forms are a fallback for data that did not know the
+ * convention, never an override of data that did.
+ *
+ * BLANKS DO NOT COUNT AS PRESENT. `{ Weight: "  ", Size: "1kg" }` has to fall
+ * through to `Size`, because an empty axis is what the admin writes when
+ * somebody clears a field, and treating it as an answer would drop the product
+ * exactly as before.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+function option(variant: ApiVariant, names: readonly string[]): string {
+  for (const name of names) {
+    const raw = variant.optionValues[name];
+    if (typeof raw === "string" && raw.trim()) return raw.trim();
+  }
+  return "";
+}
+
+/** The size axis. `Size` is accepted because live data uses it — see `option`. */
+const WEIGHT_KEYS = ["Weight", "weight", "Size", "size"] as const;
+
+/** The colour axis, both spellings of the word. */
+const COLOUR_KEYS = ["Colour", "colour", "Color", "color"] as const;
+
+/** The diameter axis. One spelling in both dialects; listed here so no axis is
+ *  read by a different mechanism from its neighbours. */
+const DIAMETER_KEYS = ["Diameter", "diameter"] as const;
+
 /** `"1.75 mm"` → `1.75`. Null for anything that is not one of the two this
  *  store sells, for the same reason `materialFrom` returns null. */
 export function diameterFrom(variants: ApiVariant[]): DiameterMm | null {
   for (const variant of variants) {
-    const raw = variant.optionValues.Diameter ?? variant.optionValues.diameter;
-    const value = Number.parseFloat(String(raw ?? "").replace(/[^0-9.]/g, ""));
+    const raw = option(variant, DIAMETER_KEYS);
+    const value = Number.parseFloat(raw.replace(/[^0-9.]/g, ""));
     if (value === 1.75 || value === 2.85) return value;
   }
   return null;
@@ -269,9 +327,10 @@ export function diameterFrom(variants: ApiVariant[]): DiameterMm | null {
 /** `"1 kg"` → `1000`, `"750 g"` → `750`. Null when the label says neither.
  *
  *  EXPORTED BECAUSE `weightGrams` IS NULL ON EVERY LIVE VARIANT and the weight
- *  only exists as the free-text `optionValues.Weight`. `sizesFrom` has always
- *  needed that fallback; `lineImagesFrom` needs the same one to fill the drawn
- *  spool, and two copies of this parse would be two ways to read one label. */
+ *  only exists in the free-text weight axis (`WEIGHT_KEYS`, read by `option`).
+ *  `sizesFrom` has always needed that fallback; `lineImagesFrom` needs the same
+ *  one to fill the drawn spool, and two copies of this parse would be two ways
+ *  to read one label. */
 export function gramsFrom(label: string): number | null {
   const value = Number.parseFloat(label.replace(/[^0-9.]/g, ""));
   if (!Number.isFinite(value) || value <= 0) return null;
@@ -326,7 +385,7 @@ export function coloursFrom(variants: ApiVariant[]): Colour[] {
     { name: string; hex: string | null; inStock: boolean; imageUrl: string | null }
   >();
   for (const variant of variants) {
-    const name = (variant.optionValues.Colour ?? variant.optionValues.colour ?? "").trim();
+    const name = option(variant, COLOUR_KEYS);
     if (!name) continue;
     const key = idOf(name);
     /* SELLABLE MEANS PRICED *AND* AVAILABLE, not just available. An unpriced
@@ -383,7 +442,7 @@ export function sizesFrom(variants: ApiVariant[]): SizeOption[] {
   >();
   for (const variant of variants) {
     if (!variant.price) continue;
-    const label = (variant.optionValues.Weight ?? variant.optionValues.weight ?? "").trim();
+    const label = option(variant, WEIGHT_KEYS);
     if (!label) continue;
     const key = idOf(label);
     const grams = variant.weightGrams ?? gramsFrom(label);
@@ -441,8 +500,8 @@ export function variantIdsFrom(variants: ApiVariant[]): Record<string, string> {
   const out: Record<string, string> = {};
   for (const variant of variants) {
     if (!variant.price) continue;
-    const colour = (variant.optionValues.Colour ?? variant.optionValues.colour ?? "").trim();
-    const weight = (variant.optionValues.Weight ?? variant.optionValues.weight ?? "").trim();
+    const colour = option(variant, COLOUR_KEYS);
+    const weight = option(variant, WEIGHT_KEYS);
     if (!colour || !weight) continue;
     const key = `${idOf(colour)}:${idOf(weight)}`;
     /* First wins, which is `position` order — the same variant `sizesFrom`
@@ -631,9 +690,7 @@ export function lineImagesFrom(products: ApiProduct[]): LineImageIndex {
            the free-text option, so `gramsFrom` is the real reader here rather
            than the fallback it looks like. */
         weightGrams:
-          variant.weightGrams ??
-          gramsFrom(variant.optionValues.Weight ?? variant.optionValues.weight ?? "") ??
-          0,
+          variant.weightGrams ?? gramsFrom(option(variant, WEIGHT_KEYS)) ?? 0,
       };
     }
   }
