@@ -21,6 +21,7 @@ import { QuantityStepper } from "../components/quantity-stepper";
 import { ProductPhoto } from "../components/product-photo";
 import { formatNaira } from "../data/money";
 import { useCart } from "./cart-context";
+import { UnsellableNotice } from "./unsellable-notice";
 import type { CartLineKey, ResolvedLine } from "./types";
 
 /**
@@ -147,6 +148,16 @@ export function CartDrawer() {
           </p>
         )}
 
+        {/* The lines the server is holding that nothing can buy, and the only
+            control in the store that can remove them. Above the basket because
+            it is what stops the basket working. */}
+        <UnsellableNotice
+          lines={cart.unsellable}
+          pending={cart.pending}
+          onRemove={cart.removeLineId}
+          className="mx-6 mt-4"
+        />
+
         {/* Anything derived from the cart renders nothing until hydrated —
             otherwise this would flash an empty cart before the real one
             loads from the server. See cart-context.tsx. */}
@@ -156,7 +167,11 @@ export function CartDrawer() {
             drawer stacked "We couldn't load your cart" directly on top of "Your
             cart is empty" — the second sentence being exactly what the first
             one says we do not know. */}
-        {cart.hydrated && cart.resolved.length === 0 && !cart.problem && (
+        {/* `unsellable.length === 0` TOO. A basket holding one unbuyable line
+            is not empty — it is stuck, and those are opposite instructions.
+            Saying "empty" over the notice that names the blocking row would be
+            the drawer contradicting itself in adjacent paragraphs. */}
+        {cart.hydrated && cart.resolved.length === 0 && cart.unsellable.length === 0 && !cart.problem && (
           <div className="flex flex-1 items-center justify-center">
             <EmptyState
               icon={<ShoppingCart aria-hidden="true" />}
@@ -209,11 +224,22 @@ export function CartDrawer() {
                 </div>
               )}
 
-              <SheetClose asChild>
-                <Button asChild className="w-full focus-visible:ring-brand focus-visible:ring-offset-background">
-                  <Link href="/checkout">Checkout</Link>
+              {/* NOT A LINK WHILE SOMETHING UNBUYABLE IS IN THE BASKET.
+                  `/checkout` answers `unresolved_lines` for exactly this cart
+                  and tells the shopper to go back and remove the line, so an
+                  enabled button here is a round trip whose only outcome is
+                  being sent back to the notice above it. */}
+              {cart.unsellable.length > 0 ? (
+                <Button type="button" disabled className="w-full">
+                  Checkout
                 </Button>
-              </SheetClose>
+              ) : (
+                <SheetClose asChild>
+                  <Button asChild className="w-full focus-visible:ring-brand focus-visible:ring-offset-background">
+                    <Link href="/checkout">Checkout</Link>
+                  </Button>
+                </SheetClose>
+              )}
 
               <SheetClose asChild>
                 <Button

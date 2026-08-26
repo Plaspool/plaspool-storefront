@@ -27,12 +27,20 @@ export * from "./components/bulk-tier-table";
 export * from "./components/product-card";
 export * from "./components/product-grid";
 
-// The cart. Browser-local, localStorage-persisted, with bulk-tier
-// recalculation. `storage.ts` stays internal — everything outside `cart/`
-// goes through `useCart()`, never through `readCart`/`writeCart` directly.
+// The cart. HELD BY THE SERVER, identified by a cookie — `storage.ts` and its
+// localStorage basket are deleted, because a cart in the browser and a cart on
+// the server is two carts and the one that takes the money has to win. See the
+// header on `cart-context.tsx`. Everything outside `cart/` goes through
+// `useCart()`, never through `cart-api.ts` directly.
+//
+// `sellable.ts` is the one place a line is judged buyable or not, and it is a
+// plain module for the reason `line-key.ts` is one: it has to be testable
+// without a provider or a browser.
 export * from "./cart/types";
+export * from "./cart/sellable";
 export * from "./cart/cart-context";
 export * from "./cart/cart-drawer";
+export * from "./cart/unsellable-notice";
 export * from "./cart/add-to-cart";
 
 // The shop's own chrome — announcement bar, sticky nav, footer, and the

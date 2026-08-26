@@ -4,6 +4,8 @@ import * as React from "react";
 
 import { addLine, createCart, majorUnits, readCart, removeLine, setLineQty } from "../data/cart-api";
 import { lineKey } from "./line-key";
+import { partitionLines } from "./sellable";
+import type { VariantMatch } from "./sellable";
 import type { ApiCartView, CartResult } from "../data/cart-api";
 import type { CartApi, CartLine, CartLineKey, ResolvedLine } from "./types";
 import type { BulkTier, Colour, SizeOption } from "../data/types";
@@ -119,7 +121,7 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
 
   /** variant id → the (product, colour, size) triple the UI names it by. */
   const byVariant = React.useMemo(() => {
-    const out = new Map<string, { entry: CartCatalogEntry; colourId: string; sizeId: string }>();
+    const out = new Map<string, VariantMatch>();
     for (const entry of catalog) {
       for (const [key, variantId] of Object.entries(entry.variantIds)) {
         const [colourId, sizeId] = key.split(":");
@@ -322,6 +324,22 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
   );
 
   /**
+   * Remove by SERVER LINE ID, which is the only handle an unsellable row has.
+   *
+   * `remove(key)` goes through `lineIdFor`, which resolves the triple to a
+   * variant through the catalogue — so for a line whose variant the catalogue
+   * has lost it returns null and does nothing at all. That silent no-op was the
+   * whole of the stuck basket: the one line that had to go was the one line no
+   * control could name.
+   */
+  const removeLineId = React.useCallback(
+    (lineId: string) => {
+      void mutate(() => removeLine(lineId));
+    },
+    [mutate],
+  );
+
+  /**
    * Emptying the basket is N deletes, in sequence.
    *
    * THERE IS NO BULK DELETE ON THE API, and doing them in parallel would race
@@ -339,42 +357,51 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
   }, [view.lines, mutate]);
 
   /**
-   * Server lines, joined against the catalogue for the words and the swatch.
+   * THE ONE PLACE A LINE IS JUDGED BUYABLE OR NOT.
    *
-   * A LINE THE CATALOGUE NO LONGER EXPLAINS IS DROPPED. The server still holds
-   * it — this does not delete anything — but the drawer cannot draw a row it
-   * has no name or colour for, and inventing them would be worse than a shorter
-   * basket. `changes` from the API is where a line the SERVER removed is
-   * reported.
+   * This used to be two decisions in two places: `resolved` dropped whatever
+   * the catalogue could not explain, and `itemCount` counted the raw server
+   * lines regardless. They disagreed the moment a variant left the catalogue —
+   * badge 1, drawer empty, nothing on screen able to remove the line. See
+   * `sellable.ts` for the whole account.
+   *
+   * A LINE THE CATALOGUE NO LONGER EXPLAINS IS NOT DROPPED ANY MORE. The server
+   * still holds it and the drawer still cannot draw a row it has no name or
+   * colour for — but it can say so and offer to take it out, which is the part
+   * that was missing. `changes` from the API remains where a line the SERVER
+   * removed is reported.
    */
-  const resolved = React.useMemo<ResolvedLine[]>(() => {
-    const out: ResolvedLine[] = [];
-    for (const line of view.lines) {
-      const match = byVariant.get(line.variantId);
-      if (!match) continue;
-      const colour = match.entry.colours.find((c) => c.id === match.colourId);
-      const size = match.entry.sizes.find((s) => s.id === match.sizeId);
-      if (!colour || !size) continue;
-      /* THE SERVER'S PRICE, not `size.priceNaira`. The two agree today, and when
-         they stop agreeing the server is the one that takes the money. */
-      const unitPrice = majorUnits(line.unit);
-      out.push({
-        key: lineKey({ productSlug: match.entry.slug, colourId: colour.id, sizeId: size.id }),
-        product: match.entry,
-        colour,
-        size,
-        qty: line.qty,
-        unitPrice,
-        total: unitPrice * line.qty,
-        /* No tier: the shop currently offers no bulk discounts (see
-           `policy.ts`), and even if it did, that would be a storefront policy
-           constant with nothing behind it in the API, so the cart could not
-           claim one the till will not honour. */
-        tier: null,
-      });
-    }
-    return out;
-  }, [view.lines, byVariant]);
+  const split = React.useMemo(
+    () => partitionLines(view.lines, byVariant),
+    [view.lines, byVariant],
+  );
+
+  const resolved = React.useMemo<ResolvedLine[]>(
+    () =>
+      /* A MAP, NOT A FILTER. Every reason to leave a line out has already been
+         applied in `partitionLines`; a second `continue` here is how the two
+         projections drifted apart the first time. */
+      split.sellable.map(({ line, entry, colour, size }) => {
+        /* THE SERVER'S PRICE, not `size.priceNaira`. The two agree today, and
+           when they stop agreeing the server is the one that takes the money. */
+        const unitPrice = majorUnits(line.unit);
+        return {
+          key: lineKey({ productSlug: entry.slug, colourId: colour.id, sizeId: size.id }),
+          product: entry,
+          colour,
+          size,
+          qty: line.qty,
+          unitPrice,
+          total: unitPrice * line.qty,
+          /* No tier: the shop currently offers no bulk discounts (see
+             `policy.ts`), and even if it did, that would be a storefront policy
+             constant with nothing behind it in the API, so the cart could not
+             claim one the till will not honour. */
+          tier: null,
+        };
+      }),
+    [split],
+  );
 
   const lines = React.useMemo<CartLine[]>(
     () =>
@@ -388,7 +415,10 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
   );
 
   const value = React.useMemo<CartApi>(() => {
-    const itemCount = view.lines.reduce((sum, l) => sum + l.qty, 0);
+    /* SELLABLE UNITS ONLY. The badge is a promise that there are things in the
+       basket worth opening it for; counting a line nothing can draw, price or
+       remove makes it a promise the drawer immediately breaks. */
+    const itemCount = split.itemCount;
     /* THE SERVER'S SUBTOTAL where there is one. Falling back to the sum of the
        resolved rows keeps the drawer honest if a preview is ever absent, and
        the two agree by construction because both use the server's unit price. */
@@ -402,6 +432,7 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
     return {
       lines,
       resolved,
+      unsellable: split.unsellable,
       itemCount,
       subtotal,
       savings: Math.max(0, list - subtotal),
@@ -413,13 +444,14 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
       addVariants,
       setQty,
       remove,
+      removeLineId,
       clear,
       isOpen,
       open,
       close,
     };
   }, [
-    view.lines,
+    split,
     view.preview,
     view.changes,
     problem,
@@ -431,6 +463,7 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
     addVariants,
     setQty,
     remove,
+    removeLineId,
     clear,
     isOpen,
     open,

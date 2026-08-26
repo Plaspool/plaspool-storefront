@@ -1,5 +1,6 @@
 import type { BulkTier, Colour, SizeOption } from "../data/types";
 import type { CartCatalogEntry } from "./cart-context";
+import type { UnsellableLine } from "./sellable";
 
 /**
  * Cart types, split out from `cart-context.tsx` so `line-key.ts` — a plain
@@ -59,6 +60,20 @@ export interface ResolvedLine {
 export interface CartApi {
   lines: CartLine[];
   resolved: ResolvedLine[];
+  /**
+   * Lines the server is holding that the shopper cannot buy — the variant left
+   * the catalogue, or the API marked it unavailable.
+   *
+   * SURFACED RATHER THAN DROPPED. These used to be filtered out of `resolved`
+   * and silently counted in `itemCount`, which is a badge reading 1 over a
+   * drawer reading "Your cart is empty" and no control anywhere able to remove
+   * the line. Every surface that draws a basket must draw these too, because
+   * `/checkout` refuses the whole cart over them and tells the shopper to go
+   * back and remove one.
+   */
+  unsellable: UnsellableLine[];
+  /** UNITS THE SHOPPER CAN ACTUALLY BUY. Never the raw server line count — see
+   *  `unsellable` for what that cost. */
   itemCount: number;
   subtotal: number;
   savings: number;
@@ -110,6 +125,15 @@ export interface CartApi {
   }>;
   setQty(key: CartLineKey, qty: number): void;
   remove(key: CartLineKey): void;
+  /**
+   * Remove BY SERVER LINE ID, for an `unsellable` row.
+   *
+   * The `(product, colour, size)` key every other control is built on cannot
+   * name a line whose variant the catalogue has lost — there is no colour and
+   * no size to name it with. That is why the old `remove(key)` could never
+   * reach the one line a shopper most needed to take out.
+   */
+  removeLineId(lineId: string): void;
   clear(): void;
   isOpen: boolean;
   open(): void;
