@@ -188,3 +188,92 @@ describe("no points or unit noun is spelled in this package", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+/**
+ * Radix's `Slot` CLONES ITS CHILD, so it must be given exactly one.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Handed two, it throws `Primitive.<x> failed to slot onto its children`, React
+ * unwinds to the nearest error boundary, and the shopper gets a blank page
+ * reading "Something went wrong" instead of the component.
+ *
+ * TWO `<Link>`s SHARED ONE `SheetClose asChild` in the mobile menu. The markup
+ * looked ordinary, the types checked and the lint passed — and because that
+ * branch only renders for a SIGNED-IN shopper, after `readShopSession()`
+ * resolves, opening the hamburger showed a working menu for about a second and
+ * then took the whole page down. A guest never reached the branch, so neither
+ * review nor the suite ever rendered it.
+ *
+ * A PARSER RATHER THAN A REGEX, because the offence spans lines and nests: the
+ * wrapper and its children are on separate lines, and the same tag can appear
+ * inside itself.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+function topLevelElementChildren(body: string): number {
+  let depth = 0;
+  let children = 0;
+  let i = 0;
+  while (i < body.length) {
+    if (body[i] === "<") {
+      const rest = body.slice(i);
+      const seg = /^<[^>]*>/.exec(rest);
+      const named = /^<\/?[A-Za-z][A-Za-z0-9_.]*/.exec(rest);
+      if (seg && named) {
+        if (rest[1] === "/") {
+          depth -= 1;
+        } else {
+          if (depth === 0) children += 1;
+          if (!seg[0].trimEnd().endsWith("/>")) depth += 1;
+        }
+        i += seg[0].length;
+        continue;
+      }
+    }
+    i += 1;
+  }
+  return children;
+}
+
+function multiChildSlots(src: string): { tag: string; line: number; children: number }[] {
+  const out: { tag: string; line: number; children: number }[] = [];
+  const open = /<([A-Z][A-Za-z0-9_.]*)([^>]*\basChild\b[^>]*)>/g;
+  let m: RegExpExecArray | null;
+  while ((m = open.exec(src)) !== null) {
+    if (m[0].trimEnd().endsWith("/>")) continue;
+    const tag = m[1];
+    const pair = new RegExp("</?" + tag.replace(/\./g, "\.") + "(?:\s[^>]*)?/?>", "g");
+    pair.lastIndex = m.index + m[0].length;
+    let depth = 1;
+    let end = -1;
+    let p: RegExpExecArray | null;
+    while ((p = pair.exec(src)) !== null) {
+      if (p[0].startsWith("</")) {
+        depth -= 1;
+        if (depth === 0) {
+          end = p.index;
+          break;
+        }
+      } else if (!p[0].trimEnd().endsWith("/>")) {
+        depth += 1;
+      }
+    }
+    if (end === -1) continue;
+    const children = topLevelElementChildren(src.slice(m.index + m[0].length, end));
+    if (children > 1) {
+      out.push({ tag, line: src.slice(0, m.index).split("\n").length, children });
+    }
+  }
+  return out;
+}
+
+describe("`asChild` is given exactly one child to clone", () => {
+  it("never hands a slotted wrapper more than one element", () => {
+    const offenders: string[] = [];
+    for (const { path, text } of [...sourcesIn(SHOP), ...sourcesIn(UI)]) {
+      for (const found of multiChildSlots(text)) {
+        offenders.push(`${path}:${found.line}  <${found.tag} asChild> wraps ${found.children}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});

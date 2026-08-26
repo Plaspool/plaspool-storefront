@@ -102,7 +102,11 @@ describe("order-line images", () => {
       coverImageUrl: null,
       variants: [variant({ id: "var_1", optionValues: LIVE_OPTIONS })],
     } as unknown as ApiProduct;
-    expect(lineImagesFrom([product]).var_1.weightGrams).toBe(1000);
+    /* `?.` because `noUncheckedIndexedAccess` types an index read as possibly
+       undefined, and it is the honest spelling here: if the variant is missing
+       the expectation reads `undefined` and still fails, where a `!` would
+       assert away the very thing under test. */
+    expect(lineImagesFrom([product]).var_1?.weightGrams).toBe(1000);
   });
 });
 

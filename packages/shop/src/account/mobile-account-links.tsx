@@ -8,7 +8,7 @@ import { SheetClose, cn } from "@plaspool/ui";
 
 import { Avatar } from "./avatar";
 import { signInHref } from "./sign-in-href";
-import { readShopSession, signOutEverywhere, type ShopSession } from "../data/auth-api";
+import { readShopSession, signOutEverywhere, type ShopCustomer, type ShopSession } from "../data/auth-api";
 
 /**
  * The account actions inside the mobile menu.
@@ -72,6 +72,44 @@ export function MobileAccountLinks({ linkClassName }: { linkClassName: string })
     );
   }
 
+  return (
+    <SignedInAccountLinks
+      customer={customer}
+      linkClassName={linkClassName}
+      signingOut={signingOut}
+      onSignOut={async () => {
+        setSigningOut(true);
+        await signOutEverywhere();
+        setSession({ kind: "guest" });
+        router.refresh();
+        router.push("/");
+      }}
+    />
+  );
+}
+
+/**
+ * The signed-in half of the mobile menu.
+ *
+ * SPLIT OUT SO IT CAN BE RENDERED WITHOUT A SESSION PROBE. The parent only
+ * reaches this branch after `readShopSession()` answers with a customer, which
+ * happens in an effect — and effects do not run under `react-dom/server`, so
+ * for as long as this markup lived inside the parent there was no way to render
+ * it in a test at all. That is precisely how a crash in here reached
+ * production: every automated check of this file could only ever see the
+ * signed-OUT branches.
+ */
+export function SignedInAccountLinks({
+  customer,
+  linkClassName,
+  signingOut,
+  onSignOut,
+}: {
+  customer: ShopCustomer;
+  linkClassName: string;
+  signingOut: boolean;
+  onSignOut: () => void;
+}) {
   const label = customer.name?.trim() || customer.email;
 
   return (
@@ -92,11 +130,20 @@ export function MobileAccountLinks({ linkClassName }: { linkClassName: string })
         </span>
       </div>
 
+      {/* ONE `SheetClose` PER LINK, and never one wrapped around several.
+          These two shared a single `asChild` close, which Radix's `Slot`
+          refuses — `React.Children.count(children) > 1` throws — so the whole
+          page went to the error boundary as "Something went wrong" the moment
+          this branch rendered. It only reached signed-in shoppers, and only
+          after `readShopSession()` resolved, so the menu appeared to work for a
+          second before taking the page down with it. */}
       <SheetClose asChild>
         <Link href="/account" className={linkClassName}>
           <User aria-hidden="true" className="h-4 w-4" />
           Your account
         </Link>
+      </SheetClose>
+      <SheetClose asChild>
         <Link href="/account/orders" className={linkClassName}>
           <Package aria-hidden="true" className="h-4 w-4" />
           Orders
@@ -124,13 +171,7 @@ export function MobileAccountLinks({ linkClassName }: { linkClassName: string })
         <button
           type="button"
           disabled={signingOut}
-          onClick={async () => {
-            setSigningOut(true);
-            await signOutEverywhere();
-            setSession({ kind: "guest" });
-            router.refresh();
-            router.push("/");
-          }}
+          onClick={onSignOut}
           className={cn(linkClassName, "w-full text-left disabled:opacity-60")}
         >
           <LogOut aria-hidden="true" className="h-4 w-4" />
