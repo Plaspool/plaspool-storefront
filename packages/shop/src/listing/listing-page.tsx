@@ -43,8 +43,8 @@ import { SortSelect } from "./sort-select";
 
 const ALL_META = { name: "All filament", blurb: "Every spool we make." };
 
-async function metaFor(category: string) {
-  return category === "all" ? ALL_META : await getCategory(category);
+async function metaFor(category: string, fresh = false) {
+  return category === "all" ? ALL_META : await getCategory(category, fresh);
 }
 
 export async function categoryMetadata({
@@ -72,8 +72,15 @@ export async function categoryParams(): Promise<{ category: string }[]> {
 
 export async function CategoryPage({
   params,
+  fresh = false,
 }: {
   params: Promise<{ category: string }>;
+  /* A PROP, NEVER A `searchParams` READ. Awaiting `searchParams` here is what
+     made this route dynamic for EVERY visitor — the #9 regression the header
+     above describes — and it does that whether or not the query is present.
+     A prop is set by the caller, so `/preview/[category]` can render fresh
+     while `/store/[category]` stays prerendered and untouched. */
+  fresh?: boolean;
 }) {
   const { category } = await params;
 
@@ -82,8 +89,8 @@ export async function CategoryPage({
      fetches and serialising them would put one latency behind the other for no
      reason. The blog's pages use the same `Promise.all` shape. */
   const [meta, base] = await Promise.all([
-    metaFor(category),
-    isAll ? listProducts() : listProductsByCategory(category),
+    metaFor(category, fresh),
+    isAll ? listProducts(fresh) : listProductsByCategory(category, fresh),
   ]);
   if (!meta) notFound();
 

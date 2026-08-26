@@ -48,6 +48,12 @@ const PRIVATE_PATHS = [
   "/cart",
   "/checkout",
   "/dev/",
+  /* The uncached mirror of the catalogue. Every page under it is a duplicate
+     of one already indexed under /store, rendered on demand rather than served
+     from KV — so letting a crawler walk it would buy duplicate content with
+     Worker invocations. The pages carry `noindex` as well; this keeps a
+     crawler from spending the render to find that out. */
+  "/preview/",
   "/sign-in",
 ];
 

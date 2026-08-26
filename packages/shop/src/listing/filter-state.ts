@@ -212,7 +212,13 @@ export function facetsFor(products: Product[]): Facets {
         });
     }
 
+    /* ZERO IS "NO WEIGHT RECORDED", NOT A WEIGHT. A product with no weight
+       axis and no `weightGrams` carries a single 0 g size; bucketing it would
+       put a "0 g" checkbox in the filter that no shopper is looking for and
+       that reads as a data error. It stays reachable unfiltered, which is the
+       same treatment an unknown material gets above. */
     for (const grams of new Set(p.sizes.map((s) => s.weightGrams))) {
+      if (grams <= 0) continue;
       weights.set(grams, (weights.get(grams) ?? 0) + 1);
     }
   }

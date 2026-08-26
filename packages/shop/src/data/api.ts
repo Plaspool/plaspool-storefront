@@ -313,6 +313,56 @@ const COLOUR_KEYS = ["Colour", "colour", "Color", "color"] as const;
  *  read by a different mechanism from its neighbours. */
 const DIAMETER_KEYS = ["Diameter", "diameter"] as const;
 
+/** `1000` -> `"1 kg"`, `100` -> `"100 g"`. Whole kilos only, so 1500 stays
+ *  `"1500 g"` rather than becoming a `1.5 kg` this catalogue never wrote. */
+function labelFromGrams(grams: number): string {
+  return grams >= 1000 && grams % 1000 === 0 ? `${grams / 1000} kg` : `${grams} g`;
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE SIZE LABEL, IN THREE STEPS, AND THE LAST ONE IS EMPTY ON PURPOSE.
+ *
+ * A weight used to be readable one way — the free-text axis — and a variant
+ * without one was skipped, which emptied `sizesFrom` and made `toProduct`
+ * drop the whole product. That cost a live product with a price, stock and a
+ * recorded weight its entire presence in the shop.
+ *
+ *   1. the weight axis, whatever the owner spelled it
+ *   2. else `weightGrams`, the STRUCTURED field — null on every variant when
+ *      this file was written, which is why it was only ever a fallback, and
+ *      no longer true: `basic` ships `weightGrams: 100` and no axis at all
+ *   3. else `""` — the catalogue genuinely records no weight
+ *
+ * AN EMPTY LABEL IS A REAL ANSWER, NOT A FAILURE. It means "this product has
+ * one size and nobody said how big it is", which is a thing a shop is allowed
+ * to sell. The surfaces render around it rather than printing a blank or an
+ * invented `0 g`: the buy box drops the Size control, the weight filter builds
+ * no bucket, and a cart line joins what it has. Inventing `"One size"` here
+ * would put a claim in the seller's mouth on a page somebody buys from.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function sizeLabelOf(variant: ApiVariant): string {
+  const label = option(variant, WEIGHT_KEYS);
+  if (label) return label;
+  const grams = variant.weightGrams;
+  return typeof grams === "number" && grams > 0 ? labelFromGrams(grams) : "";
+}
+
+/** What an unlabelled size is keyed by. One per product, since a product with
+ *  no weight axis has exactly one size by definition. */
+const UNSIZED = "default";
+
+/**
+ * The size id. `sizesFrom` and `variantIdsFrom` MUST agree on this — a buy box
+ * builds its key from a `SizeOption.id` and looks it up in `variantIds`, so an
+ * id derived two ways is an Add to cart button that does nothing.
+ */
+export function sizeIdOf(variant: ApiVariant): string {
+  const label = sizeLabelOf(variant);
+  return label ? idOf(label) : UNSIZED;
+}
+
 /** `"1.75 mm"` → `1.75`. Null for anything that is not one of the two this
  *  store sells, for the same reason `materialFrom` returns null. */
 export function diameterFrom(variants: ApiVariant[]): DiameterMm | null {
@@ -442,9 +492,8 @@ export function sizesFrom(variants: ApiVariant[]): SizeOption[] {
   >();
   for (const variant of variants) {
     if (!variant.price) continue;
-    const label = option(variant, WEIGHT_KEYS);
-    if (!label) continue;
-    const key = idOf(label);
+    const label = sizeLabelOf(variant);
+    const key = sizeIdOf(variant);
     const grams = variant.weightGrams ?? gramsFrom(label);
     const existing = byLabel.get(key);
     if (existing) {
@@ -501,9 +550,11 @@ export function variantIdsFrom(variants: ApiVariant[]): Record<string, string> {
   for (const variant of variants) {
     if (!variant.price) continue;
     const colour = option(variant, COLOUR_KEYS);
-    const weight = option(variant, WEIGHT_KEYS);
-    if (!colour || !weight) continue;
-    const key = `${idOf(colour)}:${idOf(weight)}`;
+    if (!colour) continue;
+    /* NO WEIGHT REQUIRED ANY MORE. Demanding one here dropped every variant of
+       a product with no weight axis, so the buy box rendered and Add to cart
+       had nothing to add — a control that accepts a click and does nothing. */
+    const key = `${idOf(colour)}:${sizeIdOf(variant)}`;
     /* First wins, which is `position` order — the same variant `sizesFrom`
        quotes when two share a (colour, weight) pair. */
     if (!(key in out)) out[key] = variant.id;

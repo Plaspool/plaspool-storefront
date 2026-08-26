@@ -123,6 +123,13 @@ export function BuyBox({
      control reads as an unanswered question about what you are buying. */
   const singleSize = product.sizes.length === 1;
 
+  /* A PRODUCT WHOSE CATALOGUE RECORDS NO WEIGHT HAS NOTHING TO PUT HERE.
+     `sizeLabelOf` leaves the label empty when neither the weight axis nor
+     `weightGrams` says anything, and one blank button under a "Size" heading
+     asks a question with no answer. The price above already states what is
+     being bought, and the variant is still the one Add to cart adds. */
+  const showSizes = product.sizes.some((option) => option.label !== "");
+
   const sizeLabelId = React.useId();
 
   return (
@@ -160,38 +167,42 @@ export function BuyBox({
         <p className="mt-1.5 font-sans text-sm text-muted-foreground">{colour.name}</p>
       </div>
 
-      <div>
-        <p id={sizeLabelId} className="font-sans text-sm font-semibold text-foreground">
-          Size
-        </p>
-        <div role="group" aria-labelledby={sizeLabelId} className="mt-2 flex flex-wrap gap-2">
-          {product.sizes.map((option) => {
-            const active = option.id === size.id;
-            return (
-              <button
-                key={option.id}
-                type="button"
-                aria-pressed={active}
-                disabled={singleSize}
-                onClick={() => onSizeChange(option.id)}
-                className={cn(
-                  "inline-flex items-baseline gap-2 rounded-lg border px-3 py-2 transition-colors motion-reduce:transition-none",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                  "disabled:cursor-default",
-                  active
-                    ? "border-brand bg-brand-soft text-foreground"
-                    : "border-brand-line text-muted-foreground hover:border-foreground hover:text-foreground",
-                )}
-              >
-                <span className="font-sans text-sm">{option.label}</span>
-                <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                  {option.weightGrams} g
-                </span>
-              </button>
-            );
-          })}
+      {showSizes && (
+        <div>
+          <p id={sizeLabelId} className="font-sans text-sm font-semibold text-foreground">
+            Size
+          </p>
+          <div role="group" aria-labelledby={sizeLabelId} className="mt-2 flex flex-wrap gap-2">
+            {product.sizes.map((option) => {
+              const active = option.id === size.id;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  aria-pressed={active}
+                  disabled={singleSize}
+                  onClick={() => onSizeChange(option.id)}
+                  className={cn(
+                    "inline-flex items-baseline gap-2 rounded-lg border px-3 py-2 transition-colors motion-reduce:transition-none",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    "disabled:cursor-default",
+                    active
+                      ? "border-brand bg-brand-soft text-foreground"
+                      : "border-brand-line text-muted-foreground hover:border-foreground hover:text-foreground",
+                  )}
+                >
+                  <span className="font-sans text-sm">{option.label}</span>
+                  {option.weightGrams > 0 && (
+                    <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                      {option.weightGrams} g
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       <div>
         <p className="font-sans text-sm font-semibold text-foreground">Quantity</p>
