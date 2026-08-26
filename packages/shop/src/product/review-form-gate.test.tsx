@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { ReviewForm } from "./review-form";
-import { ReviewGuestPrompt, ReviewNeedsNamePrompt } from "./review-form-gate";
+import { ReviewGuestPrompt } from "./review-form-gate";
 
 /**
  * THE REVIEWER IS THE ACCOUNT, AND IS NEVER TYPED.
@@ -21,12 +21,8 @@ import { ReviewGuestPrompt, ReviewNeedsNamePrompt } from "./review-form-gate";
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-const AUTHOR = { name: "Ada Lovelace", email: "ada@example.com" };
-
 const form = () =>
-  renderToStaticMarkup(
-    <ReviewForm productSlug="pla-basic" productName="PLA Basic" author={AUTHOR} />,
-  );
+  renderToStaticMarkup(<ReviewForm productSlug="pla-basic" productName="PLA Basic" />);
 
 describe("ReviewForm", () => {
   it("asks for no name and no email", () => {
@@ -38,11 +34,12 @@ describe("ReviewForm", () => {
     expect(html).not.toContain("Shown with your review");
   });
 
-  /* THE EMAIL MUST NOT REACH THE PAGE AT ALL — not as a value, not as a
-     placeholder, not in a hidden input. The whole point is that it stops being
-     something the product page holds. */
-  it("does not put the account's email into the markup", () => {
-    expect(form()).not.toContain("ada@example.com");
+  /* THE REVIEWER'S IDENTITY MUST NOT REACH THIS PAGE AT ALL — not as a value,
+     not as a placeholder, not in a hidden input, and since the API reads it off
+     the session cookie, not even as a prop. Any `@` in this markup would mean
+     an address had found its way back onto a public product page. */
+  it("puts no email address into the markup", () => {
+    expect(form()).not.toContain("@");
   });
 
   it("still asks for the things a review actually is", () => {
@@ -87,17 +84,5 @@ describe("ReviewGuestPrompt", () => {
       <ReviewGuestPrompt next="/sign-in?next=%2Fstore%2Fproducts%2Fpla-basic" />,
     );
     expect(html).toContain("%2Fstore%2Fproducts%2Fpla-basic");
-  });
-});
-
-describe("ReviewNeedsNamePrompt", () => {
-  /* A NAME IS PUBLISHED BESIDE THE REVIEW and the account may not have one.
-     The email must never stand in for it — it is the one field the public
-     projection cannot return, and printing it under a review would publish the
-     address this whole change exists to stop sending. */
-  it("sends the shopper to settings rather than giving them a field", () => {
-    const html = renderToStaticMarkup(<ReviewNeedsNamePrompt />);
-    expect(html).toContain('href="/account/settings"');
-    expect(html).not.toContain("<input");
   });
 });

@@ -198,8 +198,10 @@ export interface SubmitReviewInput {
   rating: number;
   title: string;
   body: string;
-  authorName: string;
-  authorEmail: string;
+  /* NO `authorName`/`authorEmail`. The API derives the author from the session
+     cookie and answers `401 {"error":"unauthenticated"}` without one. Sending
+     them would be the shopper's email crossing the wire to say something the
+     cookie already says — and nothing would stop it naming somebody else. */
 }
 
 export interface SubmitReviewResult {
@@ -214,7 +216,12 @@ export interface SubmitReviewResult {
  * configuration problem the customer cannot act on, and `failed` is the
  * catch-all. The API's own 400s are prevented client-side before we get here.
  */
-export type SubmitError = "rate-limited" | "rejected" | "invalid" | "failed";
+export type SubmitError =
+  | "signed-out"
+  | "rate-limited"
+  | "rejected"
+  | "invalid"
+  | "failed";
 
 export class ReviewSubmitError extends Error {
   constructor(readonly kind: SubmitError) {
@@ -228,6 +235,11 @@ export async function submitReview(input: SubmitReviewInput): Promise<SubmitRevi
   try {
     res = await fetch(`${COMMERCE_API_BASE}/api/shop/reviews/submit`, {
       method: "POST",
+      /* THE COOKIE IS THE AUTHOR. This call sent no credentials at all, which
+         was harmless while the author was typed into the body and is a 401 on
+         every submission now. Cross-site, like the cart's — see the header on
+         `cart-api.ts` for why the API sets `SameSite=None`. */
+      credentials: "include",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         productSlug: input.productSlug,
@@ -236,8 +248,6 @@ export async function submitReview(input: SubmitReviewInput): Promise<SubmitRevi
            an untouched field is omitted rather than sent blank. */
         ...(input.title.trim() ? { title: input.title.trim() } : {}),
         body: input.body.trim(),
-        authorName: input.authorName.trim(),
-        authorEmail: input.authorEmail.trim(),
       }),
     });
   } catch {
@@ -246,6 +256,11 @@ export async function submitReview(input: SubmitReviewInput): Promise<SubmitRevi
     throw new ReviewSubmitError("failed");
   }
 
+  /* SIGNED OUT IS NOT A BROKEN CONNECTION. This fell through to the catch-all,
+     whose copy is "check your connection and try again" — said to a shopper
+     whose connection is perfect and who has merely been signed out since the
+     page loaded. */
+  if (res.status === 401) throw new ReviewSubmitError("signed-out");
   if (res.status === 429) throw new ReviewSubmitError("rate-limited");
   if (res.status === 403) throw new ReviewSubmitError("rejected");
   if (res.status === 400 || res.status === 422) throw new ReviewSubmitError("invalid");

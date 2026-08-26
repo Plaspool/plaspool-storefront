@@ -29,9 +29,11 @@ import type { SubmitError } from "../data/reviews";
  * somebody the session already identified — and nothing stopped them typing
  * somebody else's.
  *
- * So the fields are gone and `author` arrives as a prop. `ReviewFormGate` is
- * what decides there is one: only a confirmed guest is turned away, and this
- * component is never mounted without an account behind it.
+ * So the fields are gone, and NOTHING here names the reviewer at all — not even
+ * as a prop. The API reads the author off the session cookie and answers
+ * `401 {"error":"unauthenticated"}` without one, so the identity never enters
+ * this page in any form. `ReviewFormGate` is what keeps a guest from reaching a
+ * form whose submission would be refused.
  */
 
 /** The API's own floor: "not left holding a single character by accident". */
@@ -39,6 +41,11 @@ const BODY_MIN = 10;
 const BODY_MAX = 5000;
 
 const MESSAGES: Record<SubmitError, string> = {
+  /* NOT "check your connection" — the connection is fine. A session can expire
+     between opening the page and pressing the button, and the gate cannot catch
+     that because it asked before the review was written. */
+  "signed-out":
+    "You have been signed out. Sign in again and your review can be posted.",
   "rate-limited":
     "That is a few reviews in a short time. Give it fifteen minutes and try again.",
   rejected:
@@ -113,18 +120,10 @@ function StarPicker({
 export interface ReviewFormProps {
   productSlug: string;
   productName: string;
-  /**
-   * WHO IS WRITING, FROM THE SESSION — never from a field on this page.
-   *
-   * `name` is published beside the review; `email` is not, and the public
-   * projection cannot return it. Both come from the account, so a reviewer
-   * cannot put somebody else's name on their words by typing one.
-   */
-  author: { name: string; email: string };
   className?: string;
 }
 
-export function ReviewForm({ productSlug, productName, author, className }: ReviewFormProps) {
+export function ReviewForm({ productSlug, productName, className }: ReviewFormProps) {
   const [rating, setRating] = React.useState(0);
   const [title, setTitle] = React.useState("");
   const [body, setBody] = React.useState("");
@@ -164,14 +163,7 @@ export function ReviewForm({ productSlug, productName, author, className }: Revi
 
     setSending(true);
     try {
-      await submitReview({
-        productSlug,
-        rating,
-        title,
-        body,
-        authorName: author.name,
-        authorEmail: author.email,
-      });
+      await submitReview({ productSlug, rating, title, body });
       setDone(true);
     } catch (err) {
       setError(err instanceof ReviewSubmitError ? err.kind : "failed");
