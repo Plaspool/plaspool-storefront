@@ -283,16 +283,30 @@ export function CheckoutFlow() {
    * ONLY once the areas have actually loaded: an empty list is the fetch
    * failing, not the district being wrong, and stripping a saved address's
    * district because the network hiccuped would quietly change its price.
+   *
+   * DERIVED DURING RENDER, not stored and then corrected by an effect. The
+   * effect this replaces wrote the correction in a second pass, so there was
+   * always a committed render in which the orphaned key was still live.
+   * Deriving it means the picker, the review line and the submit all read ONE
+   * expression and cannot disagree — and it is reversible, so undoing a
+   * mistyped State brings the district back rather than making the shopper
+   * choose it again.
    */
-  React.useEffect(() => {
-    if (serviceAreas.length === 0 || !address.district) return;
-    if (districtChoices.some((area) => area.key === address.district)) return;
-    setAddress((current) => (current.district ? { ...current, district: null } : current));
-  }, [serviceAreas.length, districtChoices, address.district]);
+  const effectiveDistrict =
+    !address.district ||
+    serviceAreas.length === 0 ||
+    districtChoices.some((area) => area.key === address.district)
+      ? address.district
+      : null;
+
+  /** What the submit sends: the typed address carrying the district that is
+   *  actually on screen, never an orphaned key still sitting in state. */
+  const effectiveAddress: Address =
+    effectiveDistrict === address.district ? address : { ...address, district: effectiveDistrict };
 
   /** For the review step: the district's display name, never its key. */
-  const districtName = address.district
-    ? serviceAreas.find((area) => area.key === address.district)?.name ?? null
+  const districtName = effectiveDistrict
+    ? serviceAreas.find((area) => area.key === effectiveDistrict)?.name ?? null
     : null;
 
   /**
@@ -449,7 +463,7 @@ export function CheckoutFlow() {
         setError({ code: "gone" });
         return;
       }
-      const result = await setCheckoutAddress(address, rev2.revision);
+      const result = await setCheckoutAddress(effectiveAddress, rev2.revision);
       if (!result.ok) {
         setError(result.error);
         return;
@@ -785,7 +799,7 @@ export function CheckoutFlow() {
                     that district; leaving it is the state's standard rate. */}
                 <select
                   id="co-district"
-                  value={address.district ?? ""}
+                  value={effectiveDistrict ?? ""}
                   onChange={(e) => editAddress({ district: e.target.value || null })}
                   className={NATIVE_SELECT_CLASSES}
                 >
