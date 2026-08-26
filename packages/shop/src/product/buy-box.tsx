@@ -175,6 +175,17 @@ export function BuyBox({
           <div role="group" aria-labelledby={sizeLabelId} className="mt-2 flex flex-wrap gap-2">
             {product.sizes.map((option) => {
               const active = option.id === size.id;
+              /* THE GRAM FIGURE IS A SECOND READING, NOT A REPEAT.
+                 `1kg` beside `1000 g` is worth showing: one is what the seller
+                 typed, the other is what it weighs, and the pair answers
+                 "how much is a kilo, exactly". `100 g` beside `100 g` is just
+                 the same words twice — which is what happens whenever
+                 `sizeLabelOf` DERIVED the label from `weightGrams` because no
+                 weight axis was set. Whitespace and case are ignored so `100g`
+                 counts as the same reading as `100 g`. */
+              const grams = `${option.weightGrams} g`;
+              const fold = (v: string) => v.replace(/\s+/g, "").toLowerCase();
+              const showGrams = option.weightGrams > 0 && fold(option.label) !== fold(grams);
               return (
                 <button
                   key={option.id}
@@ -192,9 +203,9 @@ export function BuyBox({
                   )}
                 >
                   <span className="font-sans text-sm">{option.label}</span>
-                  {option.weightGrams > 0 && (
+                  {showGrams && (
                     <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                      {option.weightGrams} g
+                      {grams}
                     </span>
                   )}
                 </button>
