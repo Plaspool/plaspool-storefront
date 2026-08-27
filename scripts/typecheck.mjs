@@ -11,6 +11,22 @@
 // `apps/*/tsconfig.json` and `packages/*/tsconfig.json` at run time, so a
 // new package (e.g. `packages/shop`) is covered automatically the moment it
 // gets a tsconfig.json, with no edit to this file or to package.json.
+//
+// ═══ AND ONE LEVEL DEEPER, WHICH IS NOT A FLOURISH ═══
+// Discovery used to stop at `packages/*`, and three Next dev harnesses live at
+// `packages/*/dev` — blog's, shop's and web's. Each has its own tsconfig.json,
+// each imports the package it exercises, and none of them was covered by
+// anything: not by this script, not by `npm run build` (the app never imports a
+// harness), not by `npm run lint` (which does not typecheck). So they rotted in
+// silence. `packages/shop/dev/app/kit/page.tsx` — the component gallery — had
+// been serving an HTTP 500 for some time: it still imported a `COLOURS` export
+// that had been renamed and called `listProducts()` as though the catalogue
+// were still a local array rather than an async call against the commerce API.
+//
+// A harness is exactly the code most likely to rot, because nothing else
+// imports it and nobody loads it on a normal day. Covering only the one that
+// broke would leave the same hole under the other two, so discovery walks one
+// level into each workspace rather than naming `dev`.
 
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -27,14 +43,35 @@ const require = createRequire(import.meta.url);
 // unescaped args through a shell.
 const tscBin = require.resolve("typescript/bin/tsc");
 
-function discoverTsconfigs(rootDirName) {
-  const rootDir = join(repoRoot, rootDirName);
-  if (!existsSync(rootDir)) return [];
+// Generated or vendored trees, which never hold a project we mean to check.
+// Dot-directories (`.next`, `.turbo`, `.git`) are excluded by the leading-dot
+// test below rather than named here.
+const NOT_SOURCE = new Set(["node_modules", "dist", "build", "out", "coverage"]);
 
-  return readdirSync(rootDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => join(rootDirName, entry.name, "tsconfig.json"))
-    .filter((relPath) => existsSync(join(repoRoot, relPath)));
+function subdirectories(relDir) {
+  const abs = join(repoRoot, relDir);
+  if (!existsSync(abs)) return [];
+
+  return readdirSync(abs, { withFileTypes: true })
+    .filter(
+      (entry) =>
+        entry.isDirectory() && !entry.name.startsWith(".") && !NOT_SOURCE.has(entry.name)
+    )
+    .map((entry) => join(relDir, entry.name));
+}
+
+function discoverTsconfigs(rootDirName) {
+  const found = [];
+
+  for (const workspace of subdirectories(rootDirName)) {
+    // The workspace's own project, then any nested one (`packages/*/dev`).
+    for (const dir of [workspace, ...subdirectories(workspace)]) {
+      const relPath = join(dir, "tsconfig.json");
+      if (existsSync(join(repoRoot, relPath))) found.push(relPath);
+    }
+  }
+
+  return found;
 }
 
 const targets = [...discoverTsconfigs("apps"), ...discoverTsconfigs("packages")];
