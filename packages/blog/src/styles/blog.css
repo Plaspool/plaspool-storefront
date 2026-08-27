@@ -826,9 +826,6 @@
 .blog .tpl--minimal .tpl__head {
   margin-bottom: var(--s7);
 }
-.blog .tpl--minimal .blog-prose {
-  font-size: var(--step-1);
-}
 
 /* editorial */
 .blog .tpl--editorial {
@@ -893,7 +890,6 @@
 }
 .blog .tpl--technical .blog-prose {
   font-family: var(--font-ui);
-  font-size: var(--step-1);
   line-height: 1.68;
   letter-spacing: 0;
 }
@@ -978,9 +974,21 @@
    storefront has no editor surface. The class is `.blog-prose` — see the
    file header for why that one name changed. */
 
+/* ═══ THE READING SIZE IS SET HERE AND NOWHERE ELSE ═══
+   `--step-1`, down one from `--step-2`, because the display face is
+   monospaced now. A mono advance is ~0.6em against a proportional face's
+   ~0.5em, so the same nominal size buys markedly fewer characters per line:
+   at `--step-2` the 42rem measure held about 51, which is under the band
+   where long-form reading is comfortable. At `--step-1` it holds about 62.
+   The measure did not change; what it costs per character did.
+
+   The template overrides that used to pin this value have been removed rather
+   than lowered — `--tpl-measure`, the rail and the line-height are what make
+   those layouts read denser, and there is no step between 18px and 15px to
+   spend on them. 15px of monospace is not an article. */
 .blog .blog-prose {
   font-family: var(--font-display);
-  font-size: var(--step-2);
+  font-size: var(--step-1);
   line-height: 1.72;
   color: var(--ink);
   letter-spacing: -0.003em;
@@ -1327,8 +1335,10 @@
 }
 
 @media (max-width: 640px) {
+  /* No size step here any more: this block existed to bring 22px down to 18px
+     on a narrow screen, and 18px is what the page now opens at. Only the
+     tighter leading is still a phone-specific decision. */
   .blog .blog-prose {
-    font-size: var(--step-1);
     line-height: 1.68;
   }
   .blog .blog-prose h2 {
