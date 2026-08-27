@@ -23,7 +23,7 @@ const CLAIMS: Claim[] = [
   {
     icon: Factory,
     title: "Made in Nigeria",
-    figure: "Extruded in Lagos",
+    figure: "Extruded in Abuja",
     body: "Our own line, not repackaged imports — so a reorder matches the batch you already printed.",
   },
   {
@@ -35,7 +35,7 @@ const CLAIMS: Claim[] = [
   {
     icon: Truck,
     title: "Nationwide delivery",
-    figure: "Next day in Lagos",
+    figure: "Next day in Abuja",
     body: "Two to four working days everywhere else in Nigeria, tracked from the moment it ships.",
   },
 ];

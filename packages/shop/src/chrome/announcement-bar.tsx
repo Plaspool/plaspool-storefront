@@ -142,7 +142,7 @@ export async function AnnouncementBar() {
           {` ${pointsLabel(perReturn, program)}`}
         </>
       ) : (
-        DELIVERY.lagos
+        DELIVERY.abuja
       )}
     </p>
   );

@@ -267,7 +267,7 @@ export function BuyBox({
       <div className="flex gap-2 border-t border-brand-line pt-5">
         <Truck aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
         <ul className="flex flex-col gap-1 text-sm leading-6 text-muted-foreground">
-          <li>{DELIVERY.lagos}</li>
+          <li>{DELIVERY.abuja}</li>
           <li>{DELIVERY.nationwide}</li>
         </ul>
       </div>

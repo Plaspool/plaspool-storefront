@@ -45,7 +45,7 @@ export async function OrderInfo({ className }: OrderInfoProps) {
           <Truck aria-hidden="true" className="h-5 w-5 text-brand" />
           <h3 className="font-sans text-sm font-semibold text-foreground">Delivery</h3>
           <ul className="flex flex-col gap-1.5 text-sm leading-6 text-muted-foreground">
-            <li>{DELIVERY.lagos}</li>
+            <li>{DELIVERY.abuja}</li>
             <li>{DELIVERY.nationwide}</li>
           </ul>
         </div>

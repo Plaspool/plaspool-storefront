@@ -88,11 +88,21 @@
   --card-lift: 3px;
 
   /* accent — deep botanical green */
-  --accent: #1c6b4b;
-  --accent-hover: #17573d;
-  --accent-soft: #e4efe9;
-  --accent-line: #b6d4c5;
-  --accent-ink: #ffffff;
+  /* ═══ THE SITE'S BRAND RAMP, NOT A SECOND ONE ═══
+     These were a green of their own (#1c6b4b), so the blog's pills, links and
+     buttons read as a different product from the shop two clicks away. They
+     point at the storefront's ramp now — the same custom properties
+     `globals.css` defines and `bg-brand` resolves through — so PlaSpool is one
+     colour everywhere and a change to the ramp reaches here for free.
+
+     The literal hexes stay as fallbacks for this package's dev harness, which
+     renders `blog.css` without the storefront's `globals.css` and would
+     otherwise have no accent at all. */
+  --accent: hsl(var(--brand-accent, 248.1 48.1% 21.2%));
+  --accent-hover: hsl(var(--brand-hover, 248.6 60.5% 15.9%));
+  --accent-soft: hsl(var(--brand-soft, 250 33.3% 92.9%));
+  --accent-line: hsl(var(--brand-line, 250 30.5% 76.9%));
+  --accent-ink: hsl(var(--brand-ink, 0 0% 100%));
 
   /* state */
   --danger: #962c1c;
@@ -118,8 +128,18 @@
      stays true). The var() indirection falls through to the same stacks
      the admin file names when a face is absent — e.g. in the package's
      dev harness, which loads no fonts. */
-  --font-display: var(--font-spectral, 'Spectral'), 'Iowan Old Style', 'Palatino Linotype',
-    Palatino, Georgia, 'Times New Roman', serif;
+  /* ═══ ONE TYPEFACE ACROSS THE SITE ═══
+     This was Spectral, a serif for display and prose. It is a good face and it
+     made the blog look like a different publication from the shop: every
+     heading on `/posts` was serif while every heading on `/store` was Inter.
+     The blog now sets its display face from the same variable the rest of the
+     site uses, so headings match end to end.
+
+     `--font-spectral` is still loaded by the root layout with `preload: false`,
+     which costs nothing while nothing renders it — and leaves the face one
+     token away should the blog ever want its own voice back deliberately. */
+  --font-display: var(--font-sans, 'Inter'), 'Inter', -apple-system, BlinkMacSystemFont,
+    'Segoe UI', Roboto, system-ui, sans-serif;
   --font-ui: var(--font-sans, 'Inter'), 'Inter', -apple-system, BlinkMacSystemFont,
     'Segoe UI', Roboto, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono, 'JetBrains Mono'), 'JetBrains Mono', ui-monospace,
@@ -486,8 +506,11 @@
 .blog .card__cat {
   padding: 3px var(--s3);
   border-radius: var(--radius-full);
-  background: var(--ink);
-  color: var(--paper);
+  /* THE BRAND, NOT THE INK. A filled label is the shop's accent everywhere
+     else; painting it near-black here is what made the blog read as a
+     different product. White on `--brand-accent` is ~13:1. */
+  background: var(--accent);
+  color: var(--accent-ink);
   font-size: var(--step--2);
   font-weight: 600;
   letter-spacing: 0.01em;
@@ -1497,9 +1520,12 @@
    chip and a hovered chip are the same value, and "which category am I in"
    is the question this row exists to answer. */
 .blog .cat-chip.is-on {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--paper-raised);
+  /* The selected filter is a selected state, and selected states are the brand
+     across the rest of the site. It still inverts rather than tinting — see the
+     note above for why that distinction is the point of this row. */
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
 }
 .blog .cat-chip.is-on:hover {
   color: var(--paper-raised);
@@ -1677,7 +1703,7 @@
   background: var(--ink-4);
 }
 .blog .feat__dot.is-on::before {
-  background: var(--ink);
+  background: var(--accent);
 }
 
 @media (min-width: 48rem) {

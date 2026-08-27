@@ -32,7 +32,7 @@ import { BlogStrip } from "./blog-strip";
 export const storeHomeMetadata: Metadata = {
   title: "Buy 3D printer filament in Nigeria — PLA, PETG, ABS, TPU",
   description:
-    "PLA, PLA+, PETG, ABS, ASA and TPU filament extruded in Lagos and measured to ±0.02 mm. Next-day delivery in Lagos, 2–4 days nationwide.",
+    "PLA, PLA+, PETG, ABS, ASA and TPU filament extruded in Abuja and measured to ±0.02 mm. Next-day delivery in Abuja, 2–4 days nationwide.",
   alternates: { canonical: "/store" },
 };
 
