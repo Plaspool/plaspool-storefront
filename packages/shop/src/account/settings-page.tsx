@@ -85,7 +85,7 @@ export function AccountSettingsPage() {
   if (state.kind === "failed") {
     return (
       <Shell>
-        <h1 className="font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
           Account
         </h1>
         <p
@@ -94,7 +94,7 @@ export function AccountSettingsPage() {
              (`--destructive-strong`), so the one grep in `house-rules.test.ts`
              can hold every failure line in the shop AND in `@plaspool/ui` to it
              instead of each one being someone's memory. */
-          className="mt-6 border border-destructive-strong px-4 py-3 font-sans text-sm text-destructive-strong"
+          className="mt-6 border border-destructive-strong px-4 py-3 text-sm text-destructive-strong"
         >
           We couldn&apos;t reach your account just now. This doesn&apos;t mean you&apos;re signed
           out — try again in a moment.
@@ -138,7 +138,7 @@ export function AccountSettingsPage() {
 
   return (
     <Shell>
-      <h1 className="font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+      <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
         Account
       </h1>
 
@@ -150,16 +150,16 @@ export function AccountSettingsPage() {
           className="h-12 w-12 text-base"
         />
         <div className="min-w-0">
-          <p className="truncate font-sans text-base font-semibold text-foreground">
+          <p className="truncate text-base font-semibold text-foreground">
             {name || customer.email}
           </p>
           {name && (
-            <p className="truncate font-sans text-sm text-muted-foreground">{customer.email}</p>
+            <p className="truncate text-sm text-muted-foreground">{customer.email}</p>
           )}
         </div>
       </div>
 
-      <p className="mt-6 font-sans text-sm text-muted-foreground">
+      <p className="mt-6 text-sm text-muted-foreground">
         You&apos;re signed in with this email address. It comes from the account you signed in
         with, so it isn&apos;t changed here — sign in with a different one to use a different
         address.
@@ -168,12 +168,12 @@ export function AccountSettingsPage() {
       <section aria-labelledby="account-addresses" className="mt-10">
         <h2
           id="account-addresses"
-          className="border-b border-brand-line pb-2 font-sans text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+          className="border-b border-brand-line pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
         >
           Delivery addresses
         </h2>
         {addresses.length === 0 ? (
-          <p className="mt-4 font-sans text-sm text-muted-foreground">
+          <p className="mt-4 text-sm text-muted-foreground">
             Nowhere yet. Addresses appear here once something has been delivered to them, and
             they&apos;re offered at checkout so you don&apos;t retype them.
           </p>
@@ -183,7 +183,7 @@ export function AccountSettingsPage() {
               {addresses.map((a, i) => (
                 <li key={`${a.line1}-${i}`} className="flex items-start gap-3 py-3">
                   <MapPin aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                  <address className="min-w-0 font-sans text-sm not-italic">
+                  <address className="min-w-0 text-sm not-italic">
                     <span className="block font-medium text-foreground">{a.name}</span>
                     <span className="block text-muted-foreground">
                       {[a.line1, a.line2, a.city, a.region, a.postalCode].filter(Boolean).join(", ")}
@@ -193,7 +193,7 @@ export function AccountSettingsPage() {
                 </li>
               ))}
             </ul>
-            <p className="mt-3 font-sans text-xs text-muted-foreground">
+            <p className="mt-3 text-xs text-muted-foreground">
               These are the addresses your orders went to, so there is nothing to edit here —
               checkout offers them, and a new one is saved by using it.
             </p>

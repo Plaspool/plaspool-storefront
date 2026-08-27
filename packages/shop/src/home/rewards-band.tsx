@@ -57,7 +57,7 @@ export async function RewardsBand() {
           <div className="min-w-0">
             <h2
               id="shop-rewards"
-              className="font-sans text-xl font-semibold text-foreground sm:text-2xl"
+              className="text-xl font-semibold text-foreground sm:text-2xl"
             >
               {program.name}
             </h2>

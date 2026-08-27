@@ -40,14 +40,14 @@ export function CartPage() {
   if (cart.problem) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
-        <h1 className="font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
           Your cart
         </h1>
         <p
           role="alert"
           /* WAS `red-700`, HAND-PICKED — same colour, now the token. See the
              twin of this line in `cart-drawer.tsx`. */
-          className="mt-8 border border-destructive-strong px-4 py-3 font-sans text-sm text-destructive-strong"
+          className="mt-8 border border-destructive-strong px-4 py-3 text-sm text-destructive-strong"
         >
           {cart.problem}
         </p>
@@ -71,7 +71,7 @@ export function CartPage() {
   if (cart.resolved.length === 0 && cart.unsellable.length > 0) {
     return (
       <div className="mx-auto max-w-xl px-4 py-16 sm:px-6">
-        <h1 className="mb-6 font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+        <h1 className="mb-6 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
           Your cart
         </h1>
         <UnsellableNotice
@@ -79,7 +79,7 @@ export function CartPage() {
           pending={cart.pending}
           onRemove={cart.removeLineId}
         />
-        <p className="mt-6 font-sans text-sm text-muted-foreground">
+        <p className="mt-6 text-sm text-muted-foreground">
           Nothing else is in your cart yet.
         </p>
         <Button
@@ -113,7 +113,7 @@ export function CartPage() {
   return (
     <div className="mx-auto grid max-w-5xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_320px] lg:py-16">
       <div>
-        <h1 className="mb-6 font-sans text-2xl font-bold text-foreground">Your cart</h1>
+        <h1 className="mb-6 text-2xl font-bold text-foreground">Your cart</h1>
         <UnsellableNotice
           lines={cart.unsellable}
           pending={cart.pending}
@@ -138,7 +138,7 @@ export function CartPage() {
                   <div className="min-w-0">
                     <Link
                       href={`/store/products/${line.product.slug}`}
-                      className="block truncate font-sans text-sm font-semibold text-foreground hover:underline"
+                      className="block truncate text-sm font-semibold text-foreground hover:underline"
                     >
                       {line.product.name}
                     </Link>
@@ -171,7 +171,7 @@ export function CartPage() {
                     variant="ghost"
                     size="sm"
                     onClick={() => cart.remove(toKey(line))}
-                    className="h-auto px-2 py-1 font-sans text-xs text-muted-foreground"
+                    className="h-auto px-2 py-1 text-xs text-muted-foreground"
                   >
                     Remove
                   </Button>
@@ -185,14 +185,14 @@ export function CartPage() {
       <aside>
         <div className="sticky top-24 border-2 border-foreground p-4">
           <div className="flex items-center justify-between">
-            <span className="font-sans text-sm text-muted-foreground">Subtotal</span>
+            <span className="text-sm text-muted-foreground">Subtotal</span>
             <span className="font-mono text-base font-bold tabular-nums text-foreground">
               {formatNaira(cart.subtotal)}
             </span>
           </div>
           {cart.savings > 0 && (
             <div className="mt-1 flex items-center justify-between">
-              <span className="font-sans text-sm text-muted-foreground">You save</span>
+              <span className="text-sm text-muted-foreground">You save</span>
               <span className="font-mono text-sm font-semibold tabular-nums text-brand">
                 {formatNaira(cart.savings)}
               </span>

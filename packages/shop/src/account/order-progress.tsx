@@ -657,8 +657,8 @@ export function TrackColumn({
 /** The type of the lines under a marker — the stop's name, then its stamps.
  *  The loading state hangs its bars off these same strings. */
 export const TRACK_LINE = {
-  label: "font-sans text-[11px] font-medium leading-tight sm:text-xs",
-  meta: "whitespace-nowrap font-sans text-[11px] leading-tight",
+  label: "text-[11px] font-medium leading-tight sm:text-xs",
+  meta: "whitespace-nowrap text-[11px] leading-tight",
 } as const;
 
 /** A placeholder for one of those lines. It lives HERE, beside the line it
@@ -675,7 +675,7 @@ export function TrackLineSkeleton({
 }
 
 const TRACK_NOTE =
-  "mt-5 flex items-center gap-2 border-t border-foreground/20 pt-3 font-sans text-sm text-foreground/70";
+  "mt-5 flex items-center gap-2 border-t border-foreground/20 pt-3 text-sm text-foreground/70";
 
 /** The line under the track — see `OrderProgress`, it is drawn in every state. */
 export function TrackNote({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {

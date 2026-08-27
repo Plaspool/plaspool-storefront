@@ -555,7 +555,7 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
             )}
             <Link
               href="/account/returns"
-              className="font-sans text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               View your returns
             </Link>
@@ -574,16 +574,16 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
           tabIndex={-1}
           className="border-2 border-foreground bg-brand-soft px-4 py-3 focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 focus:ring-offset-background"
         >
-          <p className="font-sans text-sm font-semibold text-foreground">
+          <p className="text-sm font-semibold text-foreground">
             You already have an open return request.
           </p>
-          <p className="mt-0.5 font-sans text-sm text-muted-foreground">
+          <p className="mt-0.5 text-sm text-muted-foreground">
             Nothing here was sent again — nothing you typed is lost either.
             {placement.existingId && ` Reference ${placement.existingId}.`}
           </p>
           <Link
             href="/account/returns"
-            className="mt-1.5 inline-block font-sans text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="mt-1.5 inline-block text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             View your returns
           </Link>
@@ -597,8 +597,8 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
           tabIndex={-1}
           className="border-2 border-foreground bg-brand-soft px-4 py-3 focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 focus:ring-offset-background"
         >
-          <p className="font-sans text-sm font-semibold text-foreground">Sign in to send this request.</p>
-          <p className="mt-0.5 font-sans text-sm text-muted-foreground">
+          <p className="text-sm font-semibold text-foreground">Sign in to send this request.</p>
+          <p className="mt-0.5 text-sm text-muted-foreground">
             {/* Signing in is a full navigation away from this form, so it does
                 NOT preserve what was typed. Say that, rather than promise a
                 preservation this branch cannot actually deliver. */}
@@ -606,7 +606,7 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
           </p>
           <Link
             href={`/sign-in?next=${encodeURIComponent("/returns")}`}
-            className="mt-1.5 inline-block font-sans text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="mt-1.5 inline-block text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             Sign in
           </Link>
@@ -628,12 +628,12 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
             clearFieldPlacement("qtyDeclared");
           }}
         />
-        <p id={id("qty-help")} className="mt-1.5 font-sans text-xs text-muted-foreground">
+        <p id={id("qty-help")} className="mt-1.5 text-xs text-muted-foreground">
           {Math.max(qtyNumber || 0, 0)} {unitLabel(qtyNumber || 0, program)} × {program.pointsPerUnit} ={" "}
           {pointsForQty} {pointsLabel(pointsForQty, program)}
         </p>
         {fieldMessage("qtyDeclared") && (
-          <p id={id("qty-error")} className="mt-1.5 font-sans text-sm text-destructive-strong">
+          <p id={id("qty-error")} className="mt-1.5 text-sm text-destructive-strong">
             {fieldMessage("qtyDeclared")}
           </p>
         )}
@@ -645,7 +645,7 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
           on screen even after the shopper edits one of those fields — see
           the file header on why prefill is not read-only. */}
       {prefillSource && (
-        <p className="font-sans text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           {prefillSource === "previous-return"
             ? "We filled this in from your last return."
             : "We filled this in from your saved address."}
@@ -679,7 +679,7 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
           }}
         />
         {attempted && problems.phone && (
-          <p id={id("phone-error")} className="mt-1.5 font-sans text-sm text-destructive-strong">
+          <p id={id("phone-error")} className="mt-1.5 text-sm text-destructive-strong">
             {problems.phone}
           </p>
         )}
@@ -700,7 +700,7 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
           }}
         />
         {attempted && problems.pickupAddress && (
-          <p id={id("address-error")} className="mt-1.5 font-sans text-sm text-destructive-strong">
+          <p id={id("address-error")} className="mt-1.5 text-sm text-destructive-strong">
             {problems.pickupAddress}
           </p>
         )}
@@ -766,19 +766,19 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
           ))}
         </select>
         {noAreas && (
-          <p id={id("area-empty")} className="mt-1.5 font-sans text-xs text-muted-foreground">
+          <p id={id("area-empty")} className="mt-1.5 text-xs text-muted-foreground">
             We are not collecting anywhere yet.
           </p>
         )}
         {fieldMessage("serviceAreaId") && (
-          <p id={id("area-error")} className="mt-1.5 font-sans text-sm text-destructive-strong">
+          <p id={id("area-error")} className="mt-1.5 text-sm text-destructive-strong">
             {fieldMessage("serviceAreaId")}
           </p>
         )}
       </Field>
 
       {placement && "field" in placement && placement.field === null && (
-        <p role="alert" className="font-sans text-sm text-destructive-strong">
+        <p role="alert" className="text-sm text-destructive-strong">
           {placement.message}
         </p>
       )}

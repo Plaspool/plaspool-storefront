@@ -141,13 +141,13 @@ export function OrderStatusPage() {
       <StatusTrail orderNumber={orderNumber} isGuest={token !== null} token={token} />
 
       <header className="mt-4">
-        <h1 className="font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
           Status history
         </h1>
         {/* THE ORDER IS NAMED UNDER THE TITLE, NOT IN IT. "Status history for
             order 1416643962" is a heading that wraps to three lines at 320px
             and buries the two words that say which page this is. */}
-        <p className="mt-1 font-sans text-sm text-muted-foreground">
+        <p className="mt-1 text-sm text-muted-foreground">
           Order {order.orderNumber} · {itemsPlaced(order)}
         </p>
       </header>
@@ -161,7 +161,7 @@ export function OrderStatusPage() {
       <section aria-labelledby="status-now" className="mt-6 bg-brand-soft/50 px-4 py-5 sm:px-6">
         <h2
           id="status-now"
-          className="font-sans text-lg font-semibold tracking-tight text-foreground sm:text-xl"
+          className="text-lg font-semibold tracking-tight text-foreground sm:text-xl"
         >
           {headlineFor(order, events)}
         </h2>
@@ -170,7 +170,7 @@ export function OrderStatusPage() {
       <section aria-labelledby="status-journey" className="mt-8">
         <h2
           id="status-journey"
-          className="border-b border-brand-line pb-2 font-sans text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+          className="border-b border-brand-line pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
         >
           Every step
         </h2>
@@ -246,14 +246,14 @@ export function OrderStatusSkeleton({
     <Shell>
       <StatusTrail orderNumber={orderNumber} isGuest={isGuest} token={token} />
       <header className="mt-4">
-        <h1 className="font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
           Status history
         </h1>
         <SkeletonRegion label="Loading this order's status history">
           {/* `text-sm`'s own line box, not an `h-4` bar picked to look about
               right — the subtitle under the title is one line of `text-sm` and
               this has to be exactly that tall or the panel below it moves. */}
-          <TextSkeleton className={cn("mt-1 w-56 max-w-full font-sans text-sm")} />
+          <TextSkeleton className={cn("mt-1 w-56 max-w-full text-sm")} />
         </SkeletonRegion>
       </header>
 

@@ -119,11 +119,11 @@ export function SignedInAccountLinks({
       <div className="flex items-center gap-2 px-1 py-2">
         <Avatar name={customer.name} email={customer.email} colourKey={customer.id} />
         <span className="min-w-0">
-          <span className="block truncate font-sans text-sm font-semibold text-foreground">
+          <span className="block truncate text-sm font-semibold text-foreground">
             {label}
           </span>
           {customer.name?.trim() && (
-            <span className="block truncate font-sans text-xs text-muted-foreground">
+            <span className="block truncate text-xs text-muted-foreground">
               {customer.email}
             </span>
           )}

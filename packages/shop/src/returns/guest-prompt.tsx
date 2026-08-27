@@ -21,15 +21,15 @@ import { Link } from "../components/link";
 export function GuestPrompt() {
   return (
     <div className="border-2 border-foreground bg-brand-soft px-4 py-3">
-      <p className="font-sans text-sm font-semibold text-foreground">
+      <p className="text-sm font-semibold text-foreground">
         Sign in to send a return request.
       </p>
-      <p className="mt-0.5 font-sans text-sm text-muted-foreground">
+      <p className="mt-0.5 text-sm text-muted-foreground">
         Signing in will take you to the returns page to send this.
       </p>
       <Link
         href={`/sign-in?next=${encodeURIComponent("/returns")}`}
-        className="mt-1.5 inline-block font-sans text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="mt-1.5 inline-block text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         Sign in
       </Link>

@@ -294,7 +294,7 @@ export function StatusTimeline({ order, events, refundAmount, className }: Statu
                   says what actually happened; the stops above it are a record
                   of how far it got, and a record does not make promises. */}
               {i === markedIndex && !outcome.over && MEANING[stop.label] && stop.state !== "upcoming" && (
-                <p className="mt-1 font-sans text-sm text-muted-foreground">
+                <p className="mt-1 text-sm text-muted-foreground">
                   {MEANING[stop.label]}
                 </p>
               )}
@@ -321,7 +321,7 @@ export function StatusTimeline({ order, events, refundAmount, className }: Statu
             className="min-w-0 flex-1 animate-row-in pb-1 motion-reduce:animate-none"
             style={{ animationDelay: `${stops.length * STEP_MS + ROW_OFFSET_MS}ms` }}
           >
-            <p className="font-sans text-sm text-muted-foreground">{partialRefund}</p>
+            <p className="text-sm text-muted-foreground">{partialRefund}</p>
           </div>
         </li>
       )}
@@ -338,13 +338,13 @@ export function StatusTimeline({ order, events, refundAmount, className }: Statu
             className="min-w-0 flex-1 animate-row-in pb-1 motion-reduce:animate-none"
             style={{ animationDelay: `${stops.length * STEP_MS + ROW_OFFSET_MS}ms` }}
           >
-            <p className="font-sans text-sm font-semibold text-foreground">{terminal.label}</p>
+            <p className="text-sm font-semibold text-foreground">{terminal.label}</p>
             {terminal.at !== null && (
               <p className={cn(TRACK_LINE.meta, "mt-0.5 text-muted-foreground")}>
                 {formatStamp(terminal.at)}
               </p>
             )}
-            <p className="mt-1 font-sans text-sm text-muted-foreground">{terminal.meaning}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{terminal.meaning}</p>
           </div>
         </li>
       )}
@@ -414,7 +414,7 @@ function StopHeading({ stop }: { stop: ReturnType<typeof resolveStops>[number] }
     <>
       <p
         className={cn(
-          "font-sans text-sm",
+          "text-sm",
           (stop.state === "done" || stop.state === "current") && "font-semibold text-foreground",
           stop.state === "current" && "text-foreground",
           stop.state === "upcoming" && "text-foreground/70",
@@ -477,7 +477,7 @@ function EventList({ events, stopAt }: { events: OrderEvent[]; stopAt: number | 
   return (
     <ul className="mt-3 flex flex-col gap-2 border-l border-brand-line pl-3">
       {said.map((event) => (
-        <li key={event.id} className="font-sans text-xs">
+        <li key={event.id} className="text-xs">
           <span className="text-foreground">{event.message}</span>
           {/* ═══ AND IT DOES NOT RESTATE THE STOP'S OWN STAMP ═══
               The stop's date is DERIVED from one of these events —
@@ -576,7 +576,7 @@ export function StatusTimelineSkeleton() {
                 `TrackLineSkeleton` established next door. Both lines are drawn
                 on every row because the resolved timeline reserves both on
                 every row; see `StopHeading`. */}
-            <TextSkeleton className="w-24 font-sans text-sm" />
+            <TextSkeleton className="w-24 text-sm" />
             <TextSkeleton className={cn(TRACK_LINE.meta, "mt-0.5 w-40")} />
             {/* ═══ ONE ROW CARRIES A THIRD LINE, AND THIS GUESSES WHICH ═══
                 The furthest stop reached explains itself in a sentence, and
@@ -585,7 +585,7 @@ export function StatusTimelineSkeleton() {
                 horizontal track's placeholder assumes it: it is the guess that
                 moves fewest bars across the states this actually renders in.
                 Unreserved, the row it lands on grew 24px on resolve. */}
-            {i === 2 && <TextSkeleton className="mt-1 w-52 max-w-full font-sans text-sm" />}
+            {i === 2 && <TextSkeleton className="mt-1 w-52 max-w-full text-sm" />}
           </div>
         </li>
       ))}

@@ -70,13 +70,13 @@ export function UnsellableNotice({
     >
       <h2
         id={headingId}
-        className="flex items-center gap-2 font-sans text-sm font-semibold text-destructive-strong"
+        className="flex items-center gap-2 text-sm font-semibold text-destructive-strong"
       >
         <PackageX aria-hidden="true" className="h-4 w-4 shrink-0" />
         {many ? "These items are no longer available" : "This item is no longer available"}
       </h2>
 
-      <p className="mt-1 font-sans text-xs text-muted-foreground">
+      <p className="mt-1 text-xs text-muted-foreground">
         {/* SAYS WHAT IT BLOCKS. "No longer available" on its own reads as a
             note; the shopper needs to know the basket will not check out until
             the row is gone, because that is the only reason to act on it. */}
@@ -94,7 +94,7 @@ export function UnsellableNotice({
           const label = line.name ?? "An item you added";
           return (
             <li key={line.lineId} className="flex items-center justify-between gap-3">
-              <span className="min-w-0 truncate font-sans text-sm text-foreground">
+              <span className="min-w-0 truncate text-sm text-foreground">
                 {label}
                 {line.qty > 1 && (
                   <span className="ml-1 font-mono text-xs tabular-nums text-muted-foreground">
@@ -109,7 +109,7 @@ export function UnsellableNotice({
                 disabled={pending}
                 onClick={() => onRemove(line.lineId)}
                 aria-label={`Remove ${label} from cart`}
-                className="h-auto shrink-0 gap-1.5 px-2 py-1 font-sans text-xs text-destructive-strong focus-visible:ring-brand focus-visible:ring-offset-background"
+                className="h-auto shrink-0 gap-1.5 px-2 py-1 text-xs text-destructive-strong focus-visible:ring-brand focus-visible:ring-offset-background"
               >
                 <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
                 Remove

@@ -140,10 +140,10 @@ function FormSkeleton() {
   return (
     <SkeletonRegion label="Checking your account" className="flex flex-col gap-5">
       <div className="flex flex-col gap-1.5">
-        <TextSkeleton className="w-56 max-w-full font-sans text-sm" />
+        <TextSkeleton className="w-56 max-w-full text-sm" />
         <Skeleton className="h-10 w-full rounded-md" />
         {/* The arithmetic line under the quantity field. */}
-        <TextSkeleton className="mt-1.5 w-40 max-w-full font-sans text-xs" />
+        <TextSkeleton className="mt-1.5 w-40 max-w-full text-xs" />
       </div>
       <FieldSkeleton width="w-16" />
       <FieldSkeleton width="w-16" />
@@ -163,7 +163,7 @@ function FieldSkeleton({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <TextSkeleton className={cn(width, "font-sans text-sm")} />
+      <TextSkeleton className={cn(width, "text-sm")} />
       <Skeleton className={cn(controlClassName, "w-full rounded-md")} />
     </div>
   );

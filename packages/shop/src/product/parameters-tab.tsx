@@ -73,7 +73,7 @@ export function ParametersTab({ parameters, className }: ParametersTabProps) {
               <tr key={row.label} className="border-b border-brand-line last:border-b-0">
                 <th
                   scope="row"
-                  className="py-3 pr-4 text-left align-baseline font-sans text-sm font-normal text-muted-foreground"
+                  className="py-3 pr-4 text-left align-baseline text-sm font-normal text-muted-foreground"
                 >
                   {row.label}
                 </th>
@@ -82,14 +82,14 @@ export function ParametersTab({ parameters, className }: ParametersTabProps) {
                     className={cn(
                       "text-foreground",
                       PROSE_LABELS.has(row.label)
-                        ? "font-sans"
+                        ? ""
                         : "font-mono font-bold tabular-nums",
                     )}
                   >
                     {row.value}
                   </span>
                   {row.note && (
-                    <span className="ml-1.5 font-sans text-muted-foreground">{row.note}</span>
+                    <span className="ml-1.5 text-muted-foreground">{row.note}</span>
                   )}
                 </td>
               </tr>

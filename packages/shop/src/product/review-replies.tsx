@@ -95,16 +95,16 @@ function ReplyRow({ reply }: { reply: ReviewReply }) {
         )}
         {/* THE FIELD, NOT A CONSTANT. The server sets the owner's display name,
             so a rename is one change there and none here. */}
-        <span className="min-w-0 truncate font-sans text-sm font-semibold text-foreground">
+        <span className="min-w-0 truncate text-sm font-semibold text-foreground">
           {reply.authorName}
         </span>
         {owner && (
-          <span className="shrink-0 border border-brand-line bg-background px-1.5 py-0 font-sans text-[11px] font-semibold uppercase tracking-wide text-brand">
+          <span className="shrink-0 border border-brand-line bg-background px-1.5 py-0 text-[11px] font-semibold uppercase tracking-wide text-brand">
             Shop
           </span>
         )}
       </div>
-      <p className="mt-1 whitespace-pre-line font-sans text-sm leading-6 text-muted-foreground">
+      <p className="mt-1 whitespace-pre-line text-sm leading-6 text-muted-foreground">
         {reply.body}
       </p>
     </div>

@@ -85,7 +85,7 @@ export function Price({
   return (
     <span className={cn("inline-flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5", className)}>
       {from && (
-        <span className={cn("font-sans text-muted-foreground", SECONDARY[size])}>From</span>
+        <span className={cn("text-muted-foreground", SECONDARY[size])}>From</span>
       )}
       <span
         className={cn(
@@ -105,7 +105,7 @@ export function Price({
       {showBulk && (
         /* NOT STRUCK, and not inside the `<s>` above: this price is not one the
            shopper has stopped paying, it is one they can reach. */
-        <span className={cn("font-sans text-muted-foreground", SECONDARY[size])}>
+        <span className={cn("text-muted-foreground", SECONDARY[size])}>
           buy{" "}
           <span className="font-mono tabular-nums">{bulkQty}</span> for{" "}
           <span className="font-mono font-semibold tabular-nums text-brand">

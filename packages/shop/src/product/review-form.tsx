@@ -213,7 +213,7 @@ export function ReviewForm({ productSlug, productName, className }: ReviewFormPr
   return (
     <form onSubmit={onSubmit} noValidate className={cn("flex flex-col gap-5", className)}>
       <div>
-        <h4 className="font-sans text-base font-semibold text-foreground">Write a review</h4>
+        <h4 className="text-base font-semibold text-foreground">Write a review</h4>
         <p id={id("moderation")} className="mt-1 text-sm text-muted-foreground">
           Tell other printers how {productName} behaved for you. Reviews are read
           before they are published.
@@ -221,7 +221,7 @@ export function ReviewForm({ productSlug, productName, className }: ReviewFormPr
       </div>
 
       <div>
-        <span className="mb-2 block font-sans text-sm font-semibold text-foreground">
+        <span className="mb-2 block text-sm font-semibold text-foreground">
           Rating
         </span>
         <StarPicker value={rating} onChange={setRating} describedBy={id("moderation")} />
@@ -233,7 +233,7 @@ export function ReviewForm({ productSlug, productName, className }: ReviewFormPr
       <div>
         <label
           htmlFor={id("title")}
-          className="mb-2 block font-sans text-sm font-semibold text-foreground"
+          className="mb-2 block text-sm font-semibold text-foreground"
         >
           Headline <span className="font-normal text-muted-foreground">(optional)</span>
         </label>
@@ -249,7 +249,7 @@ export function ReviewForm({ productSlug, productName, className }: ReviewFormPr
       <div>
         <label
           htmlFor={id("body")}
-          className="mb-2 block font-sans text-sm font-semibold text-foreground"
+          className="mb-2 block text-sm font-semibold text-foreground"
         >
           Your review
         </label>

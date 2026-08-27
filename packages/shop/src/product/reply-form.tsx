@@ -99,7 +99,7 @@ export function ReplyForm({
     return (
       <Link
         href={signInHref}
-        className="inline-block font-sans text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="inline-block text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         Sign in to reply
       </Link>
@@ -108,7 +108,7 @@ export function ReplyForm({
 
   if (done) {
     return (
-      <p role="status" className="font-sans text-xs text-muted-foreground">
+      <p role="status" className="text-xs text-muted-foreground">
         {/* THE SENTENCE THIS COMPONENT EXISTS FOR. */}
         Thanks — your reply is with us and will appear once it has been read.
       </p>
@@ -120,7 +120,7 @@ export function ReplyForm({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center font-sans text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="inline-flex items-center text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         Reply
       </button>
@@ -159,7 +159,7 @@ export function ReplyForm({
         onChange={(event) => setBody(event.target.value)}
       />
       {error && (
-        <p role="alert" className="font-sans text-xs text-destructive-strong">
+        <p role="alert" className="text-xs text-destructive-strong">
           {MESSAGES[error]}
         </p>
       )}

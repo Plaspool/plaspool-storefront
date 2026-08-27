@@ -148,7 +148,7 @@ export async function CategoryPage({
       />
 
       <div className="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <h1 className="font-sans text-2xl font-semibold text-foreground sm:text-3xl">
+        <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">
           {meta.name}
         </h1>
         {/* The category's size — static on purpose. When filters narrow the

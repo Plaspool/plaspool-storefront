@@ -34,7 +34,7 @@ export function EmptyState({ icon, title, body, action, className }: EmptyStateP
       >
         {icon}
       </span>
-      <h2 className="font-sans text-lg font-semibold text-foreground">{title}</h2>
+      <h2 className="text-lg font-semibold text-foreground">{title}</h2>
       <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">{body}</p>
       {action && <div className="mt-6">{action}</div>}
     </div>

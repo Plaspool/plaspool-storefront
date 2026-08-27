@@ -32,7 +32,7 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
     <section aria-labelledby={`filter-${title.toLowerCase()}`}>
       <h3
         id={`filter-${title.toLowerCase()}`}
-        className="font-sans text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+        className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
       >
         {title}
       </h3>
@@ -137,7 +137,7 @@ export function FilterRail({
         )}
       >
         {showHeading && (
-          <h2 className="font-sans text-sm font-semibold text-foreground">Filters</h2>
+          <h2 className="text-sm font-semibold text-foreground">Filters</h2>
         )}
         {active > 0 && (
           <Button

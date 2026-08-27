@@ -63,7 +63,7 @@ export function PointsOffer({
     <div className="border-2 border-foreground bg-brand-soft px-4 py-3">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="font-sans text-xs text-muted-foreground">Your balance</p>
+          <p className="text-xs text-muted-foreground">Your balance</p>
           <p className="font-mono text-sm font-semibold tabular-nums text-foreground">
             {available.toLocaleString()} {label}
           </p>
@@ -91,7 +91,7 @@ export function PointsOffer({
         </Button>
       </div>
       {spending && (
-        <p className="mt-2 font-sans text-xs text-muted-foreground">
+        <p className="mt-2 text-xs text-muted-foreground">
           {/*
             * DELIBERATELY NOT A NAIRA FIGURE. What the points are worth depends
             * on the order's own total, and quoting a number here that the freeze

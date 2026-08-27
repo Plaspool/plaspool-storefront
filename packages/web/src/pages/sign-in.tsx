@@ -219,7 +219,7 @@ export default function SignInPage() {
       ) : (
         <>
           <div>
-            <h1 className="font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
               Keep your cart across devices
             </h1>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -228,7 +228,7 @@ export default function SignInPage() {
           </div>
 
           {form.kind === "failed" && (
-            <p className="font-sans text-sm text-foreground" role="alert">
+            <p className="text-sm text-foreground" role="alert">
               {FAILURE_COPY[form.reason]}
             </p>
           )}
@@ -252,7 +252,7 @@ export default function SignInPage() {
 
               <div className="flex items-center gap-4">
                 <Separator className="flex-1" />
-                <span className="font-sans text-xs uppercase tracking-wide text-muted-foreground">
+                <span className="text-xs uppercase tracking-wide text-muted-foreground">
                   or
                 </span>
                 <Separator className="flex-1" />
@@ -260,7 +260,7 @@ export default function SignInPage() {
 
               <form onSubmit={handleSendLink} className="flex flex-col gap-3">
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="sign-in-email" className="font-sans text-foreground">
+                  <Label htmlFor="sign-in-email" className="text-foreground">
                     Email
                   </Label>
                   <Input
@@ -307,7 +307,7 @@ function LinkSentPanel({
 }) {
   return (
     <div className="flex flex-col items-center gap-3 rounded-lg border-2 border-foreground bg-brand-soft px-6 py-10 text-center">
-      <h2 className="font-sans text-lg font-semibold text-foreground">Check your email</h2>
+      <h2 className="text-lg font-semibold text-foreground">Check your email</h2>
       <p className="max-w-sm text-sm leading-6 text-muted-foreground">
         We sent a sign-in link to <span className="font-medium text-foreground">{email}</span>.
         Open it on this device to finish signing in.
@@ -316,7 +316,7 @@ function LinkSentPanel({
         type="button"
         variant="link"
         onClick={onSendAnother}
-        className="font-sans text-sm text-foreground underline underline-offset-4"
+        className="text-sm text-foreground underline underline-offset-4"
       >
         Send another link
       </Button>
@@ -342,7 +342,7 @@ function LinkSentPanel({
 function FinishingPanel({ arrived }: { arrived: boolean }) {
   return (
     <div role="status" className="flex flex-col gap-2">
-      <h1 className="font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+      <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
         {arrived ? "You're signed in" : "Signing you in…"}
       </h1>
       <p className="text-sm leading-6 text-muted-foreground">

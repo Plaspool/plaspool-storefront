@@ -106,7 +106,7 @@ function ReviewCard({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <RatingStars rating={review.rating} />
         {review.title && (
-          <h4 className="font-sans text-sm font-semibold text-foreground">{review.title}</h4>
+          <h4 className="text-sm font-semibold text-foreground">{review.title}</h4>
         )}
       </div>
 
@@ -397,7 +397,7 @@ export function ReviewsTab({
                 disabled={loading}
                 aria-busy={loading}
                 className={cn(
-                  "inline-flex h-10 items-center justify-center rounded-md border border-brand-line px-4 font-sans text-sm",
+                  "inline-flex h-10 items-center justify-center rounded-md border border-brand-line px-4 text-sm",
                   "transition-colors hover:border-foreground motion-reduce:transition-none disabled:opacity-50",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                 )}

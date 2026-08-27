@@ -46,7 +46,7 @@ export function WhyShop() {
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 md:py-14 lg:px-8">
         <h2
           id="why-shop"
-          className="font-sans text-xl font-semibold text-foreground sm:text-2xl"
+          className="text-xl font-semibold text-foreground sm:text-2xl"
         >
           Why shop PlaSpool
         </h2>
@@ -60,7 +60,7 @@ export function WhyShop() {
                 className="border-t border-brand-line pt-5 sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0"
               >
                 <Icon aria-hidden="true" className="h-6 w-6 text-brand" />
-                <h3 className="mt-3 font-sans text-base font-semibold text-foreground">
+                <h3 className="mt-3 text-base font-semibold text-foreground">
                   {claim.title}
                 </h3>
                 <p className="mt-1 font-mono text-sm tabular-nums text-brand">{claim.figure}</p>

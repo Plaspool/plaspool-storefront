@@ -86,7 +86,7 @@ export async function BulkPromo() {
             </p>
             <h2
               id="bulk-heading"
-              className="mt-3 font-sans text-2xl font-bold leading-tight text-brand-ink sm:text-3xl"
+              className="mt-3 text-2xl font-bold leading-tight text-brand-ink sm:text-3xl"
             >
               Buy by the box
             </h2>
@@ -98,7 +98,7 @@ export async function BulkPromo() {
             <Link
               href="/store/all"
               className={cn(
-                "mt-7 inline-flex h-11 items-center justify-center rounded-md bg-brand-ink px-6 font-sans text-sm font-medium text-brand",
+                "mt-7 inline-flex h-11 items-center justify-center rounded-md bg-brand-ink px-6 text-sm font-medium text-brand",
                 "transition-opacity hover:opacity-90 motion-reduce:transition-none",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2 focus-visible:ring-offset-brand",
               )}

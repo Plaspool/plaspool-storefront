@@ -36,14 +36,14 @@ export async function OrderInfo({ className }: OrderInfoProps) {
       aria-labelledby="order-info-heading"
       className={cn("border-t border-brand-line pt-10", className)}
     >
-      <h2 id="order-info-heading" className="font-sans text-lg font-semibold text-foreground">
+      <h2 id="order-info-heading" className="text-lg font-semibold text-foreground">
         Delivery, returns and payment
       </h2>
 
       <div className="mt-6 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
         <div className="flex flex-col gap-2">
           <Truck aria-hidden="true" className="h-5 w-5 text-brand" />
-          <h3 className="font-sans text-sm font-semibold text-foreground">Delivery</h3>
+          <h3 className="text-sm font-semibold text-foreground">Delivery</h3>
           <ul className="flex flex-col gap-1.5 text-sm leading-6 text-muted-foreground">
             <li>{DELIVERY.abuja}</li>
             <li>{DELIVERY.nationwide}</li>
@@ -52,7 +52,7 @@ export async function OrderInfo({ className }: OrderInfoProps) {
 
         <div className="flex flex-col gap-2">
           <PackageCheck aria-hidden="true" className="h-5 w-5 text-brand" />
-          <h3 className="font-sans text-sm font-semibold text-foreground">Returns</h3>
+          <h3 className="text-sm font-semibold text-foreground">Returns</h3>
           <p className="text-sm leading-6 text-muted-foreground">{DELIVERY.returns}</p>
           {program && (
             <p className="text-sm leading-6 text-muted-foreground">
@@ -71,7 +71,7 @@ export async function OrderInfo({ className }: OrderInfoProps) {
 
         <div className="flex flex-col gap-2">
           <CreditCard aria-hidden="true" className="h-5 w-5 text-brand" />
-          <h3 className="font-sans text-sm font-semibold text-foreground">Payment</h3>
+          <h3 className="text-sm font-semibold text-foreground">Payment</h3>
           <ul className="flex flex-col gap-1.5 text-sm leading-6 text-muted-foreground">
             {PAYMENT_METHODS.map((method) => (
               <li key={method}>{method}</li>

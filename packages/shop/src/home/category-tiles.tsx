@@ -21,7 +21,7 @@ export async function CategoryTiles() {
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 md:py-14 lg:px-8">
         <h2
           id="shop-categories"
-          className="font-sans text-xl font-semibold text-foreground sm:text-2xl"
+          className="text-xl font-semibold text-foreground sm:text-2xl"
         >
           Shop by material
         </h2>
@@ -57,7 +57,7 @@ export async function CategoryTiles() {
                       label={`${category.name} spool`}
                     />
                   </span>
-                  <span className="mt-2 font-sans text-sm font-semibold text-foreground">
+                  <span className="mt-2 text-sm font-semibold text-foreground">
                     {category.name}
                   </span>
                   <span className="mt-0.5 font-mono text-xs tabular-nums text-muted-foreground">

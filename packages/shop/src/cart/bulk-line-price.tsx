@@ -50,7 +50,7 @@ export function BulkLinePrice({
         <span className="whitespace-nowrap font-mono text-xs tabular-nums text-muted-foreground">
           {formatNaira(unitPrice)}
         </span>{" "}
-        <span className="whitespace-nowrap font-sans text-xs text-muted-foreground">each</span>
+        <span className="whitespace-nowrap text-xs text-muted-foreground">each</span>
       </div>
     );
   }
@@ -64,7 +64,7 @@ export function BulkLinePrice({
         >
           {/* U+2212, not a hyphen: it is a minus sign. */}
           <span className="font-mono tabular-nums">−{percentFromBps(bulkPercentBps)}%</span>
-          <span className="font-sans">bulk</span>
+          <span>bulk</span>
         </Badge>
 
         {/* `<s>` rather than a line-through class: this is a price that no
@@ -76,11 +76,11 @@ export function BulkLinePrice({
         <span className="whitespace-nowrap font-mono text-xs font-bold tabular-nums text-foreground">
           {formatNaira(effectiveUnitPrice)}
         </span>
-        <span className="whitespace-nowrap font-sans text-xs text-muted-foreground">each</span>
+        <span className="whitespace-nowrap text-xs text-muted-foreground">each</span>
       </div>
 
       {bulkQty !== lineQty && (
-        <p className="mt-1 font-sans text-xs text-muted-foreground">
+        <p className="mt-1 text-xs text-muted-foreground">
           You&rsquo;re buying{" "}
           <span className="font-mono tabular-nums">{bulkQty}</span> of this product
         </p>

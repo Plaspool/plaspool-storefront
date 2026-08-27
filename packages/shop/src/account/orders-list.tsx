@@ -214,7 +214,7 @@ export function OrdersList({
 
   return (
     <AccountShell width="wide">
-      <h1 className="font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+      <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
         Your orders
       </h1>
 
@@ -302,7 +302,7 @@ export function OrdersList({
                       the pair a shopper reads together; the order number and
                       the item count are what they read when looking for a
                       specific order, and they belong on the quiet line. */}
-                  <p className="truncate font-sans text-sm font-semibold text-foreground">
+                  <p className="truncate text-sm font-semibold text-foreground">
                     {shortStatusFor(order)}{" "}
                     <span className="font-normal text-muted-foreground">
                       · {formatStamp(order.placedAt, { dateOnly: true })}
@@ -310,7 +310,7 @@ export function OrdersList({
                   </p>
                   {/* UNITS, NOT LINES — `itemCount` carries the whole story,
                       and the "+N" on the rail is anchored to this number. */}
-                  <p className="mt-1 truncate font-sans text-xs text-muted-foreground">
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
                     Order {order.orderNumber} · {itemCount(lines)} item
                     {itemCount(lines) === 1 ? "" : "s"}
                   </p>
@@ -362,7 +362,7 @@ export function OrdersList({
           {failed && (
             /* `destructive-strong` — the base token is a fill and fails AA as
                text. See `globals.css`. */
-            <p role="alert" className="font-sans text-sm text-destructive-strong">
+            <p role="alert" className="text-sm text-destructive-strong">
               Could not load more orders. Try again.
             </p>
           )}
@@ -501,7 +501,7 @@ function TabEmpty({
   const other: OrdersTab = show === "ongoing" ? "stopped" : "ongoing";
   return (
     <div className="mt-6 border border-dashed border-brand-line px-4 py-8 text-center">
-      <p className="font-sans text-sm text-foreground">
+      <p className="text-sm text-foreground">
         {more
           ? `Nothing ${show === "ongoing" ? "ongoing" : "cancelled or refunded"} in what’s loaded so far.`
           : show === "ongoing"
@@ -509,7 +509,7 @@ function TabEmpty({
             : "Nothing cancelled or refunded — which is the good outcome."}
       </p>
       {otherCount > 0 && (
-        <p className="mt-2 font-sans text-sm text-muted-foreground">
+        <p className="mt-2 text-sm text-muted-foreground">
           <Link
             href={tabHref(other)}
             className="rounded-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
@@ -810,7 +810,7 @@ export function OrdersListSkeleton() {
       {/* THE HEADING IS DRAWN, NOT PLACEHELD. "Your orders" is a constant this
           component is already holding; a grey bar that resolves into identical
           text is a flicker with no purpose. */}
-      <h1 className="font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+      <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
         Your orders
       </h1>
       <SkeletonRegion label="Loading your orders">

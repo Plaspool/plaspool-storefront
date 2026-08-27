@@ -34,14 +34,14 @@ export async function BlogStrip() {
         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
           <h2
             id="shop-blog"
-            className="font-sans text-xl font-semibold text-foreground sm:text-2xl"
+            className="text-xl font-semibold text-foreground sm:text-2xl"
           >
             Guides and news
           </h2>
           <Link
             href="/posts"
             className={cn(
-              "rounded-sm font-sans text-sm font-medium text-brand underline-offset-4 hover:underline",
+              "rounded-sm text-sm font-medium text-brand underline-offset-4 hover:underline",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background",
             )}
           >

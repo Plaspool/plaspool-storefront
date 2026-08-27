@@ -134,8 +134,25 @@ export default function RootLayout({
       </head>
 
       <body
+        /*
+         * `font-mono` IS THE SITE'S VOICE, AND THIS IS THE ONE PLACE THAT SAYS SO.
+         *
+         * It was `font-sans`, which was never what the site looked like: the
+         * nav, the footer, the home page and /contact all set `font-mono` on
+         * themselves, and the blog's tokens now resolve to the same face. The
+         * only surface actually drawing Inter was the shop — not by decision
+         * but by inheriting this default and then restating it on 251
+         * elements, which is why turning the blog monospaced left /store and
+         * every product page behind.
+         *
+         * Those 251 declarations are gone with this change. Anything that
+         * genuinely wants Inter can still ask for `font-sans` and get it;
+         * `--font-sans` is still loaded. The point is that wanting it now has
+         * to be a decision somebody writes down, rather than the thing that
+         * happens when nobody says anything.
+         */
         className={cn(
-          "min-h-screen font-sans antialiased",
+          "min-h-screen font-mono antialiased",
           font.variable,
           spectral.variable,
           jetbrainsMono.variable,

@@ -161,7 +161,7 @@ export function ReturnsView({
            `items` for the failure that made the two look the same before. */
         <p
           role="alert"
-          className="mt-8 border border-destructive-strong px-4 py-3 font-sans text-sm text-destructive-strong"
+          className="mt-8 border border-destructive-strong px-4 py-3 text-sm text-destructive-strong"
         >
           We couldn&apos;t load your returns just now. Try again in a moment.
         </p>
@@ -206,7 +206,7 @@ export function ReturnsView({
  */
 function ReturnsHeading({ title }: { title: string | null }) {
   return (
-    <h1 className="font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+    <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
       {title ?? "Returns"}
     </h1>
   );
@@ -237,8 +237,8 @@ function ReturnCard({ item, program }: { item: MyReturn; program: RewardsProgram
     <div className="border border-brand-line px-4 py-4 sm:px-6 sm:py-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-sans text-sm font-semibold text-foreground">{stageOf(item.status)}</p>
-          <p className="mt-0.5 font-sans text-xs text-muted-foreground">
+          <p className="text-sm font-semibold text-foreground">{stageOf(item.status)}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
             Requested {formatStamp(item.createdAt, { dateOnly: true })}
           </p>
         </div>
@@ -252,7 +252,7 @@ function ReturnCard({ item, program }: { item: MyReturn; program: RewardsProgram
       </div>
 
       {item.pickupScheduledAt != null && (
-        <p className="mt-3 border-t border-brand-line pt-3 font-sans text-sm text-muted-foreground">
+        <p className="mt-3 border-t border-brand-line pt-3 text-sm text-muted-foreground">
           Pickup {formatStamp(item.pickupScheduledAt)}
           {item.driverName ? ` · ${item.driverName}` : ""}
         </p>
@@ -307,8 +307,8 @@ function ReturnCardSkeleton() {
     <div aria-hidden="true" className="border border-brand-line px-4 py-4 sm:px-6 sm:py-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <TextSkeleton className="w-32 max-w-full font-sans text-sm" />
-          <TextSkeleton className="mt-0.5 w-28 max-w-full font-sans text-xs" />
+          <TextSkeleton className="w-32 max-w-full text-sm" />
+          <TextSkeleton className="mt-0.5 w-28 max-w-full text-xs" />
         </div>
         <TextSkeleton className="w-20 shrink-0 font-mono text-sm" />
       </div>
