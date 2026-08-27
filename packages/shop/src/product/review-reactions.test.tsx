@@ -28,7 +28,7 @@ const BASE = {
   helpfulCount: 4,
   viewerReaction: null,
   pending: false,
-  canVote: true,
+  action: "allowed",
   onVote: () => {},
   signInHref: "/sign-in",
 } as const;
@@ -96,7 +96,7 @@ describe("ReviewReactions", () => {
   /* SIGNED OUT: the count still renders, and the controls become a way in
      rather than disappearing or silently failing. */
   it("offers a sign-in instead of buttons when the viewer cannot vote", () => {
-    const out = render({ ...BASE, canVote: false, signInHref: "/sign-in?next=%2Fx" });
+    const out = render({ ...BASE, action: "sign-in", signInHref: "/sign-in?next=%2Fx" });
     expect(out).toContain('href="/sign-in?next=%2Fx"');
     expect(out).not.toContain("<button");
   });
@@ -104,10 +104,45 @@ describe("ReviewReactions", () => {
   /* A shopper deciding whether to trust a review should not have to sign in to
      see how many people found it useful. */
   it("still shows the tally when the viewer cannot vote", () => {
-    expect(text({ ...BASE, canVote: false })).toContain("4");
+    expect(text({ ...BASE, action: "sign-in" })).toContain("4");
   });
 
   it("disables the controls while a vote is in flight", () => {
     expect(render({ ...BASE, pending: true })).toContain('disabled=""');
+  });
+});
+
+/**
+ * A SIGNED-IN SHOPPER WHO HAS NOT BOUGHT THE SPOOL.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * There was one `false` here and it rendered "Sign in to vote". Now that only
+ * buyers may vote, that same `false` catches somebody who IS signed in — and
+ * tells them to do the one thing they have already done and that would change
+ * nothing for them. It is the lie `ReviewGuestPrompt` exists to avoid, one row
+ * further down the page.
+ *
+ * ═══ AND THE ANSWER IS SILENCE, NOT A SECOND EXPLANATION ═══
+ * This row repeats under EVERY review on the page. A "buyers can vote" line
+ * beside each one is the same sentence five, ten, twenty times, and the panel
+ * at the top of the tab already says it once, where the reader is looking. So
+ * the tally stays — it is public and worth reading — and the control simply is
+ * not offered.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+describe("ReviewReactions, for a shopper who has not bought it", () => {
+  it("does not tell a signed-in shopper to sign in", () => {
+    const out = render({ ...BASE, action: "unbought" });
+    expect(out).not.toContain("Sign in");
+    expect(out).not.toContain("<a");
+  });
+
+  it("offers no vote controls", () => {
+    expect(render({ ...BASE, action: "unbought" })).not.toContain("<button");
+  });
+
+  /* The tally is public and does not depend on being allowed to add to it. */
+  it("still shows the tally", () => {
+    expect(text({ ...BASE, action: "unbought" })).toContain("4");
   });
 });

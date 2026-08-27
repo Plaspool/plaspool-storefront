@@ -5,6 +5,7 @@ import { cn } from "@plaspool/ui";
 
 import { Link } from "../components/link";
 import type { ReactionKind } from "../data/reviews";
+import type { ReviewAction } from "./review-permissions";
 
 /**
  * "Was this helpful?" under a review.
@@ -39,6 +40,17 @@ import type { ReactionKind } from "../data/reviews";
  * The count renders for everyone; only the CONTROLS become a way in. Reading a
  * product page signed out is not an error, and a vote button that silently
  * fails is worse than one that says what it needs.
+ *
+ * ═══ AND "CANNOT VOTE" HAS TWO REASONS, WHICH IS WHY THIS IS NOT A BOOLEAN ═══
+ * `canVote: false` rendered "Sign in to vote". Once only buyers may vote, that
+ * same `false` catches a shopper who IS signed in and simply has not bought the
+ * spool — and tells them to do the one thing they have already done. So a
+ * non-buyer gets the tally and NO CONTROL AND NO LINK.
+ *
+ * Silence rather than a second explanation, deliberately: this row repeats
+ * under every review on the page, so a "buyers can vote" line here is the same
+ * sentence printed twenty times. `PurchaseRequiredNotice` says it once, at the
+ * top of the tab, where the reader is already looking.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 export interface ReviewReactionsProps {
@@ -46,8 +58,9 @@ export interface ReviewReactionsProps {
   viewerReaction: ReactionKind | null;
   /** A vote is in flight; both controls disable rather than racing. */
   pending: boolean;
-  /** False for a viewer with no session. */
-  canVote: boolean;
+  /** Allowed, needs a session, or needs a purchase — never a boolean, because
+   *  the two refusals are different sentences. See the header. */
+  action: ReviewAction;
   /** The state to send — never a toggle. Null clears. */
   onVote: (kind: ReactionKind | null) => void;
   signInHref: string;
@@ -64,14 +77,14 @@ export function ReviewReactions({
   helpfulCount,
   viewerReaction,
   pending,
-  canVote,
+  action,
   onVote,
   signInHref,
   className,
 }: ReviewReactionsProps) {
   return (
     <div className={cn("flex flex-wrap items-center gap-1", className)}>
-      {canVote ? (
+      {action === "allowed" ? (
         <>
           <button
             type="button"
@@ -117,12 +130,16 @@ export function ReviewReactions({
               <span className="font-mono tabular-nums">{helpfulCount}</span>
             )}
           </span>
-          <Link
-            href={signInHref}
-            className="px-2 py-1 font-sans text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          >
-            Sign in to vote
-          </Link>
+          {/* ONLY FOR A VIEWER WHO HAS NO SESSION. A signed-in non-buyer gets
+              the tally and nothing else — see the header. */}
+          {action === "sign-in" && (
+            <Link
+              href={signInHref}
+              className="px-2 py-1 font-sans text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
+              Sign in to vote
+            </Link>
+          )}
         </>
       )}
     </div>

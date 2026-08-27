@@ -316,6 +316,12 @@ export type SubmitError =
   /** The review is missing, or not approved — the API answers the same `404`
    *  for both so nobody can probe which pending reviews exist. */
   | "gone"
+  /** One review per customer per product, and they have used theirs. The gate
+   *  normally prevents this; it survives as the answer to the race where the
+   *  first review was written in another tab. */
+  | "already-reviewed"
+  /** Reviews are for people who bought the thing. */
+  | "purchase-required"
   | "rate-limited"
   | "rejected"
   | "invalid"
@@ -383,6 +389,10 @@ export async function postReply(
   if (res.status === 401) throw new ReviewSubmitError("signed-out");
   if (res.status === 429) throw new ReviewSubmitError("rate-limited");
   if (res.status === 404) throw new ReviewSubmitError("gone");
+  /* THE PURCHASE GATE STANDS IN FRONT OF REPLIES TOO, so a 403 here is a
+     refusal with a reason and not a broken connection. Without this it fell
+     through to `failed`, whose copy blames the reader's network for a rule. */
+  if (res.status === 403) throw new ReviewSubmitError(await forbiddenReason(res));
   if (res.status === 400 || res.status === 422) throw new ReviewSubmitError("invalid");
   if (!res.ok) throw new ReviewSubmitError("failed");
   return (await res.json()) as PostReplyResult;
@@ -472,6 +482,100 @@ export async function myReactions(
   return out;
 }
 
+/**
+ * What one shopper may do with reviews on a product.
+ *
+ * `canReview` is "has bought it"; `hasReviewed` is "has already used their
+ * one". They are separate because they are different sentences to say to
+ * somebody, and a page that collapses them tells half of its readers the wrong
+ * one.
+ */
+export interface ProductEligibility {
+  canReview: boolean;
+  hasReviewed: boolean;
+}
+
+/**
+ * WHAT THIS SHOPPER MAY REVIEW — the read a product page gates its form on.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * PER-VIEWER, CREDENTIALED, AND NOT ON THE PUBLIC ROUTER — for exactly the
+ * reason `myReactions` is not. The public reviews response is
+ * `Cache-Control: public`, so a shared cache can hand one reader's copy to
+ * another; "have I bought this" is one shopper's purchase history and must
+ * never ride on a response another shopper can be served.
+ *
+ * ═══ IT FAILS OPEN, WHICH IS THE WHOLE DESIGN ═══
+ * An unreadable answer is `{}`, and an absent slug means DO NOT BLOCK. That is
+ * not defensive habit, it is what lets this ship before the API does: on the
+ * live API today this path falls through to the staff `/reviews/:id` route and
+ * answers `401`, so every reader would otherwise lose the form. Fail-open
+ * leaves the page exactly as it is until the admin side merges, at which point
+ * the gate starts working with no deploy here.
+ *
+ * The cost of being wrong is asymmetric and points the same way: fail-open
+ * shows a form the API then refuses — one wasted attempt, with copy that now
+ * explains it. Fail-closed silently removes reviewing from a working shop.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Batched on `BULK_LIMIT` deliberately: the API copied the aggregates route's
+ * ceiling so that a page asking both about the same grid cannot have one call
+ * succeed and the other refuse it.
+ */
+export async function reviewEligibility(
+  productSlugs: readonly string[],
+): Promise<Record<string, ProductEligibility>> {
+  const wanted = [...new Set(productSlugs)].filter((slug) => slug.length > 0);
+  if (wanted.length === 0) return {};
+
+  const out: Record<string, ProductEligibility> = {};
+  for (let i = 0; i < wanted.length; i += BULK_LIMIT) {
+    const batch = wanted.slice(i, i + BULK_LIMIT);
+    const url = new URL(`${COMMERCE_API_BASE}/api/shop/reviews/eligibility`);
+    url.searchParams.set("products", batch.join(","));
+    try {
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (!res.ok) continue;
+      const body = (await res.json()) as { eligible?: Record<string, ProductEligibility> };
+      Object.assign(out, body.eligible ?? {});
+    } catch {
+      /* One batch failing leaves those slugs absent, which reads as "do not
+         block". See the header. */
+    }
+  }
+  return out;
+}
+
+/**
+ * The API's names for its two review refusals, mapped to this client's.
+ *
+ * `reason` IS THE KEY, NOT `error`. A refused mutation answers
+ * `{"error":"forbidden","reason":"already_reviewed"}` — `error` stays
+ * `forbidden` for both, so branching on it tells the two apart never.
+ *
+ * AN UNKNOWN REASON IS STILL A PLAIN REFUSAL. The API may grow a third rule
+ * before this file hears about it, and a shopper meeting it should see the
+ * generic refusal rather than a crash or, worse, the wrong explanation.
+ */
+const FORBIDDEN_REASONS: Record<string, SubmitError | undefined> = {
+  already_reviewed: "already-reviewed",
+  purchase_required: "purchase-required",
+};
+
+/**
+ * Which refusal a 403 is.
+ *
+ * THE BODY IS NOT GUARANTEED TO BE JSON — a proxy or an edge error can answer
+ * 403 with HTML, and `res.json()` throws on it. That must not escape a submit
+ * handler as a TypeError, so the parse is guarded and an unreadable body is
+ * simply a refusal with no reason given.
+ */
+async function forbiddenReason(res: Response): Promise<SubmitError> {
+  const body = (await res.json().catch(() => ({}))) as { reason?: string };
+  const mapped = body.reason ? FORBIDDEN_REASONS[body.reason] : undefined;
+  return mapped ?? "rejected";
+}
+
 export async function submitReview(input: SubmitReviewInput): Promise<SubmitReviewResult> {
   let res: Response;
   try {
@@ -504,7 +608,7 @@ export async function submitReview(input: SubmitReviewInput): Promise<SubmitRevi
      page loaded. */
   if (res.status === 401) throw new ReviewSubmitError("signed-out");
   if (res.status === 429) throw new ReviewSubmitError("rate-limited");
-  if (res.status === 403) throw new ReviewSubmitError("rejected");
+  if (res.status === 403) throw new ReviewSubmitError(await forbiddenReason(res));
   if (res.status === 400 || res.status === 422) throw new ReviewSubmitError("invalid");
   if (!res.ok) throw new ReviewSubmitError("failed");
   return (await res.json()) as SubmitReviewResult;

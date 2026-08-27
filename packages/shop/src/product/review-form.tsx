@@ -50,6 +50,19 @@ const MESSAGES: Record<SubmitError, string> = {
      alike, so nobody can probe which pending reviews exist. This copy must not
      tell them apart either. */
   gone: "That review is no longer available.",
+  /* ═══ THE GATE NORMALLY PREVENTS THIS ONE FROM EVER BEING READ ═══
+     `ReviewFormGate` asks `hasReviewed` before mounting the form, so reaching
+     this message means the first review was written somewhere this page could
+     not see it — another tab, or between the gate's answer and this submit. It
+     must therefore say what happened to the words they just typed, because
+     "please try again later" (the old copy for every 403) invites them to do
+     the one thing that cannot work. */
+  "already-reviewed":
+    "You have already reviewed this product — reviews are one per shopper, so this one was not added.",
+  /* Not a fault of the writing either, and it names the thing that would change
+     the answer rather than leaving them to guess. */
+  "purchase-required":
+    "Reviews come from shoppers who have bought the spool. Once your order is paid, you can review it here.",
   "rate-limited":
     "That is a few reviews in a short time. Give it fifteen minutes and try again.",
   rejected:

@@ -6,7 +6,7 @@ import { Skeleton, SkeletonText, cn } from "@plaspool/ui";
 
 import { REVIEWS_PER_PAGE } from "../data/config";
 import { listReviewsFromBrowser, starsFromAggregate } from "../data/reviews";
-import { myReactions, setReaction } from "../data/reviews";
+import { myReactions, reviewEligibility, setReaction } from "../data/reviews";
 import { ReviewReplies } from "./review-replies";
 import { ReviewReactions } from "./review-reactions";
 import { ReplyForm } from "./reply-form";
@@ -17,6 +17,10 @@ import type { PublicReview, ReactionKind, ReviewAggregate } from "../data/review
 import { RatingStars } from "../components/rating-stars";
 import { EmptyState } from "../components/empty-state";
 import { ReviewFormGate } from "./review-form-gate";
+import { reviewActionFor, reviewGateFor } from "./review-permissions";
+import type { ReviewAction } from "./review-permissions";
+import type { ProductEligibility } from "../data/reviews";
+import type { ShopSession } from "../data/auth-api";
 
 /**
  * Real customer reviews: the aggregate, the distribution, the approved
@@ -83,7 +87,7 @@ function ReviewCard({
   viewerReaction,
   helpfulCount,
   pending,
-  canVote,
+  action,
   onVote,
   signIn,
 }: {
@@ -91,7 +95,8 @@ function ReviewCard({
   viewerReaction: ReactionKind | null;
   helpfulCount: number;
   pending: boolean;
-  canVote: boolean;
+  /** Allowed, needs a session, or needs a purchase — never a boolean. */
+  action: ReviewAction;
   onVote: (kind: ReactionKind | null) => void;
   signIn: string;
 }) {
@@ -133,11 +138,11 @@ function ReviewCard({
           helpfulCount={helpfulCount}
           viewerReaction={viewerReaction}
           pending={pending}
-          canVote={canVote}
+          action={action}
           onVote={onVote}
           signInHref={signIn}
         />
-        <ReplyForm reviewId={review.id} canReply={canVote} signInHref={signIn} />
+        <ReplyForm reviewId={review.id} action={action} signInHref={signIn} />
       </div>
 
       {/* The thread, then one control for adding to it. `replyControl` is
@@ -148,7 +153,7 @@ function ReviewCard({
           <ReplyForm
             reviewId={review.id}
             parentId={parentId}
-            canReply={canVote}
+            action={action}
             signInHref={signIn}
           />
         )}
@@ -194,10 +199,21 @@ export function ReviewsTab({
 
   const pathname = usePathname();
   const signIn = signInHref(pathname);
-  /* ONLY A CONFIRMED CUSTOMER MAY VOTE. `unknown` shows the sign-in link, which
-     resolves the session itself and forwards a shopper who already has one —
-     the same neutral answer `ReviewFormGate` gives, for the same reason. */
-  const [canVote, setCanVote] = React.useState(false);
+  /* ═══ ONE READ FOR THE WHOLE TAB, AND ONE `setState` ═══
+     Three surfaces here branch on the same two answers — the form gate, the
+     vote row and the reply control — and this component renders all of them.
+     Asking separately meant the product page already ran TWO `readShopSession`
+     calls, and would have run two eligibility reads on top.
+
+     BOTH ANSWERS LAND TOGETHER, deliberately: setting the session first would
+     paint the form for a confirmed customer and then take it away a moment
+     later when the eligibility answer arrived. `unknown` with an empty map is
+     the neutral first frame, which is what every one of these surfaces rendered
+     before this change. */
+  const [viewer, setViewer] = React.useState<{
+    kind: ShopSession["kind"];
+    eligible: Record<string, ProductEligibility>;
+  }>({ kind: "unknown", eligible: {} });
   const [mine, setMine] = React.useState<Record<string, ReactionKind>>({});
   /* Counts the server sent, overwritten per review by the answer to a vote. */
   const [counts, setCounts] = React.useState<Record<string, number>>({});
@@ -208,25 +224,52 @@ export function ReviewsTab({
     [initialReviews, extra],
   );
 
-  /* PER-VIEWER, AND A SECOND CALL ON PURPOSE. The reviews list is served
-     `Cache-Control: public`, so a shared cache can hand one reader's copy to
-     another; "did I vote on this" varies per reader and must never ride on it.
-     Signed out answers `200 {}` rather than 401, so there is nothing to branch
-     on beyond having no ids yet. */
+  /* WHO IS READING, AND WHAT THEY MAY DO HERE. Both answers are per-viewer and
+     credentialed, so neither may ride on the reviews list itself — that is
+     served `Cache-Control: public` and a shared cache can hand one reader's
+     copy to another. */
   React.useEffect(() => {
     let cancelled = false;
-    const ids = shown.map((r) => r.id);
-    void readShopSession().then(async (session) => {
+    void (async () => {
+      const session = await readShopSession();
       if (cancelled) return;
-      setCanVote(session.kind === "customer");
-      if (session.kind !== "customer" || ids.length === 0) return;
-      const reactions = await myReactions(ids);
+      if (session.kind !== "customer") {
+        setViewer({ kind: session.kind, eligible: {} });
+        return;
+      }
+      /* ONLY FOR A CONFIRMED CUSTOMER. The answer is per-viewer and
+         credentialed; asking on behalf of a guest spends a cross-origin request
+         to be told what the session already said. */
+      const eligible = await reviewEligibility([productSlug]);
+      if (!cancelled) setViewer({ kind: session.kind, eligible });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [productSlug]);
+
+  /* WHICH OF THE REVIEWS ON SCREEN THIS VIEWER HAS VOTED ON — a separate call
+     for the same reason as the one above: "did I vote on this" varies per
+     reader and must never ride on a response a shared cache can reuse.
+
+     ITS OWN EFFECT because it re-runs on "load more" while the one above must
+     not — a second page of reviews does not change who is reading. Signed out
+     answers `200 {}` rather than 401, so the only thing to branch on is having
+     no ids yet. */
+  React.useEffect(() => {
+    if (viewer.kind !== "customer") return;
+    const ids = shown.map((r) => r.id);
+    if (ids.length === 0) return;
+    let cancelled = false;
+    void myReactions(ids).then((reactions) => {
       if (!cancelled) setMine(reactions);
     });
     return () => {
       cancelled = true;
     };
-  }, [shown]);
+  }, [shown, viewer.kind]);
+
+  const action = reviewActionFor(viewer.kind, viewer.eligible, productSlug);
 
   async function vote(reviewId: string, kind: ReactionKind | null) {
     if (voting) return;
@@ -280,7 +323,12 @@ export function ReviewsTab({
           the branch below so it renders in both states rather than only when
           there is already something to read. */}
       <div className="mb-8 border-b border-brand-line pb-8">
-        <ReviewFormGate productSlug={productSlug} productName={productName} />
+        <ReviewFormGate
+          gate={reviewGateFor(viewer.kind, viewer.eligible, productSlug)}
+          productSlug={productSlug}
+          productName={productName}
+          signInHref={signIn}
+        />
       </div>
 
       {aggregate.count === 0 ? (
@@ -322,7 +370,7 @@ export function ReviewsTab({
                 viewerReaction={mine[review.id] ?? null}
                 helpfulCount={counts[review.id] ?? review.helpfulCount ?? 0}
                 pending={voting === review.id}
-                canVote={canVote}
+                action={action}
                 onVote={(kind) => void vote(review.id, kind)}
                 signIn={signIn}
               />
