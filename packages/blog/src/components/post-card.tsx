@@ -1,15 +1,21 @@
 import { Link } from "./link";
-import { ArrowRight } from "lucide-react";
 
 import { CoverImg } from "./cover-img";
 import type { PublicPost } from "../data/types";
 
 /**
- * The post card, ported from the admin app's `PostCard` (issue #15): the
- * cream pressable card — hard edge, hard offset shadow, press-down on click
- * — with text first and the picture under it, in the order the grid is
- * actually scanned. The geometry lives in `blog.css`; this file is the
- * public adaptation of the admin's markup.
+ * The post card, ported from the admin app's `PostCard` (issue #15): a
+ * tinted sheet behind a hairline rule, with text first and the picture under
+ * it, in the order the grid is actually scanned. The geometry lives in
+ * `blog.css`; this file is the public adaptation of the admin's markup.
+ *
+ * THE COVER CARRIES NO "READ MORE" PILL. It used to — a pressable-looking
+ * badge over the corner of the picture, `aria-hidden` and `pointer-events:
+ * none`, marking where a button would be on a card that is itself one link.
+ * It was decoration standing in for an affordance the whole card already
+ * provides, it only ever appeared on posts that happened to have a cover, and
+ * it sat on top of the image it was meant to advertise. The card is the
+ * control; nothing needs to say so.
  *
  * What the adaptation drops is everything a reader cannot do: no status
  * chip (the public API only serves published posts — the accent spine
@@ -91,12 +97,6 @@ export function PostCard({ post, index = 0 }: { post: PublicPost; index?: number
       {post.coverImage && (
         <div className="card__media">
           <CoverImg image={post.coverImage} fallbackAlt={title} className="card__img" />
-          {/* Not a control — the whole card is the control. The reference
-              design's cue that the picture is pressable. */}
-          <span className="card__more" aria-hidden="true">
-            Read More
-            <ArrowRight className="ui-ic" />
-          </span>
         </div>
       )}
     </article>

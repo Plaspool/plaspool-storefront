@@ -139,10 +139,6 @@ export function FeaturedCarousel({ posts, labelledBy }: FeaturedCarouselProps) {
           {post.coverImage ? (
             <div className="feat__media">
               <CoverImg image={post.coverImage} fallbackAlt={title} className="feat__img" />
-              <span className="card__more" aria-hidden="true">
-                Read More
-                <ArrowRight className="ui-ic" />
-              </span>
             </div>
           ) : (
             /* No cover is a normal state, not a broken one — the API serves

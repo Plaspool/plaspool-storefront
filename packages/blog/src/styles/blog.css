@@ -44,8 +44,19 @@
      losing it, so the annotated ratios remain floors. */
   --paper: #ffffff;
   --paper-raised: #ffffff;
-  --paper-sunken: #f2f0ea;
-  --paper-inset: #e8e5da;
+  /* ═══ THE TINTED SURFACES ARE THE BRAND'S PURPLE, NOT A WARM BEIGE ═══
+     These were the admin's warm neutrals (#f2f0ea / #e8e5da), chosen to sit
+     under a cream card. The card is a pale purple wash now (see --card-paper),
+     and a warm-grey tag pill on a cool-purple card reads as an unfinished
+     change rather than as a second surface. So the whole sunken ramp carries
+     the brand hue.
+     EACH VALUE IS MATCHED ON RELATIVE LUMINANCE, not on HSL lightness: blue
+     contributes almost nothing to luminance, so a purple at the same nominal
+     lightness is materially darker and would quietly drop the ink ratios
+     annotated below. Matching luminance is what keeps those annotations
+     floors rather than fiction. */
+  --paper-sunken: #eae7f6; /* was #f2f0ea */
+  --paper-inset: #e4e0f2; /* was #e8e5da */
 
   /* ink — every value below is >= 4.5:1 on --paper except --ink-5,
      which is decorative only (rules, disabled glyphs, never body copy). */
@@ -55,35 +66,43 @@
   --ink-4: #64604f; /*  5.4:1 on paper, 4.6:1 on the deepest inset */
   --ink-5: #9a9384; /*  2.9:1 — decorative only */
 
-  /* lines */
-  --rule: #e2ded2;
-  --rule-strong: #c7c0ae;
+  /* lines — the same hue shift as the surfaces above. A warm olive hairline
+     around a lavender card is the tell that only half the palette moved. */
+  --rule: #ddd9ee; /* was #e2ded2 */
+  --rule-strong: #bdb6d9; /* was #c7c0ae */
 
   /*
-   * THE CARD IS A STROKE. THE BUTTON IS THE PRESSABLE OBJECT.
+   * THE CARD IS A STROKE.
    *
-   * These used to be the same thing: every card carried the admin's hard
+   * It used to be a pressable object: every card carried the admin's hard
    * black edge, hard offset shadow and press-down travel. On a dense listing
-   * that is a page of two dozen competing solid objects, and the one control
-   * a reader is actually looking for — "Read More" — was the quietest thing
-   * on the card.
+   * that is a page of two dozen competing solid objects, so the treatment was
+   * cut back to a 1px rule and the neobrutalism moved onto a "Read More"
+   * pill — which is now gone too. `--card-line` and `--card-lift` still
+   * describe a hard edge and a hard unblurred offset, and are still the single
+   * place to turn that treatment up or down; they are now spent on
+   * `.blog-strip-card` alone — the home page's blog band, which is a handful
+   * of cards on a coloured ground rather than a listing.
    *
-   * So the neobrutalism moved rather than left. `--card-line` and
-   * `--card-lift` still describe a hard edge and a hard unblurred offset, and
-   * are still the single place to turn that treatment up or down; they are
-   * now spent on `.card__more` alone. The card itself is a 1px rule.
+   * `--card-paper` IS THE PAGE'S PURPLE, WASHED OUT ALMOST TO WHITE. It was
+   * cream (#fdfbf6) — a warm off-white carried over from the admin's paper —
+   * and cream is the one hue the rest of this site does not contain. The card
+   * takes the brand hue washed almost the whole way out: enough that it reads
+   * as a tinted sheet rather than as a hairline box on white, not so much that
+   * a grid of them becomes a page of coloured slabs.
    *
-   * `--card-paper` stays FRACTIONALLY warmer than the page. It is no longer
-   * cream — the page is white now, and cream against white read as a stain
-   * rather than as a surface — but it is not `#fff` either: a white card on a
-   * white page has nothing but its border, and the border is a hairline.
+   * IT SITS AT LUMINANCE 0.906 AGAINST THE PAGE'S 1.0, AND THAT IS THE NUMBER
+   * TO CHECK IT BY. Every ink value stays over its annotated floor there —
+   * `--ink-4`, the lowest that carries text, measures 4.9:1 on it. Deepening
+   * the tint to make the purple more obvious is exactly what takes it under,
+   * and by eye there is nothing to see until it already has.
    *
    * The shadow is composed at the ELEMENT, not here — a correctness point the
    * admin file makes and this port preserves: a custom property's `var()`s
    * are substituted where the property is DECLARED, so a `--card-shadow`
    * written at this level would bake in this level's `--card-line`.
    */
-  --card-paper: #fdfbf6;
+  --card-paper: #f5f3fd; /* was #fdfbf6 */
   --card-line: #1f1d14;
   --card-lift: 3px;
 
@@ -128,20 +147,29 @@
      stays true). The var() indirection falls through to the same stacks
      the admin file names when a face is absent — e.g. in the package's
      dev harness, which loads no fonts. */
-  /* ═══ ONE TYPEFACE ACROSS THE SITE ═══
-     This was Spectral, a serif for display and prose. It is a good face and it
-     made the blog look like a different publication from the shop: every
-     heading on `/posts` was serif while every heading on `/store` was Inter.
-     The blog now sets its display face from the same variable the rest of the
-     site uses, so headings match end to end.
+  /* ═══ ONE TYPEFACE ACROSS THE SITE — AND IT IS JETBRAINS MONO ═══
+     This has now been wrong twice in the same direction. It was Spectral, a
+     serif, which made the blog look like a different publication from the
+     shop; that was corrected to Inter on the theory that Inter was what the
+     rest of the site used. It is not. Every marketing surface — the nav, the
+     footer, the home page's headings and body copy, /contact — is drawn in
+     `font-mono`, which the Tailwind preset resolves to JetBrains Mono. Inter
+     is `font-sans`, and outside the shop's chrome almost nothing asks for it.
+     So `/posts` in Inter was still the odd page out, just less obviously.
 
-     `--font-spectral` is still loaded by the root layout with `preload: false`,
-     which costs nothing while nothing renders it — and leaves the face one
-     token away should the blog ever want its own voice back deliberately. */
-  --font-display: var(--font-sans, 'Inter'), 'Inter', -apple-system, BlinkMacSystemFont,
-    'Segoe UI', Roboto, system-ui, sans-serif;
-  --font-ui: var(--font-sans, 'Inter'), 'Inter', -apple-system, BlinkMacSystemFont,
-    'Segoe UI', Roboto, system-ui, sans-serif;
+     All three faces now point at the one the reader has been looking at since
+     the home page. `--font-mono` keeping its own name matters: code blocks
+     must stay monospaced no matter what the display face is later set to, so
+     the token that means "monospaced by requirement" cannot be collapsed into
+     the one that means "the site's voice", even while they resolve alike.
+
+     Both `--font-sans` and `--font-spectral` are still loaded by the root
+     layout (the latter with `preload: false`, which costs nothing while
+     nothing renders it), so either voice is one token away again. */
+  --font-display: var(--font-jetbrains-mono, 'JetBrains Mono'), 'JetBrains Mono',
+    ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --font-ui: var(--font-jetbrains-mono, 'JetBrains Mono'), 'JetBrains Mono', ui-monospace,
+    'SF Mono', Menlo, Consolas, monospace;
   --font-mono: var(--font-jetbrains-mono, 'JetBrains Mono'), 'JetBrains Mono', ui-monospace,
     'SF Mono', Menlo, Consolas, monospace;
 
@@ -431,23 +459,21 @@
 /* ------------------------------------------------------------------ card */
 
 /*
- * A CARD IS A SHEET WITH AN EDGE — and the thing you press is the button on it.
+ * A CARD IS A SHEET WITH AN EDGE. THE WHOLE SHEET IS THE CONTROL.
  *
- * IT USED TO BE THE WHOLE CARD: the admin's hard 2px black border, a hard
+ * IT USED TO BE A PRESSABLE OBJECT: the admin's hard 2px black border, a hard
  * offset shadow, a lift on hover and a press down into its own shadow on
  * click. Ported wholesale from a dashboard, where a handful of cards are
  * objects on a desk. A blog listing is two dozen of them at once, and two
  * dozen solid pressable slabs is a page with no hierarchy in it — every card
- * shouting equally, and the one affordance that names the action ("Read
- * More") reduced to a soft white pill with a blur behind it.
+ * shouting equally.
  *
- * The treatment did not go away; it moved to `.card__more`, which is where a
- * reader is already looking for the control. The card keeps a 1px stroke on
- * all four sides and gets out of the way.
- *
- * NO BLUR ANYWHERE IN THE NEOBRUTALIST PART. A blurred shadow is a light
- * source; an offset solid one is a shape. Mixing them lights an object from
- * two directions at once.
+ * That treatment was moved onto a "Read More" pill over the cover, and the
+ * pill has since been removed with it: a badge that could not be clicked or
+ * focused, drawn only on posts that happened to have a cover, naming an
+ * affordance the entire card already is. What is left is the sheet — a tinted
+ * ground, a hairline stroke, and hover and focus states on the stroke itself.
+ * Nothing on it pretends to be a separate button.
  */
 .blog .card {
   position: relative;
@@ -652,69 +678,6 @@
   height: 100%;
   object-fit: cover;
   display: block;
-}
-/*
- * THE ONE NEOBRUTALIST OBJECT ON THE CARD.
- *
- * Hard 2px edge, hard unblurred offset, and the press physics that used to
- * belong to the whole card: lifts with the card's hover, drops into its own
- * shadow when the card is actually pressed. The card is now a quiet sheet, so
- * this is the only thing on it claiming to be a physical control — which is
- * the correct number, and it is the thing the reader wants.
- *
- * STILL NOT A CONTROL IN THE DOM. `pointer-events: none` and no tabindex: the
- * whole card is one link (`.card__hit`), and a second focusable "Read More"
- * inside it would put every card in the tab order twice for the same
- * destination. It looks like the button because it marks where the button
- * would be; `.card__hit` is what actually takes the click.
- */
-.blog .card__more {
-  position: absolute;
-  left: var(--s3);
-  bottom: var(--s3);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s2);
-  padding: var(--s2) var(--s3);
-  border-radius: var(--radius-full);
-  border: 2px solid var(--card-line);
-  background: var(--paper-raised);
-  color: var(--ink);
-  font-size: var(--step--2);
-  font-weight: 600;
-  box-shadow: var(--card-lift) var(--card-lift) 0 var(--card-line);
-  pointer-events: none;
-  transition:
-    box-shadow var(--dur-1) var(--ease),
-    transform var(--dur-1) var(--ease);
-}
-.blog .card:hover .card__more {
-  transform: translate(-1px, -1px);
-  box-shadow: 4px 4px 0 var(--card-line);
-}
-/* Down into its own shadow, and the shadow goes with it. Keyed off the card's
-   link being pressed, not this element's — this one cannot be pressed. */
-.blog .card:has(.card__hit:active) .card__more {
-  transform: translate(var(--card-lift), var(--card-lift));
-  box-shadow: 0 0 0 0 var(--card-line);
-}
-.blog .card__more .ui-ic {
-  width: 0.85rem;
-  height: 0.85rem;
-  transition: transform var(--dur-2) var(--ease);
-}
-.blog .card:hover .card__more .ui-ic {
-  transform: translateX(3px);
-}
-/* A hard shadow snapping between two positions is the one motion here a
-   reduced-motion reader would feel as a jolt rather than as feedback. */
-@media (prefers-reduced-motion: reduce) {
-  .blog .card__more,
-  .blog .card:hover .card__more,
-  .blog .card:has(.card__hit:active) .card__more {
-    transform: none;
-    transition: none;
-  }
 }
 
 /* --------------------------------------------------------------- templates
@@ -1713,4 +1676,40 @@
   .blog .feat__body {
     padding: 0 var(--s6) var(--s6);
   }
+}
+
+/* ------------------------------------------------- tracking, for a mono face
+ * EVERY NEGATIVE `letter-spacing` IN THIS FILE WAS TUNED FOR A PROPORTIONAL
+ * FACE, AND IS WRONG NOW THAT THE DISPLAY FACE IS MONOSPACED.
+ *
+ * Tightening tracking is what makes Inter and Spectral hold together at
+ * display sizes: their sidebearings are cut for it. A monospace advance is
+ * fixed and already includes the space each glyph needs, so pulling -0.032em
+ * out of it does not tighten the setting, it walks the glyphs into each other
+ * — worst on the very sizes the tightest values were reserved for, the
+ * article title and the masthead.
+ *
+ * This is one block rather than twelve edits ON PURPOSE. The values it
+ * neutralises are still readable where they are declared, next to the sizes
+ * they were chosen against, so restoring a proportional display face is
+ * deleting this block and nothing else. Each selector is repeated at the
+ * specificity it has above; source order is what wins, so this block must
+ * stay LAST in the file.
+ */
+.blog .blog-head__title,
+.blog .section-head,
+.blog .card__title,
+.blog .feat__title,
+.blog .tpl__title,
+.blog .tpl__subtitle,
+.blog .tpl--minimal .tpl__title,
+.blog .tpl--technical .tpl__title,
+.blog .blog-prose,
+.blog .blog-prose h2,
+.blog .blog-prose h3,
+.blog .tpl--technical .blog-prose,
+.blog .tpl--technical .blog-prose h2,
+.blog .tpl--technical .blog-prose h3,
+.blog-strip-card .strip__title {
+  letter-spacing: 0;
 }
