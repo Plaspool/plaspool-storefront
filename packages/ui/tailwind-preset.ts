@@ -11,9 +11,33 @@ export const preset = {
       },
     },
     extend: {
+      /*
+       * ═══ THE FACES `next/font` ACTUALLY LOADS, NOT THE ONES WE ASKED FOR ═══
+       *
+       * These named Titillium Web and Space Mono. Neither is loaded anywhere:
+       * `app/layout.tsx` self-hosts Inter, Spectral and JetBrains Mono through
+       * `next/font` — which it must, because the CSP is `font-src 'self'` and a
+       * Google Fonts request would simply be blocked.
+       *
+       * So the served CSS said `.font-sans{font-family:Titillium Web,DIN,
+       * sans-serif}` against no `@font-face` for either, and every one of the
+       * ~420 `font-sans`/`font-mono` classes in this repo fell through to the
+       * generic system face. Three webfonts were downloaded on every page load
+       * and used by nothing.
+       *
+       * THE BLOG WAS THE ONLY PART THAT LOOKED RIGHT, and that is the tell:
+       * `blog.css` never uses these utilities, it reads the CSS variables
+       * directly (`--font-display: var(--font-spectral)` and so on). Pointing
+       * the utilities at the same variables is what makes one typeface serve
+       * the store, the marketing pages and the blog alike.
+       *
+       * The literal names stay behind the variables as the fallback chain, so a
+       * surface rendered outside the root layout — where the variables are not
+       * defined — still lands somewhere deliberate.
+       */
       fontFamily: {
-        mono: ["Space Mono", "Roboto Mono", "monospace"], // Engineering-focused monospace font
-        sans: ["Titillium Web", "DIN", "sans-serif"], // Technical sans-serif font
+        sans: ["var(--font-sans)", "Inter", "system-ui", "sans-serif"],
+        mono: ["var(--font-jetbrains-mono)", "JetBrains Mono", "ui-monospace", "monospace"],
       },
       colors: {
         brand: {

@@ -63,13 +63,13 @@ import { AccountMenu } from "@plaspool/shop"
  * wins over what the component sets.
  */
 const ACCOUNT_IN_MARKETING_NAV =
-  "text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:ring-blue-900 focus-visible:ring-offset-white"
+  "text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-brand focus-visible:ring-offset-white"
 
 export default function Nav() {
     const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
 
     return (
-         <nav className="bg-white border-b font-mono border-slate-200 sticky top-0 z-50">
+         <nav className="bg-white border-b font-mono border-brand-line sticky top-0 z-50">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                   <div className="flex justify-between items-center h-16">
                     <Link href="/" className="flex items-center" aria-label="PlaSpool home">
@@ -83,18 +83,18 @@ export default function Nav() {
                         phone, where the links are. */}
                     <div className="flex items-center gap-1 md:gap-4">
                     <div className="hidden md:flex items-center space-x-8">
-                      <Link href="/#about" className="text-slate-600 hover:text-slate-900 font-medium tracking-wide">
+                      <Link href="/#about" className="text-muted-foreground hover:text-foreground font-medium tracking-wide">
                         About
                       </Link>
-                      <Link href="/store" prefetch={false} className="whitespace-nowrap text-slate-600 hover:text-slate-900 font-medium tracking-wide">
+                      <Link href="/store" prefetch={false} className="whitespace-nowrap text-muted-foreground hover:text-foreground font-medium tracking-wide">
                         Products
                       </Link>
                       {/* `pwa-hide` — the installed app is the shop, not the
                           website. See `.pwa-hide` in `globals.css`. */}
-                      <Link href="/posts" className="pwa-hide whitespace-nowrap text-slate-600 hover:text-slate-900 font-medium tracking-wide">
+                      <Link href="/posts" className="pwa-hide whitespace-nowrap text-muted-foreground hover:text-foreground font-medium tracking-wide">
                         Blog
                       </Link>
-                      <Link href="/contact" className="whitespace-nowrap text-slate-600 hover:text-slate-900 font-medium tracking-wide">
+                      <Link href="/contact" className="whitespace-nowrap text-muted-foreground hover:text-foreground font-medium tracking-wide">
                         Contact Us
                       </Link>
                       {/* buttonVariants on the Link rather than a <Button> inside an <a>:
@@ -105,12 +105,12 @@ export default function Nav() {
                         prefetch={false}
                         className={cn(
                           buttonVariants(),
-                          "whitespace-nowrap bg-slate-800 text-white hover:bg-slate-700"
+                          "whitespace-nowrap bg-brand text-white hover:bg-brand-hover"
                         )}
                       >
                         Shop Filaments
                       </Link>
-                      {/* <Button className="bg-blue-900 hover:bg-blue-800">Contact Us</Button> */}
+                      {/* <Button className="bg-brand hover:bg-brand">Contact Us</Button> */}
                     </div>
 
                     <AccountMenu className={ACCOUNT_IN_MARKETING_NAV} />
@@ -119,7 +119,7 @@ export default function Nav() {
                     <div className="md:hidden">
                       <button
                         type="button"
-                        className="inline-flex items-center justify-center p-2 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-900"
+                        className="inline-flex items-center justify-center p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand"
                         aria-controls="mobile-menu"
                         aria-expanded={mobileMenuOpen}
                         onClick={() => setMobileMenuOpen((open) => !open)}
@@ -143,37 +143,37 @@ export default function Nav() {
                 </div>
 
                 {/* Mobile menu, show/hide based on menu state */}
-                <div className={cn("md:hidden bg-white border-t border-slate-200", mobileMenuOpen ? "block" : "hidden")} id="mobile-menu">
+                <div className={cn("md:hidden bg-white border-t border-brand-line", mobileMenuOpen ? "block" : "hidden")} id="mobile-menu">
                   <div className="px-2 pt-2 pb-3 space-y-1 font-mono">
                     <Link onClick={() => setMobileMenuOpen(false)}
                       href="/#about"
-                      className="block px-3 py-2 rounded-md text-base font-medium text-slate-900 hover:bg-slate-100"
+                      className="block px-3 py-2 rounded-md text-base font-medium text-foreground hover:bg-muted"
                     >
                       About
                     </Link>
                     <Link onClick={() => setMobileMenuOpen(false)}
                       href="/store"
                       prefetch={false}
-                      className="block px-3 py-2 rounded-md text-base font-medium text-slate-900 hover:bg-slate-100"
+                      className="block px-3 py-2 rounded-md text-base font-medium text-foreground hover:bg-muted"
                     >
                       Products
                     </Link>
                     <Link onClick={() => setMobileMenuOpen(false)}
                       href="/posts"
-                      className="pwa-hide block px-3 py-2 rounded-md text-base font-medium text-slate-900 hover:bg-slate-100"
+                      className="pwa-hide block px-3 py-2 rounded-md text-base font-medium text-foreground hover:bg-muted"
                     >
                       Blog
                     </Link>
                        <Link onClick={() => setMobileMenuOpen(false)}
                       href="/contact"
-                      className="block px-3 py-2 rounded-md text-base font-medium text-slate-900 hover:bg-slate-100"
+                      className="block px-3 py-2 rounded-md text-base font-medium text-foreground hover:bg-muted"
                     >
                       Contact us
                     </Link>
                     <Link onClick={() => setMobileMenuOpen(false)}
                       href="/store"
                       prefetch={false}
-                      className="block px-3 py-2 rounded-md text-base font-medium text-slate-900 hover:bg-slate-100"
+                      className="block px-3 py-2 rounded-md text-base font-medium text-foreground hover:bg-muted"
                     >
                       Shop Filaments
                     </Link>

@@ -277,3 +277,44 @@ describe("`asChild` is given exactly one child to clone", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+/**
+ * ONE BRAND COLOUR, AND IT LIVES IN THE RAMP.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * The marketing pages were built before the brand ramp existed and never
+ * migrated: 253 raw Tailwind palette classes across the landing page, shipping,
+ * contact, the nav and the footer — `slate` for text, `blue` for what should
+ * have been the brand, and `green`/`red`/`yellow` medallions behind decorative
+ * icons that carried no meaning at all. The shop next door had been on tokens
+ * the whole time, so the two halves of one site disagreed about what colour
+ * PlaSpool is.
+ *
+ * `text-red-700` was the worst of them: it is the literal value of
+ * `--destructive-strong`, so a globe icon on the landing page was painted the
+ * exact colour reserved for "something went wrong".
+ *
+ * The rule is the ramp, not a shade: `brand`, `brand-hover`, `brand-soft`,
+ * `brand-line`, `brand-ink`, plus `foreground`/`muted-foreground`/`muted`. A
+ * raw palette class is a colour nobody chose and nothing can restyle.
+ *
+ * Comments are blanked by `sourcesIn`, so the notes explaining what a line used
+ * to be do not trip this.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+describe("colour comes from the ramp, never from Tailwind's palette", () => {
+  const PALETTE =
+    /(?<![\w-])(?:bg|text|border|from|via|to|ring|fill|stroke|decoration|divide|outline|shadow|accent|caret)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(?:50|\d{3})(?![\w-])/;
+
+  it("never paints a surface from a raw Tailwind colour", () => {
+    const WEB = join(__dirname, "..", "..", "..", "web", "src");
+    const offenders: string[] = [];
+    for (const { path, text } of [...sourcesIn(SHOP), ...sourcesIn(UI), ...sourcesIn(WEB)]) {
+      text.split("\n").forEach((line, i) => {
+        const hit = PALETTE.exec(line);
+        if (hit) offenders.push(`${path}:${i + 1}  ${hit[0]}`);
+      });
+    }
+    expect(offenders).toEqual([]);
+  });
+});
