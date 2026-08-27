@@ -68,11 +68,14 @@ export default function Footer() {
                   Contact Us
                 </Link>
               </li>
-              <li>
+              {/* TEMPORARILY HIDDEN with the `/shipping` route itself — the
+                  policy page is not legible and 404s until it is redesigned.
+                  See `apps/storefront/app/(site)/shipping/page.tsx`. */}
+              {/* <li>
                 <Link href="/shipping" className="hover:text-white font-mono text-sm">
                   Shipping Info
                 </Link>
-              </li>
+              </li> */}
               <li>
                 <Link href="/privacy" className="hover:text-white font-mono text-sm">
                   Privacy policy
