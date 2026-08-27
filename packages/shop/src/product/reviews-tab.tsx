@@ -124,15 +124,21 @@ function ReviewCard({
           reactions endpoint returns the new `helpfulCount`, so a click updates
           from the response rather than refetching a list that is cached
           `public` and would not show the change anyway. */}
-      <ReviewReactions
-        className="mt-3"
-        helpfulCount={helpfulCount}
-        viewerReaction={viewerReaction}
-        pending={pending}
-        canVote={canVote}
-        onVote={onVote}
-        signInHref={signIn}
-      />
+      {/* ONE ROW: thumb, tally, thumb, reply — the shape of every threaded
+          comment UI, and the one shoppers already know how to read. The reply
+          control was on a line of its own beneath, which made two rows of
+          chrome under a two-line review. */}
+      <div className="mt-3 flex flex-wrap items-center gap-1">
+        <ReviewReactions
+          helpfulCount={helpfulCount}
+          viewerReaction={viewerReaction}
+          pending={pending}
+          canVote={canVote}
+          onVote={onVote}
+          signInHref={signIn}
+        />
+        <ReplyForm reviewId={review.id} canReply={canVote} signInHref={signIn} />
+      </div>
 
       {/* The thread, then one control for adding to it. `replyControl` is
           offered only on depth-0 rows — see `ReviewReplies`. */}
@@ -148,9 +154,7 @@ function ReviewCard({
         )}
       />
 
-      <div className="mt-3">
-        <ReplyForm reviewId={review.id} canReply={canVote} signInHref={signIn} />
-      </div>
+
     </li>
   );
 }
