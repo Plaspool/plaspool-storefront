@@ -66,7 +66,7 @@ export async function ReturnRequestPage() {
       {/* `program.name` — the operator's own word for this, the same choice
           `RewardsHeading` and `RewardsBand`'s `<h2>` both make. No noun here
           is this file's to spell. */}
-      <h1 className="font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+      <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
         {program.name}
       </h1>
       <p className="mt-3 max-w-prose text-base leading-7 text-muted-foreground">
@@ -121,7 +121,7 @@ function NotRunning() {
           `/api/public/marketing/areas` — the same fallback shape
           `RewardsHeading` uses with "Rewards" when no programme name is
           available. Not a programme noun invented here. */}
-      <h1 className="font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+      <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
         Returns
       </h1>
       <p className="mt-3 max-w-prose text-base leading-7 text-muted-foreground">

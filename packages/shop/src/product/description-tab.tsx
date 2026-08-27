@@ -33,7 +33,7 @@ export function DescriptionTab({ blocks, className }: DescriptionTabProps) {
             return (
               <h3
                 key={key}
-                className="mt-10 font-sans text-lg font-semibold text-foreground first:mt-0"
+                className="mt-10 text-lg font-semibold text-foreground first:mt-0"
               >
                 {block.text}
               </h3>
@@ -73,7 +73,7 @@ export function DescriptionTab({ blocks, className }: DescriptionTabProps) {
                           <th
                             key={cell}
                             scope="col"
-                            className="px-2 pb-2 text-left font-sans text-xs font-semibold text-muted-foreground"
+                            className="px-2 pb-2 text-left text-xs font-semibold text-muted-foreground"
                           >
                             {cell}
                           </th>

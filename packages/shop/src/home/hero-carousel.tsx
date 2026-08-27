@@ -102,7 +102,7 @@ export function HeroCarousel({ primary }: { primary: CategoryLink }) {
             <p className="font-mono text-xs uppercase tracking-widest text-brand">
               {slide.eyebrow}
             </p>
-            <h1 className="mt-3 font-sans text-3xl font-bold leading-tight text-foreground sm:text-4xl lg:text-5xl">
+            <h1 className="mt-3 text-3xl font-bold leading-tight text-foreground sm:text-4xl lg:text-5xl">
               {slide.heading}
             </h1>
             <p className="mt-4 max-w-prose text-base leading-7 text-muted-foreground">
@@ -112,7 +112,7 @@ export function HeroCarousel({ primary }: { primary: CategoryLink }) {
               <Link
                 href={primary.href}
                 className={cn(
-                  "inline-flex h-11 items-center justify-center rounded-md bg-brand px-6 font-sans text-sm font-medium text-brand-ink",
+                  "inline-flex h-11 items-center justify-center rounded-md bg-brand px-6 text-sm font-medium text-brand-ink",
                   "transition-colors hover:bg-brand-hover motion-reduce:transition-none",
                   BUTTON_FOCUS,
                 )}
@@ -128,7 +128,7 @@ export function HeroCarousel({ primary }: { primary: CategoryLink }) {
               <Link
                 href="/store/all"
                 className={cn(
-                  "inline-flex h-11 items-center justify-center rounded-md border border-brand-line bg-background px-6 font-sans text-sm font-medium text-foreground",
+                  "inline-flex h-11 items-center justify-center rounded-md border border-brand-line bg-background px-6 text-sm font-medium text-foreground",
                   "transition-colors hover:bg-brand-soft motion-reduce:transition-none",
                   BUTTON_FOCUS,
                 )}

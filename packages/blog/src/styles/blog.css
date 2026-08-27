@@ -1335,10 +1335,15 @@
 }
 
 @media (max-width: 640px) {
-  /* No size step here any more: this block existed to bring 22px down to 18px
-     on a narrow screen, and 18px is what the page now opens at. Only the
-     tighter leading is still a phone-specific decision. */
+  /* A PHONE PAYS FOR THE MONO ADVANCE TWICE, so it steps down again.
+     18px of monospace in a 343px column is about 32 characters a line — it
+     was ~38 when this text was Inter, and the narrower a column gets the
+     worse a short measure reads, because every line break lands mid-thought.
+     `--step-0` buys back about 38 and returns the phone to the measure it
+     had before the face changed. It is the blog's base size, not a special
+     one, so nothing else on the page has to know about it. */
   .blog .blog-prose {
+    font-size: var(--step-0);
     line-height: 1.68;
   }
   .blog .blog-prose h2 {

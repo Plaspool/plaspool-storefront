@@ -30,7 +30,7 @@ const FOOTER_LINK_FOCUS =
 function FooterColumn({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div>
-      <h2 className="font-sans text-xs font-semibold uppercase tracking-wide text-white/50">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-white/50">
         {title}
       </h2>
       <ul className="mt-3 space-y-2.5">{children}</ul>
@@ -115,7 +115,7 @@ export async function ShopFooter() {
         <Separator className="my-10 bg-white/10" />
 
         <div>
-          <h2 className="font-sans text-xs font-semibold uppercase tracking-wide text-white/50">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-white/50">
             Payment methods
           </h2>
           <ul className="mt-3 flex flex-wrap gap-2">

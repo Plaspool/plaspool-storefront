@@ -41,14 +41,14 @@ const LINK_FOCUS =
   "rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 const SHEET_LINK =
-  "flex items-center gap-2 px-2 py-2.5 font-sans text-sm font-medium text-foreground hover:bg-brand-soft hover:text-brand";
+  "flex items-center gap-2 px-2 py-2.5 text-sm font-medium text-foreground hover:bg-brand-soft hover:text-brand";
 
 function CategoryLink({ category }: { category: Category }) {
   return (
     <Link
       href={`/store/${category.slug}`}
       className={cn(
-        "font-sans text-sm font-medium text-foreground/70 transition-colors hover:text-brand motion-reduce:transition-none",
+        "text-sm font-medium text-foreground/70 transition-colors hover:text-brand motion-reduce:transition-none",
         LINK_FOCUS,
       )}
     >

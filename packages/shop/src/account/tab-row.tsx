@@ -64,7 +64,7 @@ import { TextSkeleton, cn } from "@plaspool/ui";
  * `pb-2.5 pt-2.5` plus a fixed `h-4` bar, measuring 37px against the live
  * row's 42px.
  */
-const TAB_BOX = "-mb-px block truncate border-b-2 py-2.5 font-sans text-xs sm:text-sm";
+const TAB_BOX = "-mb-px block truncate border-b-2 py-2.5 text-xs sm:text-sm";
 
 /** The row's rule. Shared for the same reason. */
 const TAB_LIST = "flex border-b border-brand-line";
@@ -141,7 +141,7 @@ export function TabRowSkeleton({ count = 2, className }: { count?: number; class
           <li key={i} className="min-w-0">
             <div className={cn(TAB_BOX, tabPad(i), "border-transparent")}>
               <TextSkeleton
-                className={cn("font-sans text-xs sm:text-sm", i === 0 ? "w-28" : "w-32")}
+                className={cn("text-xs sm:text-sm", i === 0 ? "w-28" : "w-32")}
               />
             </div>
           </li>

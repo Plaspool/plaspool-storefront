@@ -79,10 +79,10 @@ export function StickyBuyBar({
             the decision has to fit, and the name is the part you already
             know. */}
         <div className="hidden min-w-0 flex-1 sm:block">
-          <p className="truncate font-sans text-sm font-semibold text-foreground">
+          <p className="truncate text-sm font-semibold text-foreground">
             {product.name}
           </p>
-          <p className="truncate font-sans text-xs text-muted-foreground">{colour.name}</p>
+          <p className="truncate text-xs text-muted-foreground">{colour.name}</p>
         </div>
 
         {/*

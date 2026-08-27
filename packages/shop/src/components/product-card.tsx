@@ -71,7 +71,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
           <Badge
             variant={badge === "Low stock" ? "outline" : "default"}
             className={cn(
-              "pointer-events-none absolute left-2 top-2 z-10 font-sans",
+              "pointer-events-none absolute left-2 top-2 z-10",
               badge === "Low stock" && "border-brand-line bg-background",
             )}
           >
@@ -95,7 +95,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
         href={`/store/products/${product.slug}`}
         aria-label={product.name}
         className={cn(
-          "mt-2 rounded-sm font-sans text-sm font-semibold leading-snug text-foreground",
+          "mt-2 rounded-sm text-sm font-semibold leading-snug text-foreground",
           "transition-colors hover:text-brand motion-reduce:transition-none",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background",
           /* Stretches the link's hit area over the whole card. The image well
@@ -132,7 +132,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
           reaches it rather than saying "bulk discount available" — which names
           neither a saving nor a quantity and so changes nobody's basket. */}
       {bulkAffordance(product.bulkTiers) && (
-        <p className="mt-1 font-sans text-xs text-brand">
+        <p className="mt-1 text-xs text-brand">
           {bulkAffordance(product.bulkTiers)}
         </p>
       )}

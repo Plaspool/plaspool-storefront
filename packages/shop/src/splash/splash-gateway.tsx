@@ -213,12 +213,12 @@ export function SplashGateway({ destination = DESTINATION }: SplashGatewayProps)
           everyone else — the engine's own visual stack is `aria-hidden`, so a
           screen reader lands on a heading and a link rather than on nothing.
         */}
-        <h1 className="font-sans text-lg font-semibold text-foreground">
+        <h1 className="text-lg font-semibold text-foreground">
           Opening the {siteConfig.site_name} shop
         </h1>
         <a
           href={destination}
-          className="rounded-sm font-sans text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="rounded-sm text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           Go to the shop
         </a>
@@ -267,10 +267,10 @@ export function SplashGateway({ destination = DESTINATION }: SplashGatewayProps)
             "motion-reduce:translate-y-0",
           )}
         >
-          <p className="font-sans text-2xl font-semibold tracking-tight text-foreground">
+          <p className="text-2xl font-semibold tracking-tight text-foreground">
             {siteConfig.site_name}
           </p>
-          <p className="font-sans text-sm text-muted-foreground">{TAGLINE}</p>
+          <p className="text-sm text-muted-foreground">{TAGLINE}</p>
         </div>
       </div>
       )}

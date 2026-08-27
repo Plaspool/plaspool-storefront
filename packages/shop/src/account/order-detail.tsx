@@ -254,10 +254,10 @@ export function OrderDetail({
       <OrderTrail orderNumber={order.orderNumber} isGuest={isGuest} />
 
       <header className="mt-4 flex flex-col gap-1">
-        <h1 className="font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
           Order {order.orderNumber}
         </h1>
-        <p className="font-sans text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Placed {formatStamp(order.placedAt, { dateOnly: true })}
         </p>
       </header>
@@ -285,7 +285,7 @@ export function OrderDetail({
       >
         <h2
           id="order-status-heading"
-          className="font-sans text-lg font-semibold tracking-tight text-foreground sm:text-xl"
+          className="text-lg font-semibold tracking-tight text-foreground sm:text-xl"
         >
           {headline}
         </h2>
@@ -315,7 +315,7 @@ export function OrderDetail({
         {(!isGuest || token) && (
           <Link
             href={statusHref(order.orderNumber, token)}
-            className="mt-4 inline-flex items-center gap-1.5 rounded-sm font-sans text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="mt-4 inline-flex items-center gap-1.5 rounded-sm text-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             See every step
             <ChevronRight aria-hidden="true" className="h-4 w-4" />
@@ -358,7 +358,7 @@ export function OrderDetail({
       <section aria-labelledby="order-items-heading" className="mt-8">
         <h2
           id="order-items-heading"
-          className="font-sans text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+          className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
         >
           {/* UNITS, like the cart badge and like the reorder message — the
               heading counted LINES, so a two-line order of three spools read
@@ -385,8 +385,8 @@ export function OrderDetail({
                     word, that we have no photograph of this one. */}
                 <LineThumb line={line} images={lineImages} size={ROW_THUMB_PX} />
                 <div className="min-w-0 flex-1">
-                  <p className="font-sans text-sm font-medium text-foreground">{line.title}</p>
-                  <p className="mt-0.5 font-sans text-xs text-muted-foreground">
+                  <p className="text-sm font-medium text-foreground">{line.title}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
                     {[...Object.values(line.optionValues ?? {}), `${line.qty} ×`]
                       .filter(Boolean)
                       .join(" · ")}{" "}
@@ -410,7 +410,7 @@ export function OrderDetail({
         <section aria-labelledby="order-totals-heading">
           <h2
             id="order-totals-heading"
-            className="border-b border-brand-line pb-2 font-sans text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            className="border-b border-brand-line pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
           >
             Payment
           </h2>
@@ -427,7 +427,7 @@ export function OrderDetail({
             <div className="mt-1 flex items-center justify-between border-t border-brand-line pt-2">
               <dt
                 className={cn(
-                  "font-sans font-semibold text-foreground",
+                  "font-semibold text-foreground",
                   order.refundedTotal > 0 ? "text-sm" : "text-base",
                 )}
               >
@@ -448,7 +448,7 @@ export function OrderDetail({
               </dd>
             </div>
             {!paid && (
-              <p className="mt-2 font-sans text-sm text-muted-foreground">
+              <p className="mt-2 text-sm text-muted-foreground">
                 {cancelled
                   ? "You weren't charged for this order."
                   : "We haven't received payment for this order, and nothing has been charged. If that looks wrong, get in touch below."}
@@ -471,7 +471,7 @@ export function OrderDetail({
                     fully refunded order "Total paid" is history and the net is
                     what the shopper is actually out, so the emphasis moves. */}
                 <div className="flex items-center justify-between py-1">
-                  <dt className="font-sans text-base font-semibold text-foreground">
+                  <dt className="text-base font-semibold text-foreground">
                     Net after refund
                   </dt>
                   <dd className="font-mono text-base font-bold tabular-nums text-foreground">
@@ -487,11 +487,11 @@ export function OrderDetail({
           <section aria-labelledby="order-address-heading">
             <h2
               id="order-address-heading"
-              className="border-b border-brand-line pb-2 font-sans text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+              className="border-b border-brand-line pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
             >
               Delivery address
             </h2>
-            <address className="mt-3 flex flex-col font-sans text-sm not-italic text-muted-foreground">
+            <address className="mt-3 flex flex-col text-sm not-italic text-muted-foreground">
               {[address.name, address.line1, address.line2, address.city, address.region]
                 .filter(Boolean)
                 .map((part) => (
@@ -621,7 +621,7 @@ function ReorderAction({ lines, className }: { lines: OrderLine[]; className?: s
       <p
         role="status"
         className={cn(
-          "mt-2 min-h-[2.5rem] font-sans text-sm",
+          "mt-2 min-h-[2.5rem] text-sm",
           /* Anything that put nothing in the basket reads as a problem, not as
              a quieter shade of success.
 
@@ -658,7 +658,7 @@ function PaymentHelpAction({ className }: { className?: string }) {
           Ask about this payment
         </Link>
       </Button>
-      <p className="mt-2 min-h-[2.5rem] font-sans text-sm text-muted-foreground">
+      <p className="mt-2 min-h-[2.5rem] text-sm text-muted-foreground">
         We haven&apos;t received payment for this order yet.
       </p>
     </section>
@@ -671,14 +671,14 @@ function LineFulfilment({ line, delivered }: { line: OrderLine; delivered: boole
   if (line.qty <= 0) return null;
   if (line.fulfilledQty >= line.qty) {
     return (
-      <p className="mt-1 font-sans text-xs font-medium text-foreground">
+      <p className="mt-1 text-xs font-medium text-foreground">
         {delivered ? "Delivered" : "Shipped"}
       </p>
     );
   }
   if (line.fulfilledQty > 0) {
     return (
-      <p className="mt-1 font-sans text-xs font-medium text-foreground">
+      <p className="mt-1 text-xs font-medium text-foreground">
         {line.fulfilledQty} of {line.qty} shipped
       </p>
     );
@@ -991,10 +991,10 @@ function OrderContents({
           {/* TRUNCATED, BOTH LINES, so the block is one height whatever the
               order contains and a long list of colours costs a tail rather than
               a second row. The item list below carries all of it, in full. */}
-          <p className="truncate font-sans text-sm font-medium text-foreground">
+          <p className="truncate text-sm font-medium text-foreground">
             {words.products}
           </p>
-          <p className="mt-0.5 truncate font-sans text-xs text-muted-foreground">
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">
             {words.contents}
           </p>
         </div>
@@ -1013,7 +1013,7 @@ const ROW_THUMB_PX = 48;
  *  should not have to wait on a fetch to find out who to ask. */
 function SupportLine({ orderNumber }: { orderNumber: string }) {
   return (
-    <p className="mt-6 flex items-center gap-2 font-sans text-sm text-muted-foreground">
+    <p className="mt-6 flex items-center gap-2 text-sm text-muted-foreground">
       <LifeBuoy aria-hidden="true" className="h-4 w-4 shrink-0" />
       <span>
         Something wrong with this order?{" "}
@@ -1069,7 +1069,7 @@ export function OrderDetailSkeleton({
       <OrderTrail orderNumber={orderNumber} isGuest={isGuest} />
 
       <header className="mt-4 flex flex-col gap-1">
-        <h1 className="font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
           Order {orderNumber}
         </h1>
         <SkeletonRegion label="Loading your order">
@@ -1147,7 +1147,7 @@ export function OrderDetailSkeleton({
               skeleton first.
               The bar carries the link's own type rather than an `h-5` picked to
               look about right — the rule `TrackLineSkeleton` established. */}
-          <TextSkeleton className="mt-4 w-32 font-sans text-sm" />
+          <TextSkeleton className="mt-4 w-32 text-sm" />
         </div>
 
         {/* ═══ THE PICTURE BLOCK, WHICH IS ONE HEIGHT WHATEVER RESOLVES ═══
@@ -1251,7 +1251,7 @@ function TotalRow({
 }) {
   return (
     <div className="flex items-center justify-between py-1">
-      <dt className={cn("font-sans text-sm", emphasis ? "text-foreground" : "text-muted-foreground")}>
+      <dt className={cn("text-sm", emphasis ? "text-foreground" : "text-muted-foreground")}>
         {label}
       </dt>
       <dd

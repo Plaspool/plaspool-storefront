@@ -265,7 +265,7 @@ export function RewardsView({
               {failed && (
                 /* `destructive-strong` — see `globals.css`; the base token is
                    a fill and measures 3.76:1 as text. */
-                <p role="alert" className="font-sans text-sm text-destructive-strong">
+                <p role="alert" className="text-sm text-destructive-strong">
                   Could not load more. Try again.
                 </p>
               )}
@@ -288,7 +288,7 @@ export function RewardsView({
  */
 function RewardsHeading({ title }: { title: string | null }) {
   return (
-    <h1 className="font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+    <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
       {title ?? "Rewards"}
     </h1>
   );
@@ -321,7 +321,7 @@ function RewardsBalance({ balance }: { balance: PointsBalance | null }) {
 
   return (
     <div className="mt-6 border border-brand-line bg-brand-soft/50 px-4 py-4 sm:px-6 sm:py-5">
-      <p className="font-sans text-xs uppercase tracking-wider text-muted-foreground">
+      <p className="text-xs uppercase tracking-wider text-muted-foreground">
         Balance
       </p>
       {/* ═══ THE NOUN GOES UNDER THE NUMBER, NOT BESIDE IT ═══
@@ -336,7 +336,7 @@ function RewardsBalance({ balance }: { balance: PointsBalance | null }) {
       <p className="mt-1 font-mono text-3xl font-semibold leading-none tabular-nums text-foreground">
         {balance.points.toLocaleString()}
       </p>
-      <p className="mt-1 truncate font-sans text-sm font-medium text-foreground">{label}</p>
+      <p className="mt-1 truncate text-sm font-medium text-foreground">{label}</p>
 
       {/* ═══ STACKED, NOT WRAPPED ═══
           `flex-wrap` put these two facts side by side on a wide screen and on
@@ -346,7 +346,7 @@ function RewardsBalance({ balance }: { balance: PointsBalance | null }) {
           function of HOW MANY FACTS there are rather than of the viewport, and
           that is a thing the skeleton can be right about. They are two
           unrelated sentences; side by side they read as one run-on anyway. */}
-      <div className="mt-3 flex flex-col gap-1 border-t border-brand-line pt-3 font-sans text-xs text-muted-foreground">
+      <div className="mt-3 flex flex-col gap-1 border-t border-brand-line pt-3 text-xs text-muted-foreground">
         {balance.lifetimeEarned > 0 && lifetimeLabel && (
           <span>
             {balance.lifetimeEarned.toLocaleString()} {lifetimeLabel} earned in total
@@ -399,8 +399,8 @@ function LedgerRow({
             programme's nouns as they stood, and re-phrasing it here would be
             this file spelling them. It is also the only place an order is
             named, which is what makes a spend traceable. */}
-        <p className="font-sans text-sm text-foreground">{entry.reason}</p>
-        <p className="mt-0.5 font-sans text-xs text-muted-foreground">
+        <p className="text-sm text-foreground">{entry.reason}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
           {formatStamp(entry.createdAt)}
           {afterLabel && (
             <>
@@ -470,7 +470,7 @@ function FilterEmpty({
   const word = filter === "earned" ? "earned" : "spent";
   return (
     <div className="mt-6 border border-dashed border-brand-line px-4 py-8 text-center">
-      <p className="font-sans text-sm text-foreground">
+      <p className="text-sm text-foreground">
         {more
           ? `Nothing ${word} in what’s loaded so far.`
           : filter === "earned"
@@ -478,7 +478,7 @@ function FilterEmpty({
             : "Nothing spent yet."}
       </p>
       {otherCount > 0 && (
-        <p className="mt-2 font-sans text-sm text-muted-foreground">
+        <p className="mt-2 text-sm text-muted-foreground">
           <Link
             href={filterHref("all")}
             className="rounded-sm font-medium text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
@@ -514,7 +514,7 @@ export function RewardsSkeleton({ title }: { title: string | null }) {
               the noun under it. Each carries its own type rather than a height
               somebody measured. */}
           <TextSkeleton className="mt-1 w-24 max-w-full font-mono text-3xl leading-none" />
-          <TextSkeleton className="mt-1 w-32 max-w-full font-sans text-sm" />
+          <TextSkeleton className="mt-1 w-32 max-w-full text-sm" />
           <div className="mt-3 border-t border-brand-line pt-3">
             {/* TWO LINES, because the resolved footer holds two facts in a
                 `flex-wrap` and they sit on their own lines at every phone
@@ -524,8 +524,8 @@ export function RewardsSkeleton({ title }: { title: string | null }) {
                 redemption switched off, has fewer facts and settles upward by
                 one line; that is the rarer account, and the shift is 16px on
                 the panel a shopper came to this page specifically to read. */}
-            <TextSkeleton className="w-56 max-w-full font-sans text-xs" />
-            <TextSkeleton className="mt-1 w-44 max-w-full font-sans text-xs" />
+            <TextSkeleton className="w-56 max-w-full text-xs" />
+            <TextSkeleton className="mt-1 w-44 max-w-full text-xs" />
           </div>
         </div>
 
@@ -566,9 +566,9 @@ function LedgerRowSkeleton() {
             on a pointer rather than a thumb, and on the width where a 20px
             settle is least of anything. Reserving ONE line instead is exact on
             desktop and 20px short on every phone, which is where the shop is. */}
-        <TextSkeleton className="w-full font-sans text-sm" />
-        <TextSkeleton className="w-3/5 font-sans text-sm" />
-        <TextSkeleton className="mt-0.5 w-40 max-w-full font-sans text-xs" />
+        <TextSkeleton className="w-full text-sm" />
+        <TextSkeleton className="w-3/5 text-sm" />
+        <TextSkeleton className="mt-0.5 w-40 max-w-full text-xs" />
       </div>
       <TextSkeleton className="w-12 shrink-0 font-mono text-sm" />
     </div>

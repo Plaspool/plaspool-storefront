@@ -61,7 +61,7 @@ export function CardAddButton({ product }: { product: Product }) {
         className={cn(
           /* Above the link's stretched overlay, so the click lands here. */
           "absolute inset-x-2 bottom-2 z-10 inline-flex h-9 items-center justify-center gap-2",
-          "rounded-md bg-brand px-3 font-sans text-sm font-medium text-brand-ink",
+          "rounded-md bg-brand px-3 text-sm font-medium text-brand-ink",
           "shadow-sm transition-opacity duration-150 motion-reduce:transition-none",
           "hover:bg-brand-hover disabled:pointer-events-none disabled:opacity-50",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background",

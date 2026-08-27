@@ -127,7 +127,7 @@ export function Avatar({ imageUrl, name, email, colourKey, className }: AvatarPr
          screen reader reading "A" between the cart and the search box is noise,
          and the letter is a visual shorthand rather than information. */
       aria-hidden="true"
-      className={cn(shape, "font-sans text-xs font-semibold leading-none")}
+      className={cn(shape, "text-xs font-semibold leading-none")}
       style={{ backgroundColor: background, color: AVATAR_FOREGROUND }}
     >
       {avatarInitial(name, email)}

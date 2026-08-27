@@ -85,7 +85,7 @@ export function AccountHomePage({ programName }: { programName: string | null })
   if (state.kind === "failed") {
     return (
       <Shell>
-        <h1 className="font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
           Your account
         </h1>
         <p
@@ -94,7 +94,7 @@ export function AccountHomePage({ programName }: { programName: string | null })
              a BUTTON FILL and measures 3.76:1 as text — under AA, on the one
              line a shopper has to be able to read when something has gone
              wrong. See the note on the token in `globals.css`. */
-          className="mt-6 border border-destructive-strong px-4 py-3 font-sans text-sm text-destructive-strong"
+          className="mt-6 border border-destructive-strong px-4 py-3 text-sm text-destructive-strong"
         >
           We couldn&apos;t reach your account just now. This doesn&apos;t mean you&apos;re signed
           out — try again in a moment.
@@ -156,7 +156,7 @@ export function AccountHomeView({
 
   return (
     <Shell>
-      <h1 className="font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+      <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
         {/* ═══ THE GREETING IS THE HEADING, NOT A BANNER ABOVE ONE ═══
             A coloured welcome strip with the page title under it says the same
             thing twice and spends the top 90px of a phone screen doing it. The
@@ -177,9 +177,9 @@ export function AccountHomeView({
         />
         <div className="min-w-0">
           {name && (
-            <p className="truncate font-sans text-sm font-semibold text-foreground">{name}</p>
+            <p className="truncate text-sm font-semibold text-foreground">{name}</p>
           )}
-          <p className="truncate font-sans text-sm text-muted-foreground">{customer.email}</p>
+          <p className="truncate text-sm text-muted-foreground">{customer.email}</p>
         </div>
       </div>
 
@@ -281,12 +281,12 @@ function BalanceLine({
       className="mt-4 flex items-center justify-between gap-3 border border-brand-line bg-brand-soft/50 px-4 py-3 transition-colors hover:border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
       <div className="min-w-0">
-        <p className="font-sans text-xs uppercase tracking-wider text-muted-foreground">
+        <p className="text-xs uppercase tracking-wider text-muted-foreground">
           {programName ?? "Balance"}
         </p>
         <p className="mt-0.5 font-mono text-xl font-semibold tabular-nums text-foreground">
           {balance.points.toLocaleString()}{" "}
-          <span className="font-sans text-sm font-medium">{label}</span>
+          <span className="text-sm font-medium">{label}</span>
         </p>
       </div>
       <ChevronRight aria-hidden="true" className="h-5 w-5 shrink-0 text-muted-foreground" />
@@ -328,8 +328,8 @@ function HubRow({
       >
         <span className="mt-0.5 shrink-0 text-muted-foreground">{icon}</span>
         <span className="min-w-0 flex-1">
-          <span className="block font-sans text-sm font-semibold text-foreground">{title}</span>
-          <span className="mt-0.5 block font-sans text-xs text-muted-foreground">{note}</span>
+          <span className="block text-sm font-semibold text-foreground">{title}</span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">{note}</span>
         </span>
         <ChevronRight
           aria-hidden="true"
@@ -368,8 +368,8 @@ export function AccountHomeSkeleton({ programName }: { programName: string | nul
         <div className="mt-6 flex items-center gap-3 border border-brand-line px-4 py-3">
           <Skeleton className="h-11 w-11 shrink-0 rounded-full" />
           <div className="min-w-0 flex-1">
-            <TextSkeleton className="w-36 max-w-full font-sans text-sm" />
-            <TextSkeleton className="mt-0.5 w-52 max-w-full font-sans text-sm" />
+            <TextSkeleton className="w-36 max-w-full text-sm" />
+            <TextSkeleton className="mt-0.5 w-52 max-w-full text-sm" />
           </div>
         </div>
 
@@ -378,8 +378,8 @@ export function AccountHomeSkeleton({ programName }: { programName: string | nul
             <div key={i} className="flex items-start gap-3 py-4">
               <Skeleton className="mt-0.5 h-5 w-5 shrink-0" />
               <div className="min-w-0 flex-1">
-                <TextSkeleton className="w-32 max-w-full font-sans text-sm" />
-                <TextSkeleton className="mt-0.5 w-64 max-w-full font-sans text-xs" />
+                <TextSkeleton className="w-32 max-w-full text-sm" />
+                <TextSkeleton className="mt-0.5 w-64 max-w-full text-xs" />
               </div>
             </div>
           ))}

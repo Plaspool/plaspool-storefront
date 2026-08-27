@@ -148,7 +148,7 @@ export function BuyBox({
   return (
     <div className={cn("flex w-full min-w-0 flex-col gap-5", className)}>
       <div>
-        <h1 className="font-sans text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
           {product.name}
         </h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">{product.overview}</p>
@@ -171,7 +171,7 @@ export function BuyBox({
       />
 
       <div>
-        <p className="font-sans text-sm font-semibold text-foreground">Colour</p>
+        <p className="text-sm font-semibold text-foreground">Colour</p>
         <ColourSwatches
           /* Only colours somebody can order — the card's row and this picker
              have to agree, or a colour vanishes between the grid and the buy
@@ -183,12 +183,12 @@ export function BuyBox({
         />
         {/* A swatch grid with no name is unusable for anyone who cannot tell
             the hues apart. */}
-        <p className="mt-1.5 font-sans text-sm text-muted-foreground">{colour.name}</p>
+        <p className="mt-1.5 text-sm text-muted-foreground">{colour.name}</p>
       </div>
 
       {showSizes && (
         <div>
-          <p id={sizeLabelId} className="font-sans text-sm font-semibold text-foreground">
+          <p id={sizeLabelId} className="text-sm font-semibold text-foreground">
             Size
           </p>
           <div role="group" aria-labelledby={sizeLabelId} className="mt-2 flex flex-wrap gap-2">
@@ -221,7 +221,7 @@ export function BuyBox({
                       : "border-brand-line text-muted-foreground hover:border-foreground hover:text-foreground",
                   )}
                 >
-                  <span className="font-sans text-sm">{option.label}</span>
+                  <span className="text-sm">{option.label}</span>
                   {showGrams && (
                     <span className="font-mono text-xs tabular-nums text-muted-foreground">
                       {grams}
@@ -235,7 +235,7 @@ export function BuyBox({
       )}
 
       <div>
-        <p className="font-sans text-sm font-semibold text-foreground">Quantity</p>
+        <p className="text-sm font-semibold text-foreground">Quantity</p>
         <QuantityStepper
           value={quantity}
           onChange={onQuantityChange}
@@ -273,7 +273,7 @@ export function BuyBox({
       </div>
 
       {outOfStock && (
-        <p className="font-sans text-sm text-foreground">
+        <p className="text-sm text-foreground">
           {colour.name} is out of stock. Pick another colour.
         </p>
       )}

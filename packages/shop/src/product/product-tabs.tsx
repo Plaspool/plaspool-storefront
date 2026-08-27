@@ -166,7 +166,7 @@ export function ProductTabs({
                 onClick={() => setActive(index)}
                 onKeyDown={(event) => onKeyDown(event, index)}
                 className={cn(
-                  "shrink-0 whitespace-nowrap border-b-2 px-3 py-3 font-sans text-sm transition-colors",
+                  "shrink-0 whitespace-nowrap border-b-2 px-3 py-3 text-sm transition-colors",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                   selected
                     ? "border-brand font-semibold text-foreground"

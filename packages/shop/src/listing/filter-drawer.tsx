@@ -45,7 +45,7 @@ export function FilterDrawer({ facets, className }: { facets: Facets; className?
       </SheetTrigger>
       <SheetContent side="left" className="flex w-[85vw] flex-col p-0 sm:max-w-sm">
         <SheetHeader className="border-b border-brand-line px-5 py-4 text-left">
-          <SheetTitle className="font-sans text-base">Filters</SheetTitle>
+          <SheetTitle className="text-base">Filters</SheetTitle>
         </SheetHeader>
         <ScrollArea className="flex-1">
           <FilterRail

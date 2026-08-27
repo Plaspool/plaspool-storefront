@@ -37,7 +37,7 @@ export function NextTierHint({
 
   return (
     <p className={className}>
-      <span className="font-sans text-sm text-muted-foreground">
+      <span className="text-sm text-muted-foreground">
         Add <span className="font-mono font-semibold tabular-nums text-foreground">{more}</span> more{" "}
         {more === 1 ? "spool" : "spools"} to save{" "}
         <span className="font-mono font-semibold tabular-nums text-brand">

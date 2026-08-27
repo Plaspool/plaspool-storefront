@@ -71,7 +71,7 @@ export interface ReviewReactionsProps {
    with the review; these are glyphs that darken on hover, like the row this is
    modelled on. The tap target stays 32px via the padding. */
 const CONTROL =
-  "inline-flex items-center gap-1.5 rounded-full px-2 py-1 font-sans text-muted-foreground transition-colors hover:bg-brand-soft hover:text-foreground disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  "inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-muted-foreground transition-colors hover:bg-brand-soft hover:text-foreground disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 export function ReviewReactions({
   helpfulCount,
@@ -122,7 +122,7 @@ export function ReviewReactions({
               in; a shopper deciding whether to trust a review should not have to
               sign in to see how many people found it useful. */}
           <span
-            className="inline-flex items-center gap-1.5 px-2 py-1 font-sans text-xs text-muted-foreground"
+            className="inline-flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground"
             aria-label={helpfulCount > 0 ? `${helpfulCount} found this helpful` : undefined}
           >
             <ThumbsUp aria-hidden="true" className="h-4 w-4" />
@@ -135,7 +135,7 @@ export function ReviewReactions({
           {action === "sign-in" && (
             <Link
               href={signInHref}
-              className="px-2 py-1 font-sans text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="px-2 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               Sign in to vote
             </Link>

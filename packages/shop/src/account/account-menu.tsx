@@ -167,9 +167,9 @@ export function AccountMenu({ className }: { className?: string }) {
         {/* WHICH ACCOUNT AM I IN. The commonest reason to open this menu on a
             shared machine, and it should not need a trip to a settings page. */}
         <div className="px-2 py-2">
-          <p className="truncate font-sans text-sm font-semibold text-foreground">{label}</p>
+          <p className="truncate text-sm font-semibold text-foreground">{label}</p>
           {customer.name?.trim() && (
-            <p className="truncate font-sans text-xs text-muted-foreground">{customer.email}</p>
+            <p className="truncate text-xs text-muted-foreground">{customer.email}</p>
           )}
         </div>
         <DropdownMenuSeparator />

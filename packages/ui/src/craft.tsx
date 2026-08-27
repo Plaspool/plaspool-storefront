@@ -86,7 +86,7 @@ export interface BoxProps extends BaseProps {
 const styles = {
   typography: {
     base: [
-      "font-sans antialiased",
+      "antialiased",
       // Headings (without spacing)
       "[&_h1]:text-4xl [&_h1]:font-medium [&_h1]:tracking-tight",
       "[&_h2]:text-3xl [&_h2]:font-medium [&_h2]:tracking-tight",

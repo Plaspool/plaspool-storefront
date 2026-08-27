@@ -74,7 +74,7 @@ function CartLineRow({
             <SheetClose asChild>
               <Link
                 href={`/store/products/${product.slug}`}
-                className="block truncate rounded-sm font-sans text-sm font-semibold text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="block truncate rounded-sm text-sm font-semibold text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 {product.name}
               </Link>
@@ -103,7 +103,7 @@ function CartLineRow({
           size="sm"
           onClick={onRemove}
           aria-label={`Remove ${descriptor} from cart`}
-          className="h-auto w-fit gap-1.5 px-2 py-1 font-sans text-xs text-muted-foreground focus-visible:ring-brand focus-visible:ring-offset-background"
+          className="h-auto w-fit gap-1.5 px-2 py-1 text-xs text-muted-foreground focus-visible:ring-brand focus-visible:ring-offset-background"
         >
           <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
           Remove
@@ -137,7 +137,7 @@ export function CartDrawer() {
             /* WAS `red-700`, HAND-PICKED. Same colour — `--destructive-strong`
                IS red-700 — so this is a change of spelling, not of pixels, and
                the repo-wide grep in `house-rules.test.ts` can hold it. */
-            className="mx-6 mt-4 border border-destructive-strong px-3 py-2 font-sans text-sm text-destructive-strong"
+            className="mx-6 mt-4 border border-destructive-strong px-3 py-2 text-sm text-destructive-strong"
           >
             {cart.problem}
           </p>
@@ -204,7 +204,7 @@ export function CartDrawer() {
 
             <SheetFooter className="flex-col items-stretch gap-3 border-t border-brand-line px-6 py-6 sm:flex-col sm:space-x-0">
               <div className="flex items-center justify-between">
-                <span className="font-sans text-sm text-muted-foreground">Subtotal</span>
+                <span className="text-sm text-muted-foreground">Subtotal</span>
                 <span className="font-mono text-base font-bold tabular-nums text-foreground">
                   {formatNaira(cart.subtotal)}
                 </span>
@@ -212,7 +212,7 @@ export function CartDrawer() {
 
               {cart.savings > 0 && (
                 <div className="flex items-center justify-between">
-                  <span className="font-sans text-sm text-muted-foreground">You save</span>
+                  <span className="text-sm text-muted-foreground">You save</span>
                   <span className="font-mono text-sm font-semibold tabular-nums text-brand">
                     {formatNaira(cart.savings)}
                   </span>

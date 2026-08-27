@@ -244,7 +244,7 @@ export function InstallBanner() {
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2.5 sm:px-6">
           <Download aria-hidden="true" className="h-5 w-5 shrink-0" />
 
-          <p className="min-w-0 flex-1 font-sans text-xs leading-snug sm:text-sm">
+          <p className="min-w-0 flex-1 text-xs leading-snug sm:text-sm">
             {/* WHAT IT ACTUALLY DOES, not "get the app". There is no app to get
                 — this is the same site, on the home screen, and a shopper who
                 expected a download from an app store has been misled by one
@@ -269,7 +269,7 @@ export function InstallBanner() {
           <button
             type="button"
             onClick={install}
-            className="shrink-0 whitespace-nowrap border border-brand-ink px-3 py-1.5 font-sans text-xs font-semibold transition-colors hover:bg-brand-ink hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2 focus-visible:ring-offset-brand"
+            className="shrink-0 whitespace-nowrap border border-brand-ink px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-brand-ink hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2 focus-visible:ring-offset-brand"
           >
             Install
           </button>

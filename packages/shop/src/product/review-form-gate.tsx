@@ -105,7 +105,7 @@ export function ReviewFormGate({
 
 const PANEL = "border-2 border-foreground bg-brand-soft px-4 py-3";
 const PANEL_LINK =
-  "mt-1.5 inline-block font-sans text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  "mt-1.5 inline-block text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 /**
  * A shopper who has already used their one review on this product.
@@ -127,10 +127,10 @@ const PANEL_LINK =
 export function AlreadyReviewedNotice({ className }: { className?: string }) {
   return (
     <div className={className ? `${PANEL} ${className}` : PANEL}>
-      <p className="font-sans text-sm font-semibold text-foreground">
+      <p className="text-sm font-semibold text-foreground">
         You have already reviewed this
       </p>
-      <p className="mt-0.5 font-sans text-sm text-muted-foreground">
+      <p className="mt-0.5 text-sm text-muted-foreground">
         Every shopper gets one review per product. If yours is not on this page yet, it
         is still being read — a person reads each one before it goes up.
       </p>
@@ -162,10 +162,10 @@ export function AlreadyReviewedNotice({ className }: { className?: string }) {
 export function PurchaseRequiredNotice({ className }: { className?: string }) {
   return (
     <div className={className ? `${PANEL} ${className}` : PANEL}>
-      <p className="font-sans text-sm font-semibold text-foreground">
+      <p className="text-sm font-semibold text-foreground">
         Reviews come from buyers
       </p>
-      <p className="mt-0.5 font-sans text-sm text-muted-foreground">
+      <p className="mt-0.5 text-sm text-muted-foreground">
         Reviewing, replying and voting are for shoppers who bought the spool, so other
         printers know it comes from real printing. Bought this with a different email?
         Sign in with that one.
@@ -190,8 +190,8 @@ export function ReviewGuestPrompt({ next }: { next: string }) {
           anything about who is reading. "Sign in to write a review" would be a
           claim, and a signed-in shopper whose probe failed would be told they
           are signed out — the exact lie `unknown` exists to prevent. */}
-      <p className="font-sans text-sm font-semibold text-foreground">Write a review</p>
-      <p className="mt-0.5 font-sans text-sm text-muted-foreground">
+      <p className="text-sm font-semibold text-foreground">Write a review</p>
+      <p className="mt-0.5 text-sm text-muted-foreground">
         Reviews are published under your account name, so other printers know they came
         from a real shopper.
       </p>

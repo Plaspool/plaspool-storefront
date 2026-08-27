@@ -21,7 +21,7 @@ export function WaitlistPage() {
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-16 sm:px-6 sm:py-24">
       <div className="flex flex-col items-center gap-4 text-center">
-        <h1 className="font-sans text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+        <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
           Join the waitlist
         </h1>
         <p className="max-w-xl text-base leading-7 text-muted-foreground">

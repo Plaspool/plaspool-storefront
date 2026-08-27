@@ -64,7 +64,7 @@ function StepHeader({ step }: { step: Step }) {
       <p className="font-mono text-xs uppercase tracking-wide text-muted-foreground">
         Step {index + 1} of {STEP_ORDER.length}
       </p>
-      <h1 className="mt-1 font-sans text-2xl font-bold text-foreground">{labels[step]}</h1>
+      <h1 className="mt-1 text-2xl font-bold text-foreground">{labels[step]}</h1>
     </div>
   );
 }
@@ -132,8 +132,8 @@ function ErrorBanner({
     <div className="mb-4 flex gap-3 border-2 border-foreground bg-destructive/10 p-4">
       <AlertTriangle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-destructive-strong" />
       <div>
-        <p className="font-sans text-sm font-semibold text-foreground">{title}</p>
-        <p className="mt-0.5 font-sans text-sm text-muted-foreground">{body}</p>
+        <p className="text-sm font-semibold text-foreground">{title}</p>
+        <p className="mt-0.5 text-sm text-muted-foreground">{body}</p>
         {action && <div className="mt-3">{action}</div>}
       </div>
     </div>
@@ -627,7 +627,7 @@ export function CheckoutFlow() {
       <div>
         <Link
           href="/cart"
-          className="mb-6 inline-flex items-center gap-1.5 font-sans text-sm text-muted-foreground hover:text-foreground"
+          className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft aria-hidden="true" className="h-4 w-4" />
           Back to cart
@@ -656,7 +656,7 @@ export function CheckoutFlow() {
           <form onSubmit={submitAddress} className="flex flex-col gap-4">
             {savedAddresses.length > 0 && (
               <fieldset className="flex flex-col gap-2">
-                <legend className="mb-2 font-sans text-sm font-semibold text-foreground">
+                <legend className="mb-2 text-sm font-semibold text-foreground">
                   Deliver to
                 </legend>
                 {savedAddresses.map((parsed, i) => {
@@ -684,7 +684,7 @@ export function CheckoutFlow() {
                           touchAddress();
                         }}
                       />
-                      <span className="min-w-0 font-sans text-sm">
+                      <span className="min-w-0 text-sm">
                         <span className="block font-medium text-foreground">{parsed.name}</span>
                         {/* EVERY FIELD THAT DISTINGUISHES ONE FROM ANOTHER.
                             The API dedupes on the whole snapshot, so two orders
@@ -727,7 +727,7 @@ export function CheckoutFlow() {
                       touchAddress();
                     }}
                   />
-                  <span className="font-sans text-sm font-medium text-foreground">
+                  <span className="text-sm font-medium text-foreground">
                     Somewhere else
                   </span>
                 </label>
@@ -834,7 +834,7 @@ export function CheckoutFlow() {
         {step === "delivery" && (
           <form onSubmit={submitDelivery} className="flex flex-col gap-3">
             {shippingOptions.length === 0 && (
-              <p className="font-sans text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 No delivery options reach this address. Go back and check the region.
               </p>
             )}
@@ -855,7 +855,7 @@ export function CheckoutFlow() {
                     onChange={() => setSelectedShippingId(option.id)}
                     className="h-4 w-4 accent-brand"
                   />
-                  <span className="font-sans text-sm font-medium text-foreground">
+                  <span className="text-sm font-medium text-foreground">
                     {option.label}
                   </span>
                 </span>
@@ -888,8 +888,8 @@ export function CheckoutFlow() {
               </SkeletonRegion>
             ) : customerEmail ? (
               <div className="border-2 border-foreground bg-brand-soft px-4 py-3">
-                <p className="font-sans text-xs text-muted-foreground">Signed in as</p>
-                <p className="font-sans text-sm font-semibold text-foreground">{customerEmail}</p>
+                <p className="text-xs text-muted-foreground">Signed in as</p>
+                <p className="text-sm font-semibold text-foreground">{customerEmail}</p>
               </div>
             ) : (
               <Field id="co-email" label="Email" required>
@@ -901,7 +901,7 @@ export function CheckoutFlow() {
                   onChange={(e) => setGuestEmail(e.target.value)}
                   placeholder="you@example.com"
                 />
-                <p className="mt-1 font-sans text-xs text-muted-foreground">
+                <p className="mt-1 text-xs text-muted-foreground">
                   Your receipt and order access go to this address.
                 </p>
               </Field>
@@ -925,7 +925,7 @@ export function CheckoutFlow() {
         {step === "review" && (
           <div className="flex flex-col gap-4">
             {busy && !totals && (
-              <p className="flex items-center gap-2 font-sans text-sm text-muted-foreground">
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
                 Locking in your total…
               </p>
@@ -943,16 +943,16 @@ export function CheckoutFlow() {
                       from; it is the worst possible place to make "that's wrong"
                       a dead end. */}
                   <div className="flex items-start justify-between gap-3">
-                    <p className="font-sans text-sm font-semibold text-foreground">Deliver to</p>
+                    <p className="text-sm font-semibold text-foreground">Deliver to</p>
                     <button
                       type="button"
                       onClick={() => setStep("address")}
-                      className="shrink-0 font-sans text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      className="shrink-0 text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     >
                       Change
                     </button>
                   </div>
-                  <p className="mt-1 font-sans text-sm text-muted-foreground">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     {address.name}, {address.line1}
                     {address.line2 ? `, ${address.line2}` : ""}
                     {/* The district is part of where the parcel goes AND why
@@ -961,18 +961,18 @@ export function CheckoutFlow() {
                     {districtName ? `, ${districtName}` : ""}, {address.city}, {address.region}{" "}
                     {address.postalCode}
                   </p>
-                  <p className="mt-2 font-sans text-sm text-muted-foreground">{email}</p>
+                  <p className="mt-2 text-sm text-muted-foreground">{email}</p>
                 </div>
 
                 <div className="border-2 border-foreground p-4">
                   <div className="flex items-center justify-between py-1">
-                    <span className="font-sans text-sm text-muted-foreground">Subtotal</span>
+                    <span className="text-sm text-muted-foreground">Subtotal</span>
                     <span className="font-mono text-sm tabular-nums text-foreground">
                       {formatNaira(majorUnits(totals.subtotal))}
                     </span>
                   </div>
                   <div className="flex items-center justify-between py-1">
-                    <span className="font-sans text-sm text-muted-foreground">Delivery</span>
+                    <span className="text-sm text-muted-foreground">Delivery</span>
                     <span className="font-mono text-sm tabular-nums text-foreground">
                       {formatNaira(majorUnits(totals.shippingTotal))}
                     </span>
@@ -981,7 +981,7 @@ export function CheckoutFlow() {
                     <div className="flex items-center justify-between py-1">
                       {/* The API's own label ("VAT") — the customer is told
                           WHAT the line is, not the generic word for it. */}
-                      <span className="font-sans text-sm text-muted-foreground">
+                      <span className="text-sm text-muted-foreground">
                         {totals.tax?.label || "Tax"}
                       </span>
                       <span className="font-mono text-sm tabular-nums text-foreground">
@@ -1004,7 +1004,7 @@ export function CheckoutFlow() {
                       key={adjustment.code}
                       className="flex items-center justify-between py-1"
                     >
-                      <span className="font-sans text-sm text-muted-foreground">
+                      <span className="text-sm text-muted-foreground">
                         {adjustment.label}
                       </span>
                       <span className="font-mono text-sm tabular-nums text-foreground">
@@ -1013,7 +1013,7 @@ export function CheckoutFlow() {
                     </div>
                   ))}
                   <div className="mt-1 flex items-center justify-between border-t border-brand-line pt-2">
-                    <span className="font-sans text-base font-semibold text-foreground">
+                    <span className="text-base font-semibold text-foreground">
                       Total
                     </span>
                     <span className="font-mono text-base font-bold tabular-nums text-foreground">
@@ -1033,7 +1033,7 @@ export function CheckoutFlow() {
                   )}
                   {redirecting ? "Taking you to payment…" : "Pay now"}
                 </Button>
-                <p className="text-center font-sans text-xs text-muted-foreground">
+                <p className="text-center text-xs text-muted-foreground">
                   {"The store never sees your card. You'll pay on Paystack's own page."}
                 </p>
               </>
@@ -1044,11 +1044,11 @@ export function CheckoutFlow() {
 
       <aside className="hidden lg:block">
         <div className="sticky top-24 border-2 border-foreground p-4">
-          <p className="font-sans text-sm font-semibold text-foreground">In your cart</p>
+          <p className="text-sm font-semibold text-foreground">In your cart</p>
           <ul className="mt-3 flex flex-col gap-3">
             {cart.resolved.map((line) => (
               <li key={line.key} className="flex justify-between gap-2 text-sm">
-                <span className="min-w-0 flex-1 truncate font-sans text-muted-foreground">
+                <span className="min-w-0 flex-1 truncate text-muted-foreground">
                   {line.product.name} × {line.qty}
                 </span>
                 <span className="shrink-0 font-mono tabular-nums text-foreground">
@@ -1058,7 +1058,7 @@ export function CheckoutFlow() {
             ))}
           </ul>
           <div className="mt-4 flex items-center justify-between border-t border-brand-line pt-3">
-            <span className="font-sans text-sm text-muted-foreground">Subtotal</span>
+            <span className="text-sm text-muted-foreground">Subtotal</span>
             <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
               {formatNaira(cart.subtotal)}
             </span>
