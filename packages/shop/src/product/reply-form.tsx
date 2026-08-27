@@ -18,6 +18,18 @@ import type { SubmitError } from "../data/reviews";
  * who assumes it failed and posts again, which is how a moderation queue fills
  * with duplicates of the same sentence.
  *
+ * ═══ COLLAPSED UNTIL ASKED FOR ═══
+ * The box used to sit open under every review AND under every reply, so a page
+ * with one review and one reply showed two empty textareas stacked on top of
+ * each other, each with its own dead "Reply" button. That is a form shouting
+ * over the thing it is attached to.
+ *
+ * It is a plain text control now — the affordance every threaded comment UI
+ * uses — and the box appears on click, focused, with a way back out. Cancel
+ * discards the draft: a reply somebody abandoned is not worth restoring, and
+ * keeping it means the control reopens holding words they already decided
+ * against.
+ *
  * ═══ NO BYLINE FIELD ═══
  * `authorName` is optional on the wire and the account already carries one.
  * Offering a field here would reopen, one level down, exactly the door the
@@ -47,10 +59,19 @@ export function ReplyForm({
   signInHref: string;
   onPosted?: () => void;
 }) {
+  const [open, setOpen] = React.useState(false);
   const [body, setBody] = React.useState("");
   const [sending, setSending] = React.useState(false);
   const [error, setError] = React.useState<SubmitError | null>(null);
   const [done, setDone] = React.useState(false);
+  const box = React.useRef<HTMLTextAreaElement>(null);
+
+  /* FOCUS FOLLOWS THE CLICK. Somebody who pressed "Reply" has said what they
+     want to do next; making them find the box afterwards is a second step for
+     nothing, and a keyboard user would be left where the button used to be. */
+  React.useEffect(() => {
+    if (open) box.current?.focus();
+  }, [open]);
 
   if (!canReply) {
     return (
@@ -69,6 +90,18 @@ export function ReplyForm({
         {/* THE SENTENCE THIS COMPONENT EXISTS FOR. */}
         Thanks — your reply is with us and will appear once it has been read.
       </p>
+    );
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center font-sans text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      >
+        Reply
+      </button>
     );
   }
 
@@ -95,6 +128,7 @@ export function ReplyForm({
       }}
     >
       <Textarea
+        ref={box}
         value={body}
         maxLength={REPLY_MAX}
         rows={2}
@@ -107,9 +141,23 @@ export function ReplyForm({
           {MESSAGES[error]}
         </p>
       )}
-      <div>
+      <div className="flex items-center gap-2">
         <Button type="submit" size="sm" disabled={sending || tooShort} className="h-8 px-3">
           {sending ? "Sending…" : "Reply"}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          disabled={sending}
+          onClick={() => {
+            setOpen(false);
+            setBody("");
+            setError(null);
+          }}
+          className="h-8 px-3"
+        >
+          Cancel
         </Button>
       </div>
     </form>
