@@ -24,6 +24,17 @@ import type { ReactionKind } from "../data/reviews";
  * because two tabs doing that would land on arrival order. `onVote` receives
  * the state to send, already resolved.
  *
+ * ═══ AN ICON AND A NUMBER, NOT A SENTENCE ═══
+ * This read "4 found this helpful" beside two labelled buttons, which is three
+ * ways of saying the same thing stacked on one row. The count belongs against
+ * the thumb it counts — the shape every threaded comment UI uses, and the one
+ * shoppers already know how to read.
+ *
+ * THE BUTTONS ARE ICON-ONLY AND STILL HAVE NAMES. `aria-label` carries "Helpful"
+ * and "Not helpful", including the tally, so a screen reader is told what the
+ * glyph means and what the number counts. An icon button without a name is a
+ * control only sighted users can use.
+ *
  * ═══ SIGNED OUT STILL READS ═══
  * The count renders for everyone; only the CONTROLS become a way in. Reading a
  * product page signed out is not an error, and a vote button that silently
@@ -43,8 +54,11 @@ export interface ReviewReactionsProps {
   className?: string;
 }
 
+/* NO BORDER AND NO FILL. A row of outlined pills under every review competes
+   with the review; these are glyphs that darken on hover, like the row this is
+   modelled on. The tap target stays 32px via the padding. */
 const CONTROL =
-  "inline-flex items-center gap-1.5 border border-brand-line px-2 py-1 font-sans text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  "inline-flex items-center gap-1.5 rounded-full px-2 py-1 font-sans text-muted-foreground transition-colors hover:bg-brand-soft hover:text-foreground disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 export function ReviewReactions({
   helpfulCount,
@@ -56,27 +70,25 @@ export function ReviewReactions({
   className,
 }: ReviewReactionsProps) {
   return (
-    <div className={cn("flex flex-wrap items-center gap-3", className)}>
-      {/* ZERO SAYS NOTHING. "0 found this helpful" reads as a verdict on the
-          review rather than as the absence of votes. */}
-      {helpfulCount > 0 && (
-        <span className="font-sans text-xs text-muted-foreground">
-          <span className="font-mono tabular-nums text-foreground">{helpfulCount}</span> found
-          this helpful
-        </span>
-      )}
-
+    <div className={cn("flex flex-wrap items-center gap-1", className)}>
       {canVote ? (
-        <div className="flex items-center gap-2">
+        <>
           <button
             type="button"
             disabled={pending}
             aria-pressed={viewerReaction === "helpful"}
+            aria-label={
+              helpfulCount > 0 ? `Helpful, ${helpfulCount} so far` : "Helpful"
+            }
             onClick={() => onVote(viewerReaction === "helpful" ? null : "helpful")}
-            className={cn(CONTROL, viewerReaction === "helpful" && "border-brand text-brand")}
+            className={cn(CONTROL, viewerReaction === "helpful" && "text-brand")}
           >
-            <ThumbsUp aria-hidden="true" className="h-3.5 w-3.5" />
-            Helpful
+            <ThumbsUp aria-hidden="true" className="h-4 w-4" />
+            {/* ZERO SHOWS NOTHING. A "0" beside the thumb reads as a verdict on
+                the review rather than as the absence of votes. */}
+            {helpfulCount > 0 && (
+              <span className="font-mono text-xs tabular-nums">{helpfulCount}</span>
+            )}
           </button>
 
           {/* NO FIGURE BESIDE THIS ONE, EVER — see the file header. */}
@@ -84,20 +96,34 @@ export function ReviewReactions({
             type="button"
             disabled={pending}
             aria-pressed={viewerReaction === "unhelpful"}
+            aria-label="Not helpful"
             onClick={() => onVote(viewerReaction === "unhelpful" ? null : "unhelpful")}
-            className={cn(CONTROL, viewerReaction === "unhelpful" && "border-brand text-brand")}
+            className={cn(CONTROL, viewerReaction === "unhelpful" && "text-brand")}
           >
-            <ThumbsDown aria-hidden="true" className="h-3.5 w-3.5" />
-            Not helpful
+            <ThumbsDown aria-hidden="true" className="h-4 w-4" />
           </button>
-        </div>
+        </>
       ) : (
-        <Link
-          href={signInHref}
-          className="font-sans text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-        >
-          Sign in to say whether this helped
-        </Link>
+        <>
+          {/* SIGNED OUT STILL READS THE TALLY. Only the controls become a way
+              in; a shopper deciding whether to trust a review should not have to
+              sign in to see how many people found it useful. */}
+          <span
+            className="inline-flex items-center gap-1.5 px-2 py-1 font-sans text-xs text-muted-foreground"
+            aria-label={helpfulCount > 0 ? `${helpfulCount} found this helpful` : undefined}
+          >
+            <ThumbsUp aria-hidden="true" className="h-4 w-4" />
+            {helpfulCount > 0 && (
+              <span className="font-mono tabular-nums">{helpfulCount}</span>
+            )}
+          </span>
+          <Link
+            href={signInHref}
+            className="px-2 py-1 font-sans text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
+            Sign in to vote
+          </Link>
+        </>
       )}
     </div>
   );

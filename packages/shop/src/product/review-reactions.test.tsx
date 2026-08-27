@@ -34,14 +34,27 @@ const BASE = {
 } as const;
 
 describe("ReviewReactions", () => {
-  it("says how many found it helpful", () => {
-    expect(text({ ...BASE })).toMatch(/4\s*found this helpful/);
+  /* THE COUNT SITS AGAINST THE THUMB IT COUNTS, not in a sentence beside it —
+     "4 found this helpful" next to two labelled buttons was three ways of
+     saying the same thing on one row. */
+  it("shows the tally as a figure, not a sentence", () => {
+    const out = text({ ...BASE });
+    expect(out).toContain("4");
+    expect(out).not.toMatch(/found this helpful/);
+  });
+
+  /* ICON-ONLY BUTTONS STILL NEED NAMES. Without these the controls are usable
+     only by people who can see the glyph. */
+  it("names both controls for a screen reader", () => {
+    const html = render({ ...BASE });
+    expect(html).toContain('aria-label="Helpful, 4 so far"');
+    expect(html).toContain('aria-label="Not helpful"');
   });
 
   /* ═══ THE RULE THIS FILE EXISTS FOR ═══ */
   it("never puts a number beside the not-helpful control", () => {
     const out = text({ ...BASE, viewerReaction: "unhelpful" });
-    /* The only figure on this control may be the helpful count. */
+    /* The only figure anywhere on this row may be the helpful count. */
     const numbers = out.match(/\d+/g) ?? [];
     expect(numbers).toEqual(["4"]);
   });
@@ -63,13 +76,13 @@ describe("ReviewReactions", () => {
   });
 
   it("still offers the not-helpful control", () => {
-    expect(text({ ...BASE })).toMatch(/not helpful/i);
+    expect(render({ ...BASE })).toContain('aria-label="Not helpful"');
   });
 
-  /* A review nobody has voted on should not announce "0 found this helpful" —
-     that reads as a verdict rather than an absence. */
-  it("says nothing about a count of zero", () => {
-    expect(text({ ...BASE, helpfulCount: 0 })).not.toMatch(/found this helpful/);
+  /* A review nobody has voted on shows no figure at all — a "0" beside the
+     thumb reads as a verdict rather than as an absence of votes. */
+  it("shows no figure for a count of zero", () => {
+    expect(text({ ...BASE, helpfulCount: 0 }).trim()).not.toMatch(/\d/);
   });
 
   it("marks the control this viewer has already pressed", () => {
@@ -88,8 +101,10 @@ describe("ReviewReactions", () => {
     expect(out).not.toContain("<button");
   });
 
-  it("still shows the count when the viewer cannot vote", () => {
-    expect(text({ ...BASE, canVote: false })).toMatch(/4\s*found this helpful/);
+  /* A shopper deciding whether to trust a review should not have to sign in to
+     see how many people found it useful. */
+  it("still shows the tally when the viewer cannot vote", () => {
+    expect(text({ ...BASE, canVote: false })).toContain("4");
   });
 
   it("disables the controls while a vote is in flight", () => {
