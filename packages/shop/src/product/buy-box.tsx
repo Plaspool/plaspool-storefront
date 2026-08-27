@@ -5,6 +5,7 @@ import { Check, Truck } from "lucide-react";
 import { Button, cn, NEO_SURFACE } from "@plaspool/ui";
 
 import type { Colour, Product, SizeOption } from "../data/types";
+import { tierFor } from "../data/bulk";
 import { availableColours, unitPriceFor } from "../data/money";
 import { DELIVERY } from "../data/config";
 import { starsFromAggregate } from "../data/reviews";
@@ -23,7 +24,8 @@ import { useCart } from "../cart/cart-context";
  * Everything you need to decide with, in the order the spec fixes: name,
  * rating, price, colour, size, quantity, tiers, features, delivery, actions.
  *
- * The price is `unitPriceFor(..., qty)`, so raising the stepper moves it. That
+ * The headline price is the LIVE one; the bulk rung is stated beside it rather
+ * than replacing it — see the note on `rung` below for what that fixes. That
  * is what makes the tier ladder underneath real rather than decorative.
  *
  * All state is owned by `ProductBuySection` above, because the sticky bar
@@ -112,6 +114,16 @@ export function BuyBox({
      stars rather than a manufactured score. */
   const showRating = reviewAggregate.count > 0;
 
+  /* ═══ THE HEADLINE PRICE IS THE LIVE ONE, AND NO LONGER MOVES WITH THE
+     STEPPER — this reverses what this file's header used to say. ═══
+     It read `unitPriceFor(..., quantity)` and was handed to `Price` as
+     `amount`, with the list price as `compareAt`. That struck ₦24,000 against
+     a five-up price of ₦18,000 and read as a 25% sale when the sale was 17%
+     and the rest was earned by quantity — two discounts with different causes
+     collapsed into one strike-through. The rung is stated separately now, with
+     the quantity that earns it, so raising the stepper still changes what the
+     block says; it changes the honest half. */
+  const rung = tierFor(product.bulkTiers, quantity);
   const unit = unitPriceFor(size.priceNaira, product.bulkTiers, quantity);
   const line: CartLineKey = {
     productSlug: product.slug,
@@ -150,7 +162,13 @@ export function BuyBox({
         />
       )}
 
-      <Price amount={unit} compareAt={size.compareAtNaira} size="lg" />
+      <Price
+        amount={size.priceNaira}
+        compareAt={size.compareAtNaira}
+        bulkAmount={unit}
+        bulkQty={rung?.minQty ?? null}
+        size="lg"
+      />
 
       <div>
         <p className="font-sans text-sm font-semibold text-foreground">Colour</p>

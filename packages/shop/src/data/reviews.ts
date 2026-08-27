@@ -25,6 +25,41 @@ import type { RatingSummary } from "./types";
 
 export type SentimentLabel = "positive" | "neutral" | "negative";
 
+/**
+ * Who wrote a reply. READ THIS, NEVER THE NAME.
+ *
+ * Matching on `authorName === "PlaSpool"` to decide whether a reply is
+ * official breaks the day a customer is called that, and impersonation is
+ * precisely what this field exists to prevent.
+ */
+export type ReplyAuthorKind = "owner" | "customer";
+
+/**
+ * One reply on a review.
+ *
+ * ═══ THEY ARRIVE FLAT, INCLUDING THE NESTED ONES ═══
+ * `replies` is a single array whatever the shape of the conversation; `depth`
+ * and `parentId` are the only things that say otherwise. Expecting the JSON to
+ * nest loses every second-level reply without erroring — see `threadReplies`.
+ *
+ * `depth` is `0` or `1` and nothing else. Two levels is the ceiling, enforced
+ * server-side with a `400 parentId`.
+ *
+ * THE STAFF MEMBER WHO TYPED AN OWNER REPLY IS NOT HERE, and never will be.
+ * There is no `staffUserId` on the public wire.
+ */
+export interface ReviewReply {
+  id: string;
+  /** Null for a reply to the review itself. */
+  parentId: string | null;
+  depth: number;
+  body: string;
+  authorKind: ReplyAuthorKind;
+  authorName: string;
+  /** Epoch milliseconds. */
+  createdAt: number;
+}
+
 export interface PublicReview {
   id: string;
   productSlug: string;
@@ -35,6 +70,57 @@ export interface PublicReview {
   sentiment: SentimentLabel;
   /** Epoch milliseconds. */
   createdAt: number;
+  /**
+   * How many shoppers found this helpful.
+   *
+   * THERE IS NO PUBLIC DISLIKE COUNT, deliberately — a tally of `unhelpful` on
+   * a product page is a scoreboard for brigading. Render "N found this
+   * helpful", never "N up / M down", and never compute a ratio: the
+   * denominator does not exist on this side and inventing one misrepresents it.
+   */
+  helpfulCount: number;
+  /** Always an array, empty when there are none. Approved replies only —
+   *  including to their own author, which is why the reply form has to say so. */
+  replies: ReviewReply[];
+}
+
+/** One reply and the replies hanging off it. One level, then stop. */
+export interface ReplyNode {
+  reply: ReviewReply;
+  children: ReviewReply[];
+}
+
+/**
+ * The flat `replies` array as a one-level tree.
+ *
+ * ORDER IS THE API'S, PRESERVED. It arrives oldest-first and already sorted;
+ * re-sorting is at best a no-op and at worst reorders a conversation around a
+ * tie in `createdAt`.
+ *
+ * A reply naming a parent that is not in the array is kept at the TOP LEVEL
+ * rather than dropped. It should not happen, and a visible reply in a slightly
+ * wrong place beats a comment that silently disappears.
+ */
+export function threadReplies(replies: ReviewReply[]): ReplyNode[] {
+  const nodes = new Map<string, ReplyNode>();
+  const roots: ReplyNode[] = [];
+
+  for (const reply of replies) {
+    if (reply.parentId === null) {
+      const node: ReplyNode = { reply, children: [] };
+      nodes.set(reply.id, node);
+      roots.push(node);
+    }
+  }
+
+  for (const reply of replies) {
+    if (reply.parentId === null) continue;
+    const parent = nodes.get(reply.parentId);
+    if (parent) parent.children.push(reply);
+    else roots.push({ reply, children: [] });
+  }
+
+  return roots;
 }
 
 export interface ReviewPage {
@@ -218,6 +304,9 @@ export interface SubmitReviewResult {
  */
 export type SubmitError =
   | "signed-out"
+  /** The review is missing, or not approved — the API answers the same `404`
+   *  for both so nobody can probe which pending reviews exist. */
+  | "gone"
   | "rate-limited"
   | "rejected"
   | "invalid"
@@ -228,6 +317,150 @@ export class ReviewSubmitError extends Error {
     super(kind);
     this.name = "ReviewSubmitError";
   }
+}
+
+/** The API's floor and ceiling for a reply body. */
+export const REPLY_MIN = 2;
+export const REPLY_MAX = 2000;
+
+export interface PostReplyResult {
+  replyId: string;
+  /** Always `pending` today. The customer must be told — see `ReplyForm`. */
+  status: string;
+}
+
+/**
+ * Reply to a review, or to a reply on one.
+ *
+ * IT LANDS `pending` AND IS INVISIBLE UNTIL APPROVED — including to the person
+ * who wrote it. Any caller that does not say so out loud produces a customer
+ * who posts, sees nothing appear, and posts again.
+ *
+ * `parentId` OMITTED IS A REPLY TO THE REVIEW. Naming a depth-1 reply is
+ * `400 parentId`: two levels is the ceiling, which is why the UI hides the
+ * control on a nested reply rather than letting somebody find the wall by
+ * hitting it.
+ *
+ * `404 gone` COVERS TWO THINGS DELIBERATELY — the review is missing, or it is
+ * not approved — so that nobody can probe which pending reviews exist. It is
+ * not this client's business to tell them apart either.
+ */
+export async function postReply(
+  reviewId: string,
+  input: { body: string; parentId?: string | null },
+): Promise<PostReplyResult> {
+  let res: Response;
+  try {
+    res = await fetch(
+      `${COMMERCE_API_BASE}/api/shop/reviews/${encodeURIComponent(reviewId)}/replies`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          body: input.body.trim(),
+          /* Omitted rather than sent null when replying to the review itself —
+             the same rule `submitReview` follows for an untouched headline. */
+          ...(input.parentId ? { parentId: input.parentId } : {}),
+          /* NO `authorName`. It is optional on the wire and the account already
+             carries one; sending a typed byline would be the impersonation door
+             the review form just closed, reopened one level down. */
+        }),
+      },
+    );
+  } catch {
+    throw new ReviewSubmitError("failed");
+  }
+  if (res.status === 401) throw new ReviewSubmitError("signed-out");
+  if (res.status === 429) throw new ReviewSubmitError("rate-limited");
+  if (res.status === 404) throw new ReviewSubmitError("gone");
+  if (res.status === 400 || res.status === 422) throw new ReviewSubmitError("invalid");
+  if (!res.ok) throw new ReviewSubmitError("failed");
+  return (await res.json()) as PostReplyResult;
+}
+
+export type ReactionKind = "helpful" | "unhelpful";
+
+export interface ReactionResult {
+  reviewId: string;
+  viewerReaction: ReactionKind | null;
+  helpfulCount: number;
+}
+
+/**
+ * Cast, change or clear this viewer's vote on a review.
+ *
+ * `PUT` AND IDEMPOTENT: the body names the STATE you want, not a toggle.
+ * Sending `helpful` twice leaves one vote. Clearing is `{"kind": null}`, sent
+ * deliberately — the server does not flip state for us, because two tabs doing
+ * that would land on arrival order.
+ *
+ * The answer carries the new `helpfulCount`; use it rather than refetching the
+ * list, which is cached and would not show the change anyway.
+ */
+export async function setReaction(
+  reviewId: string,
+  kind: ReactionKind | null,
+): Promise<ReactionResult> {
+  let res: Response;
+  try {
+    res = await fetch(
+      `${COMMERCE_API_BASE}/api/shop/reviews/${encodeURIComponent(reviewId)}/reactions`,
+      {
+        method: "PUT",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ kind }),
+      },
+    );
+  } catch {
+    throw new ReviewSubmitError("failed");
+  }
+  if (res.status === 401) throw new ReviewSubmitError("signed-out");
+  if (res.status === 429) throw new ReviewSubmitError("rate-limited");
+  if (!res.ok) throw new ReviewSubmitError("failed");
+  return (await res.json()) as ReactionResult;
+}
+
+/** The API refuses more than this many ids with a `400`. */
+const REACTIONS_PER_REQUEST = 100;
+
+/**
+ * Which of these reviews this viewer has voted on.
+ *
+ * ═══ A SECOND CALL, AND IT MUST NOT BE CACHED IN A SHARED LAYER ═══
+ * The public reviews response is `Cache-Control: public`, so a shared cache can
+ * hand one reader's copy to another. The helpful COUNT does not vary by reader;
+ * "did I vote on this" does. Putting the vote on the cacheable response would
+ * show one shopper another's votes, which is why it lives here instead.
+ *
+ * SIGNED OUT IS A `200` WITH AN EMPTY MAP, NOT A `401` — reading a product page
+ * signed out is not an error, and a client handling 401 here has the wrong
+ * contract. An absent key means no vote; only voted reviews appear.
+ *
+ * A failure costs the filled state of a button and never the page, so this
+ * answers `{}` rather than throwing.
+ */
+export async function myReactions(
+  reviewIds: string[],
+): Promise<Record<string, ReactionKind>> {
+  if (reviewIds.length === 0) return {};
+
+  const out: Record<string, ReactionKind> = {};
+  for (let i = 0; i < reviewIds.length; i += REACTIONS_PER_REQUEST) {
+    const batch = reviewIds.slice(i, i + REACTIONS_PER_REQUEST);
+    const url = new URL(`${COMMERCE_API_BASE}/api/shop/reviews/reactions/mine`);
+    url.searchParams.set("reviews", batch.join(","));
+    try {
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (!res.ok) continue;
+      const body = (await res.json()) as { reactions?: Record<string, ReactionKind> };
+      Object.assign(out, body.reactions ?? {});
+    } catch {
+      /* One batch failing costs those buttons their filled state, not the rest. */
+    }
+  }
+  return out;
 }
 
 export async function submitReview(input: SubmitReviewInput): Promise<SubmitReviewResult> {

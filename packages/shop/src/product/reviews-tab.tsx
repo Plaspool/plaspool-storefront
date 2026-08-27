@@ -6,7 +6,14 @@ import { Skeleton, SkeletonText, cn } from "@plaspool/ui";
 
 import { REVIEWS_PER_PAGE } from "../data/config";
 import { listReviewsFromBrowser, starsFromAggregate } from "../data/reviews";
-import type { PublicReview, ReviewAggregate } from "../data/reviews";
+import { myReactions, setReaction } from "../data/reviews";
+import { ReviewReplies } from "./review-replies";
+import { ReviewReactions } from "./review-reactions";
+import { ReplyForm } from "./reply-form";
+import { readShopSession } from "../data/auth-api";
+import { signInHref } from "../account/sign-in-href";
+import { usePathname } from "next/navigation";
+import type { PublicReview, ReactionKind, ReviewAggregate } from "../data/reviews";
 import { RatingStars } from "../components/rating-stars";
 import { EmptyState } from "../components/empty-state";
 import { ReviewFormGate } from "./review-form-gate";
@@ -71,7 +78,23 @@ const DATE_FORMAT = new Intl.DateTimeFormat("en-NG", {
   timeZone: "UTC",
 });
 
-function ReviewCard({ review }: { review: PublicReview }) {
+function ReviewCard({
+  review,
+  viewerReaction,
+  helpfulCount,
+  pending,
+  canVote,
+  onVote,
+  signIn,
+}: {
+  review: PublicReview;
+  viewerReaction: ReactionKind | null;
+  helpfulCount: number;
+  pending: boolean;
+  canVote: boolean;
+  onVote: (kind: ReactionKind | null) => void;
+  signIn: string;
+}) {
   const date = new Date(review.createdAt);
   return (
     <li className="border-b border-brand-line py-6 last:border-b-0">
@@ -96,6 +119,38 @@ function ReviewCard({ review }: { review: PublicReview }) {
           {DATE_FORMAT.format(date)}
         </time>
       </p>
+
+      {/* THE COUNT IS THE SERVER'S, OVERRIDDEN BY THE LAST VOTE'S ANSWER. The
+          reactions endpoint returns the new `helpfulCount`, so a click updates
+          from the response rather than refetching a list that is cached
+          `public` and would not show the change anyway. */}
+      <ReviewReactions
+        className="mt-3"
+        helpfulCount={helpfulCount}
+        viewerReaction={viewerReaction}
+        pending={pending}
+        canVote={canVote}
+        onVote={onVote}
+        signInHref={signIn}
+      />
+
+      {/* The thread, then one control for adding to it. `replyControl` is
+          offered only on depth-0 rows — see `ReviewReplies`. */}
+      <ReviewReplies
+        replies={review.replies}
+        replyControl={(parentId) => (
+          <ReplyForm
+            reviewId={review.id}
+            parentId={parentId}
+            canReply={canVote}
+            signInHref={signIn}
+          />
+        )}
+      />
+
+      <div className="mt-3">
+        <ReplyForm reviewId={review.id} canReply={canVote} signInHref={signIn} />
+      </div>
     </li>
   );
 }
@@ -133,6 +188,65 @@ export function ReviewsTab({
   const [loading, setLoading] = React.useState(false);
   const [failed, setFailed] = React.useState(false);
 
+  const pathname = usePathname();
+  const signIn = signInHref(pathname);
+  /* ONLY A CONFIRMED CUSTOMER MAY VOTE. `unknown` shows the sign-in link, which
+     resolves the session itself and forwards a shopper who already has one —
+     the same neutral answer `ReviewFormGate` gives, for the same reason. */
+  const [canVote, setCanVote] = React.useState(false);
+  const [mine, setMine] = React.useState<Record<string, ReactionKind>>({});
+  /* Counts the server sent, overwritten per review by the answer to a vote. */
+  const [counts, setCounts] = React.useState<Record<string, number>>({});
+  const [voting, setVoting] = React.useState<string | null>(null);
+
+  const shown = React.useMemo(
+    () => [...initialReviews, ...extra],
+    [initialReviews, extra],
+  );
+
+  /* PER-VIEWER, AND A SECOND CALL ON PURPOSE. The reviews list is served
+     `Cache-Control: public`, so a shared cache can hand one reader's copy to
+     another; "did I vote on this" varies per reader and must never ride on it.
+     Signed out answers `200 {}` rather than 401, so there is nothing to branch
+     on beyond having no ids yet. */
+  React.useEffect(() => {
+    let cancelled = false;
+    const ids = shown.map((r) => r.id);
+    void readShopSession().then(async (session) => {
+      if (cancelled) return;
+      setCanVote(session.kind === "customer");
+      if (session.kind !== "customer" || ids.length === 0) return;
+      const reactions = await myReactions(ids);
+      if (!cancelled) setMine(reactions);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [shown]);
+
+  async function vote(reviewId: string, kind: ReactionKind | null) {
+    if (voting) return;
+    setVoting(reviewId);
+    try {
+      const result = await setReaction(reviewId, kind);
+      setMine((prev) => {
+        const next = { ...prev };
+        if (result.viewerReaction) next[reviewId] = result.viewerReaction;
+        else delete next[reviewId];
+        return next;
+      });
+      /* THE ANSWER'S COUNT, NOT AN INCREMENT OF OUR OWN — the server is the only
+         thing that knows what the tally is after everybody else's votes. */
+      setCounts((prev) => ({ ...prev, [reviewId]: result.helpfulCount }));
+    } catch {
+      /* A vote that did not land leaves the button as it was. Nothing is said:
+         the control is a nicety, and an error banner over a review list is a
+         worse answer than a click that visibly did nothing. */
+    } finally {
+      setVoting(null);
+    }
+  }
+
   async function loadMore() {
     if (!cursor || loading) return;
     setLoading(true);
@@ -148,7 +262,9 @@ export function ReviewsTab({
     }
   }
 
-  const reviews = [...initialReviews, ...extra];
+  /* `shown` is the same list, memoised above so the reactions effect does not
+     re-run on every render. */
+  const reviews = shown;
 
   return (
     <div className={cn("max-w-3xl", className)}>
@@ -185,7 +301,16 @@ export function ReviewsTab({
 
           <ul className="flex flex-col">
             {reviews.map((review) => (
-              <ReviewCard key={review.id} review={review} />
+              <ReviewCard
+                key={review.id}
+                review={review}
+                viewerReaction={mine[review.id] ?? null}
+                helpfulCount={counts[review.id] ?? review.helpfulCount}
+                pending={voting === review.id}
+                canVote={canVote}
+                onVote={(kind) => void vote(review.id, kind)}
+                signIn={signIn}
+              />
             ))}
             {/* The next page, shaped like a review — see the same treatment on
                 the orders list, and `CLAUDE.md`'s "Loading states" rule. */}
