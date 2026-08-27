@@ -94,8 +94,11 @@ export async function ShopFooter() {
           </FooterColumn>
 
           <FooterColumn title="Help">
-            <FooterLink href="/shipping">Delivery</FooterLink>
-            <FooterLink href="/shipping">Returns</FooterLink>
+            {/* TEMPORARILY HIDDEN with the `/shipping` route itself — the
+                policy page is not legible and 404s until it is redesigned.
+                See `apps/storefront/app/(site)/shipping/page.tsx`. */}
+            {/* <FooterLink href="/shipping">Delivery</FooterLink> */}
+            {/* <FooterLink href="/shipping">Returns</FooterLink> */}
             <FooterLink href="/contact">Contact</FooterLink>
           </FooterColumn>
 

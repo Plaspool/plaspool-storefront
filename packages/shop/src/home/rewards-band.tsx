@@ -87,12 +87,16 @@ export async function RewardsBand() {
                 beside it: same underline, same weight, same restrained
                 register the rest of this band already keeps. */}
             <p className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-              <Link
+              {/* TEMPORARILY HIDDEN with the `/shipping` route itself — the
+                  policy page is not legible and 404s until it is redesigned,
+                  so this band is down to one link for now. See
+                  `apps/storefront/app/(site)/shipping/page.tsx`. */}
+              {/* <Link
                 href="/shipping"
                 className="underline decoration-brand-line underline-offset-4 hover:decoration-foreground"
               >
                 How returns work
-              </Link>
+              </Link> */}
               <ReturnsCta
                 program={program}
                 areas={areas ?? []}

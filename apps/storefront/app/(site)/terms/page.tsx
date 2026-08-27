@@ -44,8 +44,12 @@ export default function Page() {
 
           <h2>Delivery</h2>
           <p>
-            We deliver nationwide within Nigeria. See our{" "}
-            <a href="/shipping">shipping information</a> for how orders are sent.
+            {/* The link to `/shipping` is TEMPORARILY REMOVED with the route
+                itself — the policy page is not legible and 404s until it is
+                redesigned. See `apps/storefront/app/(site)/shipping/page.tsx`.
+                Original: See our <a href="/shipping">shipping information</a>
+                for how orders are sent. */}
+            We deliver nationwide within Nigeria.
           </p>
           <p>
             <strong>To be confirmed:</strong> our published dispatch and delivery
