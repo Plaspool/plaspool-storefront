@@ -10,6 +10,8 @@ import { EmptyState } from "../components/empty-state";
 import { confirmPaymentIntent, getPaymentIntent } from "../data/checkout-api";
 import type { PaymentIntent } from "../data/checkout-api";
 import { getShopCustomer } from "../data/auth-api";
+import { useCart } from "../cart/cart-context";
+import { basketIsSpent } from "./basket-spent";
 
 /**
  * `/checkout/complete` — where Paystack sends the customer back.
@@ -83,6 +85,17 @@ export function CheckoutComplete() {
   const params = useSearchParams();
   const reference = params.get("reference") ?? params.get("trxref");
 
+  /**
+   * DESTRUCTURED, not `const cart = useCart()`.
+   *
+   * The context value is a fresh object on every cart change, so depending on
+   * `cart` would restart the poll below — and each restart re-enters at attempt
+   * one with a `confirm` call, turning a bounded sixty-second poll into an
+   * unbounded one. `refresh` is a stable callback; that is the whole reason to
+   * reach for only the piece this page uses.
+   */
+  const { refresh } = useCart();
+
   const [phase, setPhase] = React.useState<Phase>(() =>
     reference ? { kind: "loading" } : { kind: "no_reference" },
   );
@@ -134,7 +147,20 @@ export function CheckoutComplete() {
       }
 
       const intent = result.data;
-      if (intent.status === "captured") {
+      if (basketIsSpent(intent.status)) {
+        /* ═══ THE BASKET IS SPENT, AND THIS TAB IS THE ONLY THING THAT KNOWS ═══
+           The commerce API converted the cart to an order on its own side and
+           has no way to tell a page that is already open. `confirm` above ran
+           the same reconciliation the webhook does, so by the time a captured
+           status is in hand the cart is retired server-side — but the badge in
+           the nav still holds whatever the mount read found a second ago, back
+           when the basket was open. Left alone it says "3 items" over an empty
+           cart for the rest of the visit, and only a manual reload corrects it.
+
+           Deliberately NOT cleared locally. This asks the server and applies
+           whatever it says, so the one thing that decides what is in the cart
+           stays the thing that takes the money. */
+        void refresh();
         setPhase({ kind: "captured" });
         return;
       }
@@ -159,7 +185,7 @@ export function CheckoutComplete() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [reference]);
+  }, [reference, refresh]);
 
   return (
     <div className="mx-auto max-w-xl px-4 py-16 sm:px-6">

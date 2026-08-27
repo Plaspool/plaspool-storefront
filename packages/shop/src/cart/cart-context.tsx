@@ -13,6 +13,7 @@ import {
   setLineQty,
 } from "../data/cart-api";
 import { lineKey } from "./line-key";
+import { EMPTY_VIEW as EMPTY, outcomeOfRead } from "./read-outcome";
 import { partitionLines } from "./sellable";
 import type { VariantMatch } from "./sellable";
 import type { ApiCartView, CartResult } from "../data/cart-api";
@@ -79,8 +80,6 @@ export interface CartProviderProps {
   catalog: CartCatalogEntry[];
 }
 
-const EMPTY: ApiCartView = { cart: null, lines: [], preview: null, changes: [] };
-
 export function CartProvider({ children, catalog }: CartProviderProps) {
   const [view, setView] = React.useState<ApiCartView>(EMPTY);
   const [hydrated, setHydrated] = React.useState(false);
@@ -93,26 +92,93 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
    *  and the server agree. */
   const [problem, setProblem] = React.useState<string | null>(null);
 
-  React.useEffect(() => {
-    let cancelled = false;
-    void readCart().then((result) => {
-      if (cancelled) return;
-      if (result.ok) setView(result.view);
-      /* A READ THAT FAILED IS NOT AN EMPTY CART. With nothing set here the
-         drawer falls through to "Your cart is empty", which is an assertion
-         this client is in no position to make when it never heard back — the
-         same class of lie as the dead basket, told the other way round.
-         `gone` is exempt: there genuinely is no cart, and a shopper who has
-         just checked out does not need that in red. */
-      if (!result.ok && result.reason !== "gone") {
-        setProblem("We couldn't load your cart. Refresh to try again.");
-      }
+  /**
+   * Which read is the current one.
+   *
+   * Overlapping reads must land in the order they were ISSUED, not the order
+   * the network chose to answer them. The case that matters is `/checkout/
+   * complete`: the mount read fires the instant the page loads, while the
+   * basket is still open, and the confirmation's read fires a second or two
+   * later once the payment is known captured. A slow first read landing last
+   * would put the spent basket straight back on screen — the very bug this
+   * refresh exists to fix, reappearing intermittently.
+   *
+   * `mutate` bumps this too: a write's response IS the new cart, so it
+   * supersedes any read still in the air.
+   */
+  const readSeq = React.useRef(0);
+
+  /**
+   * READ THE CART AND APPLY IT. The one path from the server to the view.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════
+   * THIS USED TO BE A MOUNT EFFECT AND NOTHING ELSE, WHICH IS THE WHOLE BUG.
+   *
+   * One read, on mount, for the life of the page — and `CartProvider` sits in
+   * `ShopShell`, above every `(shop)` route, so it does not remount on a
+   * client-side navigation either. Nothing anywhere could ask the cart again.
+   *
+   * That is survivable while the only thing that changes the basket is this
+   * tab, because every mutation already answers with the new state. It stops
+   * being survivable when the basket is retired by something OFF-SCREEN — and
+   * paying for it is exactly that: the commerce API converts the cart to an
+   * order on its side, and this tab is never told. The badge went on
+   * advertising a basket the shopper had already bought until they reloaded
+   * the page by hand, which is precisely what was reported.
+   *
+   * So the read is a function now, and the two moments the view can no longer
+   * be trusted both call it — see the effects below and `refresh` on the
+   * context. `outcomeOfRead` owns what each answer means, so mount and refresh
+   * cannot drift apart.
+   * ═══════════════════════════════════════════════════════════════════════════
+   */
+  const load = React.useCallback((): Promise<void> => {
+    const seq = ++readSeq.current;
+    /* `.then` rather than `await`: the state updates have to sit behind a
+       callback the effect below does not run synchronously, or
+       `react-hooks/set-state-in-effect` reads this as a cascading render. Same
+       shape the mount read had before it became a function. */
+    return readCart().then((result) => {
+      /* HYDRATED EITHER WAY, and BEFORE the guard below. All this flag claims
+         is that the client has heard from the server, which is now true no
+         matter whose answer wins — and every cart surface renders nothing
+         until it flips. Leaving it unset when a write superseded this read
+         would blank the badge, the drawer and `/cart` for the rest of the
+         page's life. */
       setHydrated(true);
+      if (seq !== readSeq.current) return;
+      const outcome = outcomeOfRead(result);
+      /* NULL MEANS KEEP. A read that failed is not an empty cart — see
+         `read-outcome.ts` for why that distinction is the load-bearing one. */
+      if (outcome.view) setView(outcome.view);
+      setProblem(outcome.problem);
     });
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  React.useEffect(() => {
+    void load();
+  }, [load]);
+
+  /**
+   * A BFCACHE RESTORE IS A PAGE WHOSE CART IS AS OLD AS THE FREEZE.
+   *
+   * The other way back from Paystack is the Back button, and a restored page
+   * comes back with its whole JS heap intact: this provider's `view` still
+   * holds the basket as it was before the payment, and no effect re-runs to
+   * correct it. Same stale badge, different route to it — and `checkout-flow`
+   * already carries a `pageshow` listener for its own half of this exact trip,
+   * which is the evidence that shoppers do come back this way.
+   *
+   * `event.persisted` is what separates a real restore from an ordinary load;
+   * without it this would double every first read.
+   */
+  React.useEffect(() => {
+    function onPageShow(event: PageTransitionEvent) {
+      if (event.persisted) void load();
+    }
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, [load]);
 
   const open = React.useCallback(() => setIsOpen(true), []);
   const close = React.useCallback(() => setIsOpen(false), []);
@@ -183,6 +249,11 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
    * ═══════════════════════════════════════════════════════════════════════════
    */
   const mutate = React.useCallback(async (run: () => Promise<CartResult>) => {
+    /* A WRITE SUPERSEDES ANY READ STILL IN THE AIR. Every mutation answers with
+       the whole new cart, so a `load` issued before this one started is stale
+       the moment this runs — and letting it land afterwards would undo the
+       edit on screen. Same rule as `readSeq` itself: issue order wins. */
+    readSeq.current += 1;
     setPending(true);
     setProblem(null);
     try {
@@ -475,6 +546,7 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
       remove,
       removeLineId,
       clear,
+      refresh: load,
       isOpen,
       open,
       close,
@@ -494,6 +566,7 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
     remove,
     removeLineId,
     clear,
+    load,
     isOpen,
     open,
     close,

@@ -155,6 +155,22 @@ export interface CartApi {
    */
   removeLineId(lineId: string): void;
   clear(): void;
+  /**
+   * Re-read the basket from the server, for when something OFF-SCREEN has
+   * changed it and this tab would otherwise never find out.
+   *
+   * THE CASE IT EXISTS FOR IS PAYING. The commerce API turns the cart into an
+   * order on its own side; nothing tells this tab, and the provider used to
+   * read the cart exactly once per full page load — so the badge went on
+   * showing a basket the shopper had already bought until they refreshed by
+   * hand. `/checkout/complete` calls this the moment the payment is known
+   * captured.
+   *
+   * NOT needed after an ordinary edit: `add`, `setQty` and `remove` already
+   * answer with the whole new cart, so a read on top of one would be a second
+   * round trip and a window in which the two disagree.
+   */
+  refresh(): Promise<void>;
   isOpen: boolean;
   open(): void;
   close(): void;
