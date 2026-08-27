@@ -30,7 +30,7 @@ interface Slide {
 
 const SLIDES: Slide[] = [
   {
-    eyebrow: "Made in Lagos",
+    eyebrow: "Made in Abuja",
     heading: "Filament extruded in Nigeria",
     body: "Every spool is made here, not repackaged from an import — so a reorder in March matches the batch you printed in January.",
     colourHex: COLOURS["brand-navy"].hex,

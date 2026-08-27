@@ -137,7 +137,7 @@ export const REVIEWS_BULK_REVALIDATE = 300;
 export const REVIEWS_PER_PAGE = 10;
 
 export const DELIVERY = {
-  lagos: "Next day in Lagos on orders placed before 2pm",
+  abuja: "Next day in Abuja on orders placed before 2pm",
   nationwide: "2–4 working days nationwide",
   returns: "Unopened spools can be returned within 7 days",
 } as const;
@@ -146,5 +146,5 @@ export const PAYMENT_METHODS = [
   "Card",
   "Bank transfer",
   "USSD",
-  "Pay on delivery (Lagos)",
+  "Pay on delivery (Abuja)",
 ] as const;
