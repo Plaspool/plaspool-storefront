@@ -268,6 +268,17 @@ export function ReviewsTab({
 
   return (
     <div className={cn("max-w-3xl", className)}>
+      {/* ═══ THE WRITING CONTROL COMES FIRST ═══
+          It sat under the whole list, so on a product with reviews you had to
+          scroll past every one of them to add your own — and on a product with
+          none it was below an empty state telling you to be the first. Above
+          the list is where every threaded comment UI puts it, and it is outside
+          the branch below so it renders in both states rather than only when
+          there is already something to read. */}
+      <div className="mb-8 border-b border-brand-line pb-8">
+        <ReviewFormGate productSlug={productSlug} productName={productName} />
+      </div>
+
       {aggregate.count === 0 ? (
         <EmptyState
           icon={<MessageSquareText aria-hidden="true" className="h-6 w-6" />}
@@ -351,9 +362,6 @@ export function ReviewsTab({
         </>
       )}
 
-      <div className="mt-10 border-t border-brand-line pt-8">
-        <ReviewFormGate productSlug={productSlug} productName={productName} />
-      </div>
     </div>
   );
 }
