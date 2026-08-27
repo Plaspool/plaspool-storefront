@@ -100,10 +100,19 @@ export interface ReplyNode {
  * A reply naming a parent that is not in the array is kept at the TOP LEVEL
  * rather than dropped. It should not happen, and a visible reply in a slightly
  * wrong place beats a comment that silently disappears.
+ *
+ * ═══ AND IT TOLERATES THE FIELD BEING ABSENT ENTIRELY ═══
+ * The API's contract is that `replies` is always an array, which is true of
+ * what it sends today and NOT true of what is already in the incremental cache:
+ * `stale-while-revalidate` on a product page is 30 days, so a render frozen
+ * before replies shipped carries no such key. `for (const r of undefined)`
+ * throws, and because this runs during render it took the entire product page
+ * to a 500 rather than costing one empty thread.
  */
 export function threadReplies(replies: ReviewReply[]): ReplyNode[] {
   const nodes = new Map<string, ReplyNode>();
   const roots: ReplyNode[] = [];
+  if (!Array.isArray(replies)) return roots;
 
   for (const reply of replies) {
     if (reply.parentId === null) {

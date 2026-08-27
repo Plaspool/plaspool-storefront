@@ -137,7 +137,7 @@ function ReviewCard({
       {/* The thread, then one control for adding to it. `replyControl` is
           offered only on depth-0 rows — see `ReviewReplies`. */}
       <ReviewReplies
-        replies={review.replies}
+        replies={review.replies ?? []}
         replyControl={(parentId) => (
           <ReplyForm
             reviewId={review.id}
@@ -305,7 +305,7 @@ export function ReviewsTab({
                 key={review.id}
                 review={review}
                 viewerReaction={mine[review.id] ?? null}
-                helpfulCount={counts[review.id] ?? review.helpfulCount}
+                helpfulCount={counts[review.id] ?? review.helpfulCount ?? 0}
                 pending={voting === review.id}
                 canVote={canVote}
                 onVote={(kind) => void vote(review.id, kind)}

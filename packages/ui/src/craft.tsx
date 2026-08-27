@@ -111,8 +111,8 @@ const styles = {
       "[&_h6]:mt-4 [&_h6]:mb-2",
     ],
     links: [
-      "[&_a]:underline [&_a]:text-blue-800 [&_a]:underline-offset-4 [&_a]:decoration-primary/50 [&_a]:transition-colors",
-      "hover:[&_a]:decoration-slate-900 hover:[&_a]:text-slate-900",
+      "[&_a]:underline [&_a]:text-brand [&_a]:underline-offset-4 [&_a]:decoration-brand-line [&_a]:transition-colors",
+      "hover:[&_a]:decoration-foreground hover:[&_a]:text-foreground",
     ],
     lists: [
       // Unordered lists

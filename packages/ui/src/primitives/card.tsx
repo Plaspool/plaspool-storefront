@@ -9,7 +9,10 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-lg border bg-gray-100 text-card-foreground shadow-sm",
+      /* `bg-card`, NOT `bg-gray-100`. The token existed the whole time and the
+         paired `text-card-foreground` beside it was already using it — half the
+         rule applied, which is how a card ended up a colour nobody picked. */
+      "rounded-lg border bg-card text-card-foreground shadow-sm",
       className
     )}
     {...props}
@@ -36,7 +39,10 @@ const CardTitle = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "text-2xl font-semibold text-gray-200 leading-none tracking-tight",
+      /* NO COLOUR OF ITS OWN — inherits `text-card-foreground` from `Card`.
+         This was `text-gray-200`: a near-white title on a near-white card,
+         which is not a style choice but an unreadable one. */
+      "text-2xl font-semibold leading-none tracking-tight",
       className
     )}
     {...props}

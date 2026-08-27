@@ -97,6 +97,18 @@ describe("threadReplies", () => {
   it("answers nothing for a review with no replies", () => {
     expect(threadReplies([])).toEqual([]);
   });
+
+  /* ═══ A CACHED PAYLOAD PREDATES THE FIELD ═══
+     The API's contract is that `replies` is always an array, and that is true
+     of what it sends TODAY. It is not true of what is already sitting in the
+     incremental cache: `stale-while-revalidate` on the product page is 30 days,
+     so a render from before replies shipped has no such key — and
+     `for (const r of undefined)` threw, turning the whole product page into a
+     500. Found on a dev server holding exactly that stale entry. */
+  it("does not throw on a payload that predates the field", () => {
+    expect(threadReplies(undefined as unknown as ReviewReply[])).toEqual([]);
+    expect(threadReplies(null as unknown as ReviewReply[])).toEqual([]);
+  });
 });
 
 describe("setReaction", () => {

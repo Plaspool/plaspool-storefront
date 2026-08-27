@@ -3,9 +3,18 @@ import { BrandLogo } from "@plaspool/brand"
 // Extracted client component: keeps this footer a server component.
 import { CookiePreferencesButton } from "../consent/preferences-button"
 
+/*
+ * `text-brand-line` for the secondary text, NOT `text-muted-foreground`.
+ *
+ * This footer is the dark brand fill, and `--muted-foreground` is tuned as grey
+ * on a LIGHT page: against `--brand-accent` it measures 2.78:1, under AA's 4.5.
+ * The ramp's light step is the muted tone that belongs on a dark surface. The
+ * migration off `text-slate-400` mapped it the other way and made these links
+ * unreadable — the one place a blanket colour rename could not be blanket.
+ */
 export default function Footer() {
   return (
-    <footer className="bg-slate-900 text-white py-16">
+    <footer className="bg-brand text-brand-ink py-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid md:grid-cols-4 gap-8">
           <div className="space-y-4 flex flex-col items-start">
@@ -18,7 +27,7 @@ export default function Footer() {
           </div>
           <div className="space-y-4">
             <h4 className="font-semibold tracking-wide">Products</h4>
-            <ul className="space-y-2 text-slate-400">
+            <ul className="space-y-2 text-brand-line">
               <li>
                 <Link href="/store" prefetch={false} className="hover:text-white font-mono text-sm">
                   PLA Filaments
@@ -33,7 +42,7 @@ export default function Footer() {
           </div>
           <div className="space-y-4">
             <h4 className="font-semibold tracking-wide">Company</h4>
-            <ul className="space-y-2 text-slate-400">
+            <ul className="space-y-2 text-brand-line">
               <li>
                 <Link href="/#about" className="hover:text-white font-mono text-sm">
                   About Us
@@ -53,7 +62,7 @@ export default function Footer() {
           </div>
           <div className="space-y-4">
             <h4 className="font-semibold tracking-wide">Support</h4>
-            <ul className="space-y-2 text-slate-400">
+            <ul className="space-y-2 text-brand-line">
               <li>
                 <Link href="/contact" className="hover:text-white font-mono text-sm">
                   Contact Us
@@ -80,7 +89,7 @@ export default function Footer() {
             </ul>
           </div>
         </div>
-        <div className="border-t border-slate-800 mt-12 pt-8 text-center text-slate-400">
+        <div className="border-t border-brand-line mt-12 pt-8 text-center text-brand-line">
           <p className="font-mono text-sm">
             &copy; 2025 PlaSpool. All rights reserved.
           </p>
