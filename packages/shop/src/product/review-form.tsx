@@ -46,6 +46,10 @@ const MESSAGES: Record<SubmitError, string> = {
      that because it asked before the review was written. */
   "signed-out":
     "You have been signed out. Sign in again and your review can be posted.",
+  /* The API answers one `404` for "no such review" and "not approved yet"
+     alike, so nobody can probe which pending reviews exist. This copy must not
+     tell them apart either. */
+  gone: "That review is no longer available.",
   "rate-limited":
     "That is a few reviews in a short time. Give it fifteen minutes and try again.",
   rejected:
