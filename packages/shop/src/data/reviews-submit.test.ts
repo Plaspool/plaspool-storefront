@@ -114,3 +114,52 @@ describe("submitReview", () => {
     await expect(submitReview(INPUT)).rejects.toBeInstanceOf(ReviewSubmitError);
   });
 });
+
+/**
+ * THE TWO REFUSALS A REVIEW MUTATION CARRIES, AND WHY THEY MUST NOT COLLAPSE.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Every 403 mapped to `rejected`, whose copy is "Nothing is wrong with what you
+ * wrote — please try again later." Said to somebody who has already reviewed
+ * the spool that is a lie twice over: something IS wrong with what they wrote
+ * (it is a duplicate), and trying again later will never work.
+ *
+ * The API names the reason in the body — `{"error":"forbidden","reason":…}` —
+ * and `reason` is the key to branch on, NOT `error`, which stays `forbidden`
+ * for both. A bare 403 with no reason keeps its old meaning so that every other
+ * 403 in the API serialises and reads exactly as before.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+describe("submitReview refusals", () => {
+  it("tells a duplicate apart from a generic refusal", async () => {
+    stub(403, { error: "forbidden", reason: "already_reviewed" });
+    await expect(submitReview(INPUT)).rejects.toMatchObject({ kind: "already-reviewed" });
+  });
+
+  it("tells a shopper who has not bought it apart from a generic refusal", async () => {
+    stub(403, { error: "forbidden", reason: "purchase_required" });
+    await expect(submitReview(INPUT)).rejects.toMatchObject({ kind: "purchase-required" });
+  });
+
+  /* A REASON THIS CLIENT DOES NOT KNOW IS STILL A REFUSAL, not a crash and not
+     a duplicate. The API may name a third one before this file hears about it. */
+  it("falls back to a plain refusal for a reason it does not recognise", async () => {
+    stub(403, { error: "forbidden", reason: "some_future_rule" });
+    await expect(submitReview(INPUT)).rejects.toMatchObject({ kind: "rejected" });
+  });
+
+  /* The body is not guaranteed to be JSON — a proxy or an edge error can answer
+     403 with HTML, and `res.json()` throws on it. That must not become a
+     TypeError escaping a submit handler. */
+  it("survives a 403 whose body is not JSON", async () => {
+    const spy = vi.fn(async () => ({
+      ok: false,
+      status: 403,
+      json: async () => {
+        throw new SyntaxError("Unexpected token <");
+      },
+    }) as unknown as Response);
+    global.fetch = spy as unknown as typeof fetch;
+    await expect(submitReview(INPUT)).rejects.toMatchObject({ kind: "rejected" });
+  });
+});

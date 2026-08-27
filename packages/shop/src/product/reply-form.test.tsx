@@ -21,7 +21,7 @@ import { ReplyForm } from "./reply-form";
 
 const render = (over: Partial<Parameters<typeof ReplyForm>[0]> = {}) =>
   renderToStaticMarkup(
-    <ReplyForm reviewId="rev_1" canReply signInHref="/sign-in" {...over} />,
+    <ReplyForm reviewId="rev_1" action="allowed" signInHref="/sign-in" {...over} />,
   );
 
 describe("ReplyForm", () => {
@@ -37,9 +37,35 @@ describe("ReplyForm", () => {
 
   /* A guest gets a way in, not a control that will fail — and still no box. */
   it("offers a sign-in instead, for a shopper who cannot reply", () => {
-    const html = render({ canReply: false, signInHref: "/sign-in?next=%2Fx" });
+    const html = render({ action: "sign-in", signInHref: "/sign-in?next=%2Fx" });
     expect(html).toContain('href="/sign-in?next=%2Fx"');
     expect(html).not.toContain("<textarea");
     expect(html).not.toContain("<button");
+  });
+});
+
+/**
+ * A SIGNED-IN SHOPPER WHO HAS NOT BOUGHT THE SPOOL.
+ *
+ * Same trap as the vote row: the old `canReply: false` rendered "Sign in to
+ * reply", which is addressed to a guest and is simply wrong for somebody who is
+ * already signed in and merely has not bought this spool.
+ *
+ * THE CONTROL GOES AWAY ENTIRELY rather than explaining itself. This sits under
+ * every review and under every reply; a sentence here is that sentence repeated
+ * down the whole page, and the panel at the top of the tab has already said it
+ * once where the reader is looking.
+ */
+describe("ReplyForm, for a shopper who has not bought it", () => {
+  it("does not tell a signed-in shopper to sign in", () => {
+    const html = render({ action: "unbought" });
+    expect(html).not.toContain("Sign in");
+    expect(html).not.toContain("<a");
+  });
+
+  it("offers no reply control at all", () => {
+    const html = render({ action: "unbought" });
+    expect(html).not.toContain("<button");
+    expect(html).not.toContain("<textarea");
   });
 });

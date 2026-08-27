@@ -6,6 +6,7 @@ import { Button, Textarea } from "@plaspool/ui";
 import { Link } from "../components/link";
 import { REPLY_MAX, REPLY_MIN, ReviewSubmitError, postReply } from "../data/reviews";
 import type { SubmitError } from "../data/reviews";
+import type { ReviewAction } from "./review-permissions";
 
 /**
  * Replying to a review, or to a reply on one.
@@ -40,6 +41,18 @@ const MESSAGES: Record<SubmitError, string> = {
   "signed-out": "You have been signed out. Sign in again and your reply can be posted.",
   gone: "That review is no longer available.",
   "rate-limited": "That is a few replies in a short time. Give it a moment and try again.",
+  /* SHARED VOCABULARY, AND ONE OF THESE CANNOT HAPPEN HERE. `SubmitError` is
+     the reviews client's whole error set, so this record must be exhaustive —
+     but only the submit route refuses with `already_reviewed`; a shopper may
+     reply to a review as often as they like. It therefore gets the GENERIC
+     refusal rather than review copy: "you have already reviewed this product"
+     said about a reply would be a confident lie, whereas this stays true if the
+     API ever does send it. */
+  "already-reviewed": "We could not accept a reply from this page. Please try again later.",
+  /* This one very much can happen — the same purchase gate stands in front of
+     replies as of `Let only buyers review, reply, and vote`. */
+  "purchase-required":
+    "Replies come from shoppers who have bought the spool. Once your order is paid, you can join in here.",
   rejected: "We could not accept a reply from this page. Please try again later.",
   invalid: "Something in the reply was not accepted. Check it and try again.",
   failed: "The reply could not be sent. Check your connection and try again.",
@@ -48,14 +61,17 @@ const MESSAGES: Record<SubmitError, string> = {
 export function ReplyForm({
   reviewId,
   parentId = null,
-  canReply,
+  action,
   signInHref,
   onPosted,
 }: {
   reviewId: string;
   /** Null replies to the review itself. */
   parentId?: string | null;
-  canReply: boolean;
+  /** Allowed, needs a session, or needs a purchase. NOT a boolean: "sign in to
+   *  reply" said to somebody already signed in, who has merely not bought the
+   *  spool, is an instruction that cannot help them. */
+  action: ReviewAction;
   signInHref: string;
   onPosted?: () => void;
 }) {
@@ -73,7 +89,13 @@ export function ReplyForm({
     if (open) box.current?.focus();
   }, [open]);
 
-  if (!canReply) {
+  /* A NON-BUYER GETS NO CONTROL AND NO SENTENCE. This sits under every review
+     and under every reply, so an explanation here is that explanation repeated
+     down the whole page; `PurchaseRequiredNotice` gives it once at the top of
+     the tab. */
+  if (action === "unbought") return null;
+
+  if (action === "sign-in") {
     return (
       <Link
         href={signInHref}
