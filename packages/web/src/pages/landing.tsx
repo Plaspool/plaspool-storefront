@@ -367,6 +367,91 @@ export default function PlaspoolLanding() {
       {/* Technical Specifications */}
     
 
+      {/* ═══ WHY THIS IS ON THE HOME PAGE AND NOT ONLY IN /privacy ═══
+
+          Google's OAuth verification reads the page submitted as the app's
+          home page and looks for an explanation of what user data the app
+          asks for and why. A link to the privacy policy is required too, but
+          it is not what THAT check is satisfied by — the explanation has to be
+          on the page, readable by a signed-out visitor.
+
+          PlaSpool offers "Continue with Google" on /sign-in, so the answer
+          belongs here. Deleting this section, or putting it behind a sign-in,
+          puts the app's Google verification back where it was in August 2026:
+          rejected. Keep it in step with /privacy — the two must not disagree
+          about what Google sends us. */}
+      <section id="accounts" className="py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center space-y-4 mb-16">
+            <Badge variant="outline" className="text-brand border-brand-line font-mono text-xs tracking-wider">
+              Accounts &amp; Privacy
+            </Badge>
+            <h2 className="text-3xl lg:text-4xl font-bold text-foreground tracking-tight">Your PlaSpool Account</h2>
+            <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+              Browse the catalogue and check out without an account if you prefer. Create one and PlaSpool keeps your
+              order history, delivery updates and returns in one place — signed in with your email address, or with
+              your Google Account.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8 items-start">
+            <Card className="border-brand-line">
+              <CardHeader className="space-y-4">
+                <div className="w-12 h-12 bg-brand-soft rounded-full flex items-center justify-center">
+                  <Users className="w-6 h-6 text-brand" />
+                </div>
+                <CardTitle className="text-foreground tracking-tight">Signing in with Google</CardTitle>
+                <CardDescription>
+                  Choosing <strong className="text-foreground">Continue with Google</strong> asks for your permission
+                  first. Google then sends us the basic profile on your Google Account: your name, your email address,
+                  your profile picture and your Google account identifier.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                <p className="font-semibold text-foreground">We use it for one thing — running your account:</p>
+                <ul className="space-y-2 list-disc pl-5">
+                  <li>creating your account, and signing you back in on later visits;</li>
+                  <li>attaching your orders to you, so your history, delivery status and returns are there;</li>
+                  <li>contacting you about an order you have placed.</li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            <Card className="border-brand-line">
+              <CardHeader className="space-y-4">
+                <div className="w-12 h-12 bg-brand-soft rounded-full flex items-center justify-center">
+                  <Shield className="w-6 h-6 text-brand" />
+                </div>
+                <CardTitle className="text-foreground tracking-tight">What we never ask for</CardTitle>
+                <CardDescription>
+                  That basic profile is the whole of it. Nothing else about your Google Account is visible to us.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                <ul className="space-y-2 list-disc pl-5">
+                  <li>No access to Gmail, Drive, Contacts, Calendar or Photos — we cannot read any of them.</li>
+                  <li>Your Google password is never shared with us. Google performs the sign-in itself.</li>
+                  <li>We never sell your information, and never use it for advertising or profiling.</li>
+                  <li>Your card details never reach us — payment happens on Paystack&apos;s own page.</li>
+                </ul>
+                <p className="pt-2">
+                  You can disconnect PlaSpool from your Google Account whenever you like, and ask us to delete your
+                  PlaSpool account entirely.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="text-center mt-12">
+            <Button asChild variant="outline" className="border-brand-line text-brand hover:bg-brand-soft font-mono">
+              <Link href="/privacy">
+                Read our privacy policy <ArrowRight className="ml-2 w-4 h-4" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="py-24 bg-gradient-to-r from-brand to-brand-hover text-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-8">
