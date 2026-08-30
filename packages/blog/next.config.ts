@@ -13,7 +13,7 @@ const config: NextConfig = {
     return [
       {
         source: "/images/blog/:id",
-        destination: "https://blog-admin-app-gold.vercel.app/api/public/images/:id",
+        destination: "https://admin.plaspool.com/api/public/images/:id",
       },
     ];
   },
