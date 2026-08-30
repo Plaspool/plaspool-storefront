@@ -1,5 +1,13 @@
-/** Hardcoded on purpose — the storefront has no env file. */
-export const BLOG_API_BASE = "https://blog-admin-app-gold.vercel.app";
+/**
+ * Hardcoded on purpose — the storefront has no env file.
+ *
+ * A SUBDOMAIN OF THE SITE ITSELF, not the deployment's `*.vercel.app` name.
+ * The blog's own reads are server-side and would not care, but this is the
+ * same host `COMMERCE_API_BASE` uses, and the cart's credentialed calls very
+ * much do — see the long note there for what being on a different registrable
+ * domain cost. One host, changed in both places together.
+ */
+export const BLOG_API_BASE = "https://admin.plaspool.com";
 export const BLOG_API = `${BLOG_API_BASE}/api/public`;
 
 export const POSTS_PER_PAGE = 9;

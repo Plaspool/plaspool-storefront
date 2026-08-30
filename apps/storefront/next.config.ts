@@ -5,7 +5,19 @@ import type { NextConfig } from "next";
  * inlined so the policy below reads as a list of decisions, and so adding a
  * vendor is one edit in one place.
  */
-const BLOG_API = "https://blog-admin-app-gold.vercel.app";
+/**
+ * The admin API, which serves BOTH the blog and the commerce endpoints — one
+ * deployment, one host, named once here.
+ *
+ * ⚠  IT IS ALSO `COMMERCE_API_BASE`. The cart, the session exchange and the
+ * account all talk to this origin FROM THE BROWSER with `credentials:
+ * "include"`, so a stale value here does not merely break blog covers — it
+ * blocks every credentialed call in `connect-src` and the shop reports
+ * "We couldn't load your cart" with nothing saying why. Change it here,
+ * `packages/blog/src/data/config.ts` and `packages/shop/src/data/config.ts`
+ * together, or not at all.
+ */
+const BLOG_API = "https://admin.plaspool.com";
 /** Cover images 302 from the blog API to a presigned account-scoped R2 host. */
 const R2 = "https://*.r2.cloudflarestorage.com";
 const WAITLISTER = "https://waitlister.me";

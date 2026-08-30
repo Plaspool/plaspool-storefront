@@ -19,8 +19,29 @@
  * the reason that one is: there is no environment variable for it, on
  * purpose, and the two packages own their own copy rather than one importing
  * the other's config.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A SUBDOMAIN OF THE STOREFRONT'S OWN SITE, AND THAT IS LOAD-BEARING.
+ *
+ * This was `blog-admin-app-gold.vercel.app`. Same deployment, but a different
+ * REGISTRABLE DOMAIN from `plaspool.com` — which made every credentialed call
+ * here a THIRD-PARTY request. `__Host-shop_cart` and `__Host-shop_session`
+ * then depended on third-party cookies surviving, which they increasingly do
+ * not: Safari's ITP blocks them outright, and the exchange would 200 while the
+ * browser silently dropped the `Set-Cookie`, leaving a shopper signed in
+ * according to Clerk and a guest according to the shop.
+ *
+ * `admin.plaspool.com` shares the registrable domain with the storefront, so
+ * those cookies are SAME-SITE. They are still `__Host-` prefixed and therefore
+ * still host-only — nothing is being loosened — but they are no longer
+ * third-party, and the whole class of tracking-prevention failure goes away.
+ *
+ * CORS STILL APPLIES. Same site is not same origin, so the admin must still
+ * allow-list `https://plaspool.com` in `APP_ORIGINS` and answer credentialed
+ * preflights. See `plaspool-admin/server/shop/cart/cors.ts`.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
-export const COMMERCE_API_BASE = "https://blog-admin-app-gold.vercel.app";
+export const COMMERCE_API_BASE = "https://admin.plaspool.com";
 
 /**
  * Catalogue cache windows, matching the blog's two-tier shape next door
