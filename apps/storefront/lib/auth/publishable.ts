@@ -40,4 +40,4 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 export const CLERK_PUBLISHABLE_KEY =
-  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
+  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? 'pk_live_Y2xlcmsucGxhc3Bvb2wuY29tJA';
