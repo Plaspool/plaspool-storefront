@@ -152,15 +152,37 @@ const before = readFileSync(TARGET, 'utf8');
  * diff either.
  */
 const EOL = before.includes('\r\n') ? '\r\n' : '\n';
+const PATTERN = /export const CLERK_PUBLISHABLE_KEY =[\s\S]*?;\s*$/;
+
+/*
+ * ═══ "NOTHING CHANGED" AND "NOTHING MATCHED" ARE DIFFERENT ANSWERS ═══
+ * This used to die whenever `replace()` returned an identical string, and
+ * treated that as the pattern being missing. But an identical string is also
+ * what you get when the key is ALREADY correct — so the second run of this
+ * script, with the same key, reported that it could not find the export it was
+ * looking straight at. Which made "re-running is safe" untrue at exactly the
+ * moment somebody needed it to be: after a partial failure.
+ *
+ * So the match is tested FIRST, and an unchanged file is a success.
+ */
+if (!PATTERN.test(before)) {
+  die(
+    `Could not find the CLERK_PUBLISHABLE_KEY export to rewrite in\n    ${TARGET}\n` +
+      '    Set it by hand instead — it is the last statement in that file.',
+  );
+}
+
 const after = before.replace(
-  /export const CLERK_PUBLISHABLE_KEY =[\s\S]*?;\s*$/,
+  PATTERN,
   `export const CLERK_PUBLISHABLE_KEY =${EOL}  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '${pk}';${EOL}`,
 );
+
 if (after === before) {
-  die(`Could not find CLERK_PUBLISHABLE_KEY to rewrite in\n    ${TARGET}`);
+  console.log('  ✔ Publishable key already set to this value — nothing to write');
+} else {
+  writeFileSync(TARGET, after);
+  console.log('  ✔ Publishable key written to apps/storefront/lib/auth/publishable.ts');
 }
-writeFileSync(TARGET, after);
-console.log('  ✔ Publishable key written to apps/storefront/lib/auth/publishable.ts');
 
 /* ── 2. Secret key → wrangler, via stdin, never to disk ──────────────────── */
 if (sk && !skipSecret) {
@@ -211,10 +233,18 @@ if (sk && !skipSecret) {
           encoding: 'utf8',
           shell: true,
         });
+        /*
+         * NOT LISTED IS THE EXPECTED ANSWER HERE, and calling it a warning was
+         * misleading. `versions secret list` reports the secrets on the
+         * DEPLOYED version. `versions secret put` deliberately does not deploy
+         * — that is the whole reason it is the command this Worker needs — so a
+         * freshly uploaded secret is absent from that list until the next
+         * Workers Builds deploy carries it forward.
+         */
         console.log(
           listed.includes('CLERK_SECRET_KEY')
-            ? '  ✔ Cloudflare confirms CLERK_SECRET_KEY is set'
-            : '  ! Uploaded, but CLERK_SECRET_KEY was not listed back — check the dashboard',
+            ? '  ✔ Cloudflare lists CLERK_SECRET_KEY on the deployed version'
+            : '  · Not on the DEPLOYED version yet — expected; the next deploy carries it',
         );
       } catch {
         /* Non-fatal: the upload above succeeded, this is only corroboration. */
@@ -247,24 +277,51 @@ if (sk && !skipSecret) {
 console.log('\n  Building — this is the check that was missing last time.\n');
 execFileSync('npm', ['run', 'build'], { cwd: ROOT, stdio: 'inherit', shell: true });
 
+/*
+ * ═══ WHERE THE KEY ACTUALLY LANDS, WHICH IS NOT WHERE YOU WOULD GUESS ═══
+ *
+ * This searched `.next/static/chunks` only, and reported MISSING for a build
+ * that was completely correct — nearly blocking a good deploy, which is the
+ * mirror image of the bug the check exists to catch.
+ *
+ * `CLERK_PUBLISHABLE_KEY` is read in `app/layout.tsx`, a SERVER Component, and
+ * handed to `<ClerkProvider>` as a prop. So it is serialised into the RSC
+ * payload and the prerendered HTML under `.next/server/app/**` — NOT inlined
+ * into a static JS chunk. A static chunk would only carry it if client-side
+ * code referenced `process.env.NEXT_PUBLIC_*` directly, which nothing here
+ * does any more, and deliberately so.
+ *
+ * Both trees are searched, so this stays correct either way.
+ */
+const SEARCH_DIRS = [join(APP, '.next/server/app'), join(APP, '.next/static')];
+
 const found = execFileSync(
   'node',
   [
     '-e',
-    `const {readdirSync,readFileSync,statSync}=require('fs');const {join}=require('path');
-     const dir=${JSON.stringify(join(APP, '.next/static/chunks'))};let hit=false;
-     const walk=(d)=>{for(const f of readdirSync(d)){const p=join(d,f);
-       if(statSync(p).isDirectory())walk(p);
-       else if(f.endsWith('.js')&&readFileSync(p,'utf8').includes(${JSON.stringify(pk)}))hit=true;}};
-     walk(dir);process.stdout.write(hit?'FOUND':'MISSING');`,
+    `const {readdirSync,readFileSync,statSync,existsSync}=require('fs');const {join}=require('path');
+     const dirs=${JSON.stringify(SEARCH_DIRS)};const needle=${JSON.stringify(pk)};
+     let where='';
+     const walk=(d)=>{if(where||!existsSync(d))return;
+       for(const f of readdirSync(d)){const p=join(d,f);
+         if(statSync(p).isDirectory()){walk(p);if(where)return;continue;}
+         if(!/\\.(js|html|rsc|json|txt)$/.test(f))continue;
+         try{if(readFileSync(p,'utf8').includes(needle)){where=p;return;}}catch{}}};
+     for(const d of dirs){walk(d);if(where)break;}
+     process.stdout.write(where||'MISSING');`,
   ],
   { cwd: ROOT, encoding: 'utf8' },
 ).trim();
 
-if (found !== 'FOUND') {
-  die('Built, but the publishable key is NOT in any client chunk. Do not deploy.');
+if (found === 'MISSING') {
+  die(
+    'Built, but the publishable key is in NEITHER the server render nor the\n' +
+      '    client chunks. Do not deploy — Clerk would not initialise.',
+  );
 }
-console.log('\n  ✔ Publishable key confirmed present in the built client bundle.');
+console.log(
+  `\n  ✔ Publishable key confirmed in the build output\n      ${found.replace(ROOT, '.')}`,
+);
 
 /* ── 4. Clean up the secret from disk ────────────────────────────────────── */
 if (sk && !skipSecret) {
@@ -282,6 +339,23 @@ if (!push) {
 }
 
 execFileSync('git', ['add', 'apps/storefront/lib/auth/publishable.ts'], { cwd: ROOT, stdio: 'inherit' });
+
+/* Nothing staged means the key was already committed — a re-run after a
+   partial failure, which is a success here and not an error to stop on. */
+let staged = true;
+try {
+  execFileSync('git', ['diff', '--cached', '--quiet'], { cwd: ROOT });
+  staged = false;
+} catch {
+  /* non-zero exit means there ARE staged changes */
+}
+
+if (!staged) {
+  console.log('\n  ✔ Publishable key already committed — pushing any pending commits.\n');
+  execFileSync('git', ['push'], { cwd: ROOT, stdio: 'inherit' });
+  process.exit(0);
+}
+
 execFileSync(
   'git',
   [
