@@ -3,28 +3,39 @@
 import * as React from "react";
 
 /**
- * The panel beside the sign-in form: five abstract scenes drawn from 3D
- * printing, on a slow crossfade.
+ * The panel beside the sign-in form: five photographs of the thing this shop
+ * sells being used, on a slow crossfade.
  *
  * ═══════════════════════════════════════════════════════════════════════════
- * WHY THE ART IS DRAWN RATHER THAN PHOTOGRAPHED.
+ * THE IMAGES ARE LOCAL FILES, NOT UNSPLASH URLS.
  *
- * A photographic carousel here would need licensed stock, and licensed stock
- * is the one asset a repository cannot honestly fake — an unlicensed photo of a
- * person is a legal problem that ships to production looking exactly like a
- * design win. So these are generated: pure SVG, no bytes over the network, no
- * `img-src` entry, no layout shift while they load, and legible at any size
- * because nothing is rasterised.
+ * They come from Unsplash, whose licence covers free commercial use with no
+ * attribution required — but they are COMMITTED to `public/brand/sign-in/`
+ * rather than hotlinked, for three reasons that all matter here:
  *
- * They are also the *subject* rather than decoration. Every scene is a real
- * artefact of the thing this shop sells — a sliced toolpath, gyroid infill,
- * filament on a reel, a nozzle laying a bead, a first layer on a build plate.
+ *   - `img-src 'self'` already covers them, so the CSP in `next.config.ts`
+ *     needs no third-party image origin.
+ *   - Workers has no sharp (`images.unoptimized`), so a remote URL would be
+ *     served at whatever size the CDN felt like. These are pre-sized to ~900px
+ *     wide at q70; all five together are under 400 KB.
+ *   - A sign-in page must not depend on a third party's CDN being up.
  *
- * ═══ SWAPPING IN PHOTOGRAPHY LATER ═══
- * `SCENES` is the whole contract. Give an entry an `image` (a `/public` path)
- * and it renders that instead of its `art`, keeping the caption, the dots and
- * the timing untouched. Nothing else needs to change, and a half-migrated list
- * — some drawn, some shot — renders correctly.
+ * Photographers, recorded because it is decent practice even where the licence
+ * does not require it: Minku Kang, Kadir Celep, Christian Englmeier,
+ * Osman Talha Dikyar, Opt Lasers.
+ *
+ * ⚠  ONE CANDIDATE WAS REJECTED ON PURPOSE. A well-shot photo of a printed
+ * Grogu figurine was the best-looking image of the set. Unsplash's licence
+ * covers the PHOTOGRAPH; it does not license the character depicted in it, and
+ * putting a recognisable Disney character on a commercial storefront is a
+ * trademark problem that looks exactly like a design win until it is a letter.
+ * Prefer machines, materials and abstract detail over printed *characters*
+ * when adding to this list.
+ *
+ * ═══ SWAPPING THEM ═══
+ * `SCENES` is the whole contract: drop a file in `public/brand/sign-in/`, point
+ * an entry at it, write a caption that describes what is actually in the frame.
+ * Nothing else changes.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
@@ -35,236 +46,50 @@ interface Scene {
   id: string;
   title: string;
   body: string;
-  /** Drawn artwork. Ignored when `image` is set. */
-  art: React.ReactNode;
+  /** Path under `/public`. */
+  src: string;
   /**
-   * A photograph, once there is a licensed one. Path under `/public`, e.g.
-   * `/brand/sign-in/workshop.jpg`. Rendered with a plain `<img>` for the same
-   * reason blog covers are: `images.unoptimized` is on for Workers, so
-   * `next/image` would buy nothing here.
+   * What is in the frame, for somebody who cannot see it. NOT a repeat of the
+   * caption — the caption is already text on the page and is read separately.
    */
-  image?: { src: string; alt: string };
-}
-
-/*
- * ONE PALETTE, DECLARED ONCE. Every scene draws from these so the crossfade
- * between any two reads as one continuous surface rather than five unrelated
- * illustrations. They are the brand ramp's own values — see `globals.css`.
- */
-const INK = "hsl(248 48% 21%)";
-const LINE = "hsl(250 31% 77%)";
-const SOFT = "hsl(250 33% 93%)";
-const GLOW = "hsl(247 43% 70%)";
-
-/** Concentric sliced contours — the toolpath a slicer emits for one layer. */
-function ToolpathArt() {
-  return (
-    <svg viewBox="0 0 400 400" className="h-full w-full" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-      <rect width="400" height="400" fill={SOFT} />
-      <g fill="none" stroke={INK} strokeLinejoin="round">
-        {Array.from({ length: 14 }, (_, i) => {
-          const inset = 52 + i * 9;
-          return (
-            <rect
-              key={i}
-              x={inset}
-              y={inset}
-              width={400 - inset * 2}
-              height={400 - inset * 2}
-              rx={60 - i * 3.2}
-              strokeWidth={i % 3 === 0 ? 2.4 : 1}
-              opacity={0.15 + i * 0.055}
-            />
-          );
-        })}
-      </g>
-      {/* The travel move: where the head lifts and crosses the part. */}
-      <path
-        d="M200 60 L200 340"
-        stroke={GLOW}
-        strokeWidth="2"
-        strokeDasharray="7 11"
-        opacity="0.85"
-      />
-      <circle cx="200" cy="60" r="6" fill={INK} />
-    </svg>
-  );
-}
-
-/** Gyroid infill — the sparse lattice that makes a print light and stiff. */
-function GyroidArt() {
-  const rows = Array.from({ length: 9 }, (_, r) => r);
-  return (
-    <svg viewBox="0 0 400 400" className="h-full w-full" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-      <rect width="400" height="400" fill={INK} />
-      <g fill="none" stroke={GLOW} strokeWidth="2.2" strokeLinecap="round">
-        {rows.map((r) => {
-          const y = 30 + r * 45;
-          /* Alternating phase is what makes a gyroid read as woven rather
-             than as stacked sine waves. */
-          const shift = r % 2 === 0 ? 0 : 45;
-          return (
-            <path
-              key={r}
-              d={`M-20 ${y} q 22.5 -34 45 0 t 45 0 t 45 0 t 45 0 t 45 0 t 45 0 t 45 0 t 45 0 t 45 0`}
-              transform={`translate(${shift} 0)`}
-              opacity={0.28 + (r % 3) * 0.24}
-            />
-          );
-        })}
-      </g>
-    </svg>
-  );
-}
-
-/** Filament on a reel, abstracted to wound arcs. */
-function SpoolArt() {
-  return (
-    <svg viewBox="0 0 400 400" className="h-full w-full" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-      <rect width="400" height="400" fill={SOFT} />
-      <g transform="translate(200 200)">
-        <circle r="150" fill="none" stroke={LINE} strokeWidth="2" />
-        {/* The wind: many turns, each a fraction off the last. */}
-        {Array.from({ length: 26 }, (_, i) => (
-          <circle
-            key={i}
-            r={52 + i * 3.7}
-            fill="none"
-            stroke={i % 2 === 0 ? INK : GLOW}
-            strokeWidth="1.5"
-            strokeDasharray={`${180 + i * 22} 60`}
-            transform={`rotate(${i * 27})`}
-            opacity={0.5 + (i % 4) * 0.12}
-          />
-        ))}
-        <circle r="44" fill={SOFT} stroke={INK} strokeWidth="2.5" />
-        <circle r="13" fill={INK} />
-        {/* The loose end, feeding off toward the printer. */}
-        <path
-          d="M148 18 C 210 34, 236 74, 232 126"
-          fill="none"
-          stroke={INK}
-          strokeWidth="3"
-          strokeLinecap="round"
-        />
-      </g>
-    </svg>
-  );
-}
-
-/** A nozzle laying a bead, mid-extrusion. */
-function NozzleArt() {
-  return (
-    <svg viewBox="0 0 400 400" className="h-full w-full" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-      <rect width="400" height="400" fill={INK} />
-      {/* Beads already laid, receding. */}
-      <g fill="none" stroke={GLOW} strokeLinecap="round">
-        {Array.from({ length: 7 }, (_, i) => (
-          <path
-            key={i}
-            d={`M56 ${268 + i * 11} H 344`}
-            strokeWidth="7"
-            opacity={0.14 + i * 0.11}
-          />
-        ))}
-      </g>
-      {/* The bead being laid right now, with its meniscus. */}
-      <path
-        d="M56 257 H 268"
-        stroke={SOFT}
-        strokeWidth="8"
-        strokeLinecap="round"
-        fill="none"
-      />
-      {/* Hot end. */}
-      <g transform="translate(268 120)">
-        <rect x="-34" y="0" width="68" height="76" rx="9" fill={SOFT} opacity="0.92" />
-        <rect x="-22" y="76" width="44" height="26" fill={LINE} />
-        <path d="M-22 102 L-7 130 H7 L22 102 Z" fill={SOFT} />
-        {/* Filament entering the top. */}
-        <path
-          d="M0 -70 V 0"
-          stroke={GLOW}
-          strokeWidth="6"
-          strokeLinecap="round"
-        />
-        {/* The extruded thread. */}
-        <path d="M0 130 V 137" stroke={SOFT} strokeWidth="8" strokeLinecap="round" />
-      </g>
-    </svg>
-  );
-}
-
-/** A first layer going down on a build plate, in perspective. */
-function BuildPlateArt() {
-  return (
-    <svg viewBox="0 0 400 400" className="h-full w-full" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-      <rect width="400" height="400" fill={SOFT} />
-      {/* `scale(0.78)` KEEPS THE DIAMOND'S CORNERS ON SCREEN. With
-            `preserveAspectRatio="slice"` a 690x870 panel crops the 400-unit
-            viewBox to roughly x in [41, 359]; the unscaled plate's widest
-            points sit at x=7.7 and x=392.3, so both corners — the most
-            recognisable thing about the shape — were being cut clean off. */}
-      <g transform="translate(200 232) scale(0.78) scale(1 0.5) rotate(45)">
-        <rect x="-136" y="-136" width="272" height="272" fill="none" stroke={INK} strokeWidth="2.5" />
-        <g stroke={LINE} strokeWidth="1.2">
-          {Array.from({ length: 15 }, (_, i) => {
-            const p = -136 + i * 19.4;
-            return (
-              <React.Fragment key={i}>
-                <path d={`M${p} -136 V 136`} />
-                <path d={`M-136 ${p} H 136`} />
-              </React.Fragment>
-            );
-          })}
-        </g>
-        {/* The solid first layer, filled in. */}
-        <g stroke={INK} strokeWidth="4" strokeLinecap="round">
-          {Array.from({ length: 11 }, (_, i) => (
-            <path key={i} d={`M-64 ${-58 + i * 11.6} H 64`} opacity="0.9" />
-          ))}
-        </g>
-      </g>
-      {/* The part rising off the plate. */}
-      <g fill="none" stroke={INK} strokeWidth="2" opacity="0.55">
-        {Array.from({ length: 6 }, (_, i) => (
-          <ellipse key={i} cx="200" cy={200 - i * 17} rx={64 - i * 3} ry={32 - i * 1.5} />
-        ))}
-      </g>
-    </svg>
-  );
+  alt: string;
 }
 
 const SCENES: Scene[] = [
   {
-    id: "toolpath",
+    id: "printers-row",
     title: "Filament that prints the first time",
     body: "Tight diameter tolerance, so the slicer's numbers and the nozzle's reality agree.",
-    art: <ToolpathArt />,
+    src: "/brand/sign-in/printers-row.jpg",
+    alt: "A row of desktop 3D printers on a workbench, one part-way through printing a set of blue cylinders.",
   },
   {
-    id: "gyroid",
-    title: "Infill you can trust to hold",
-    body: "Consistent flow, so a sparse lattice comes out as strong as the slicer promised.",
-    art: <GyroidArt />,
+    id: "first-layer",
+    title: "A first layer that just sticks",
+    body: "Consistent flow from the first millimetre, so a print is not lost an hour in.",
+    src: "/brand/sign-in/first-layer.jpg",
+    alt: "Close-up of a 3D printer hot end laying its first layer across the build plate.",
   },
   {
-    id: "spool",
-    title: "Stocked in Nigeria, delivered from here",
-    body: "No customs wait and no month-long shipping. It leaves Lagos, not Shenzhen.",
-    art: <SpoolArt />,
-  },
-  {
-    id: "nozzle",
+    id: "hotend-dark",
     title: "Lays down clean, layer after layer",
     body: "Every spool is printed from before it ships — the batch you buy, not a sample of it.",
-    art: <NozzleArt />,
+    src: "/brand/sign-in/hotend-dark.jpg",
+    alt: "A printer's extruder against a black background, building a small red part on the bed.",
   },
   {
-    id: "plate",
-    title: "A first layer that just sticks",
-    body: "Sign in and your past orders keep their settings, so restocking a colour is two taps.",
-    art: <BuildPlateArt />,
+    id: "printing-yellow",
+    title: "Colours that match the last spool",
+    body: "Reorder a colour months later and it still lands where the first one did.",
+    src: "/brand/sign-in/printing-yellow.jpg",
+    alt: "A yellow object part-way through printing, lit by the printer's blue status light.",
+  },
+  {
+    id: "machine-violet",
+    title: "Stocked in Nigeria, delivered from here",
+    body: "No customs wait and no month-long shipping. It leaves Lagos, not Shenzhen.",
+    src: "/brand/sign-in/machine-violet.jpg",
+    alt: "A machine head moving over a work surface under violet light.",
   },
 ];
 
@@ -344,16 +169,19 @@ export function SignInShowcase() {
           aria-roledescription="slide"
           aria-label={`${i + 1} of ${SCENES.length}`}
         >
-          {scene.image ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              src={scene.image.src}
-              alt={scene.image.alt}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            scene.art
-          )}
+          {/* A plain <img>, for the reason blog covers use one: Workers has no
+              sharp, so `images.unoptimized` is on and `next/image` would add a
+              component without adding an optimisation. `object-cover` fills the
+              panel at any aspect ratio; `eager` on the first slide only, since
+              the other four are behind a 6s crossfade. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={scene.src}
+            alt={scene.alt}
+            loading={i === 0 ? "eager" : "lazy"}
+            decoding="async"
+            className="h-full w-full object-cover"
+          />
 
           {/* The caption plate. Its own solid ground rather than a gradient
               over the art, so contrast is a known quantity on every scene

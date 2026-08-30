@@ -1,13 +1,36 @@
 import { clerkMiddleware } from '@clerk/nextjs/server';
 
 /**
- * Clerk's request proxy.
+ * Clerk's request middleware.
  *
  * ═══════════════════════════════════════════════════════════════════════════
- * `proxy.ts` AND NOT `middleware.ts` — Next 16 renamed the file. The old name
- * is not read at all on this version, so a `middleware.ts` here would be a
- * silently dead file and every Clerk helper would report "no session" with
- * nothing anywhere saying why.
+ * ⚠  DO NOT RENAME THIS TO `proxy.ts`, AND DO NOT RUN THE CODEMOD NEXT
+ *    SUGGESTS. EVERY BUILD PRINTS A DEPRECATION WARNING TELLING YOU TO:
+ *
+ *      ⚠ The "middleware" file convention is deprecated. Please use "proxy".
+ *        npx @next/codemod@canary middleware-to-proxy .
+ *
+ *    OBEYING IT BREAKS THE DEPLOY. Next 16's `proxy.ts` ALWAYS runs on the
+ *    Node.js runtime — that is not a default, it is enforced: Next refuses a
+ *    route-segment `runtime` export in a proxy file with "Proxy always runs on
+ *    Node.js runtime". And `@opennextjs/cloudflare` cannot bundle Node
+ *    middleware:
+ *
+ *      ERROR Node.js middleware is not currently supported.
+ *            Consider switching to Edge Middleware.
+ *
+ *    `middleware.ts` still compiles to EDGE, which OpenNext bundles happily
+ *    ("Bundling middleware function..."). So the deprecated name is the only
+ *    one that ships on Workers today. Revisit when OpenNext supports Node
+ *    middleware — not before.
+ *
+ * ═══ AND `next build` WILL NOT TELL YOU ═══
+ * This failure appears only in `opennextjs-cloudflare build`, which is what
+ * Workers Builds runs (`npm run upload`) and what `npm run build` does NOT.
+ * A local `next build` passes green with a Node proxy, the deploy fails, and
+ * GitHub reports it with an empty summary. It cost a build to find; the
+ * diagnostic that isolated it is in CLAUDE.md — push master's tree on a
+ * throwaway branch and compare.
  *
  * WHAT IT ACTUALLY DOES HERE: `clerkMiddleware()` with no argument protects
  * NOTHING. It only reads Clerk's cookie and attaches the session to the

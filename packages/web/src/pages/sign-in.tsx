@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth, useSignIn, useSignUp } from "@clerk/nextjs";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
+import { BrandLogo } from "@plaspool/brand";
 import { Button, Input, Label, Separator, cn, NEO_SURFACE } from "@plaspool/ui";
 import {
   completeSignIn,
@@ -580,10 +581,13 @@ export default function SignInPage({ next = null, bridge = null }: SignInPagePro
             the only element on the page that did not line up with the form. */}
         <header className="mx-auto flex w-full max-w-sm items-center justify-between gap-4">
           <Link href="/" className="flex items-center gap-2.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2">
-            <SpoolMark />
-            <span className="text-base font-semibold tracking-tight text-foreground">
-              PlaSpool
-            </span>
+            {/* THE REAL LOCKUP. This was a hand-drawn SVG spool plus the
+                wordmark set in the body face — close enough to look deliberate
+                and wrong enough that the sign-in page was the one screen not
+                wearing the actual brand. `BrandLogo` is the same component the
+                nav and footer use, reading the same artwork; `h-7 w-auto`
+                keeps its 4800x980 ratio. */}
+            <BrandLogo variant="lockup" className="h-7" alt="PlaSpool" />
           </Link>
           <Link
             href={returnTo}
@@ -819,24 +823,6 @@ function FinishingPanel({ arrived }: { arrived: boolean }) {
           : "One moment while we finish setting up your account."}
       </p>
     </div>
-  );
-}
-
-/** The brand's spool, reduced to what still reads at 28px. */
-function SpoolMark() {
-  return (
-    <svg viewBox="0 0 32 32" className="h-7 w-7 shrink-0" aria-hidden="true">
-      <circle cx="16" cy="16" r="15" fill="hsl(248 48% 21%)" />
-      <circle cx="16" cy="16" r="9.5" fill="none" stroke="hsl(250 33% 93%)" strokeWidth="2" />
-      <circle cx="16" cy="16" r="4" fill="hsl(250 33% 93%)" />
-      <path
-        d="M25 11.5 A 10 10 0 0 1 25.5 20"
-        fill="none"
-        stroke="hsl(247 43% 70%)"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-      />
-    </svg>
   );
 }
 
