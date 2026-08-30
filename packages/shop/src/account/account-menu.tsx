@@ -86,6 +86,9 @@ export function AccountMenu({ className }: { className?: string }) {
 
   const signOut = React.useCallback(async () => {
     setSigningOut(true);
+    /* No destination: reload where they are. Signing out from the header on
+       `/store` should leave them on `/store`. The reload is what ends
+       clerk-js's session — see `auth-api.ts`. */
     await signOutEverywhere();
     /* BOTH, and in this order. `refresh()` re-runs the server components that
        may have rendered something identity-shaped; `setCustomer(null)` flips

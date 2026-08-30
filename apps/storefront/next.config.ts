@@ -13,13 +13,30 @@ const GTM = "https://www.googletagmanager.com";
 const GA = ["https://www.google-analytics.com", "https://*.analytics.google.com"];
 const VERCEL_INSIGHTS = "https://vitals.vercel-insights.com";
 /**
- * Neon Auth's hosted endpoint — the origin `lib/auth/config.ts` names as
- * `NEON_AUTH_BASE_URL`. The browser talks to it directly for the
- * `/api/auth/*` calls Neon's own client makes, so it belongs in `connect-src`
- * the same way `BLOG_API` does. Google's own OAuth redirect happens as a
- * top-level navigation, not a `fetch`, so it needs nothing here.
+ * Clerk, which replaced Neon Auth.
+ *
+ * ═══ WHY THIS IS THREE ENTRIES AND NOT ONE ═══
+ * Clerk serves its frontend SDK and its API from an instance-specific host,
+ * and that host is DIFFERENT between environments: `clerk.plaspool.com` once
+ * the production instance is attached to the domain, and a generated
+ * `*.clerk.accounts.dev` subdomain for development instances. Both are listed
+ * so a preview build and production share one policy — an origin nobody is
+ * using costs nothing, whereas a missing one is a sign-in page that loads and
+ * then silently refuses to submit.
+ *
+ * Clerk's script is fetched AND called, so these belong in `script-src` and
+ * `connect-src` alike. Google's OAuth redirect is a top-level navigation
+ * rather than a `fetch`, so it still needs nothing here.
  */
-const NEON_AUTH = "https://ep-late-math-ayvz1kdi.neonauth.c-5.us-east-2.aws.neon.tech";
+const CLERK = "https://clerk.plaspool.com https://*.clerk.accounts.dev";
+/** Avatars Clerk hosts for accounts that have one — `img-src` only. */
+const CLERK_IMG = "https://img.clerk.com";
+/**
+ * Cloudflare Turnstile, which Clerk mounts in an iframe for its bot-protection
+ * challenge. Absent from `frame-src`, the challenge renders blank and sign-up
+ * cannot be completed — with nothing in the console pointing at the frame.
+ */
+const TURNSTILE = "https://challenges.cloudflare.com";
 
 /**
  * Content-Security-Policy — REPORT-ONLY for now.
@@ -52,15 +69,22 @@ const NEON_AUTH = "https://ep-late-math-ayvz1kdi.neonauth.c-5.us-east-2.aws.neon
  */
 const CSP = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' ${WAITLISTER} ${GTM}`,
+  `script-src 'self' 'unsafe-inline' ${WAITLISTER} ${GTM} ${CLERK} ${TURNSTILE}`,
   "style-src 'self' 'unsafe-inline'",
   // `data:` for the engine's generated textures, `blob:` for canvas readback.
-  `img-src 'self' data: blob: ${BLOG_API} ${R2} ${GTM} ${GA[0]}`,
+  `img-src 'self' data: blob: ${BLOG_API} ${R2} ${GTM} ${GA[0]} ${CLERK_IMG}`,
   // next/font self-hosts Inter at build time, so no external font origin.
   "font-src 'self' data:",
-  `connect-src 'self' ${BLOG_API} ${R2} ${WAITLISTER} ${GTM} ${GA.join(" ")} ${VERCEL_INSIGHTS} ${NEON_AUTH}`,
-  // The /shop waitlist is an iframe embed.
-  `frame-src 'self' ${WAITLISTER}`,
+  `connect-src 'self' ${BLOG_API} ${R2} ${WAITLISTER} ${GTM} ${GA.join(" ")} ${VERCEL_INSIGHTS} ${CLERK}`,
+  // The /shop waitlist is an iframe embed; Turnstile is Clerk's bot challenge.
+  `frame-src 'self' ${WAITLISTER} ${TURNSTILE}`,
+  /*
+   * Clerk instantiates a Web Worker from a blob to refresh its session token
+   * off the main thread. Without `blob:` here the worker is refused and the
+   * session silently stops refreshing — the shopper is signed out at the next
+   * token expiry rather than at sign-out.
+   */
+  "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

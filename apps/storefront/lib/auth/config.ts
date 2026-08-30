@@ -1,46 +1,55 @@
-import { BRIDGE, NEON_COOKIE } from '../utils/service-keys';
+import { BRIDGE } from '../utils/service-keys';
 
 /**
- * Neon Auth configuration — ONE place that names every value auth needs.
+ * Auth configuration — ONE place that names every value auth needs.
  *
- * Before this file the three values were read as bare `process.env.X!` at their
- * point of use, spread across three route modules. Nothing in the repository
- * said what they were or which were sensitive, so the only way to discover a
- * missing one was a failed deploy — and in one case a failed BUILD, because a
- * module-scope `createNeonAuth` throws when the cookie secret is absent.
+ * Before this file the values were read as bare `process.env.X!` at their point
+ * of use, spread across three route modules. Nothing in the repository said
+ * what they were or which were sensitive, so the only way to discover a missing
+ * one was a failed deploy.
  *
- * WHAT IS COMMITTED AND WHAT IS NOT. The base URL is here in full: it is not a
- * secret by any definition — the browser connects to it directly, so it is in
- * the page's network traffic and named in the CSP `connect-src` list. Keeping
- * it in the repository means a fresh clone builds and a deploy needs one fewer
- * piece of out-of-band setup.
+ * ═══════════════════════════════════════════════════════════════════════════
+ * CLERK REPLACED NEON AUTH, AND THE TWO CLERK KEYS ARE **NOT** COMMITTED.
  *
- * The two actual secrets fall back to `../utils/service-keys`, which holds them
- * in the repository. That decision, and the condition it depends on — both
- * repositories being private — is argued in that file. Everything here stays
- * env-first, so `wrangler secret put` still overrides either value without a
- * code change.
+ * `../utils/service-keys` argues at length for keeping this app's own secrets
+ * in a private repository. That argument does not extend to Clerk's keys, for a
+ * reason worth stating rather than assuming:
+ *
+ *   - They are a THIRD PARTY'S credential, rotated in Clerk's dashboard rather
+ *     than by editing this repository. A committed copy goes stale silently the
+ *     first time somebody rotates it there, and the failure looks like an
+ *     outage rather than a stale constant.
+ *   - `CLERK_SECRET_KEY` authenticates this app to Clerk's Backend API for
+ *     EVERY user in the instance. That is a wider blast radius than `BRIDGE`,
+ *     which at least stops at this one commerce database.
+ *
+ * So both are env-only and there is no fallback. A missing one is a loud
+ * runtime failure on the routes that need it, which is the correct outcome —
+ * see `bridge/route.ts` for how that failure is reported.
+ *
+ * WHERE THEY COME FROM ON CLOUDFLARE, AND WHY THE TWO ARE SET DIFFERENTLY:
+ *
+ *   CLERK_SECRET_KEY                    -> `wrangler secret put`, or a
+ *                                          Workers Builds secret. Runtime only.
+ *                                          Never reaches the browser.
+ *   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY   -> MUST be a **build** variable in
+ *                                          Workers Builds, not only a runtime
+ *                                          secret.
+ *
+ * ⚠  THAT SECOND ONE IS THE TRAP. `NEXT_PUBLIC_*` is inlined into the client
+ * bundle by `next build`. A value that exists only as a Worker secret is
+ * invisible at build time, so the bundle ships with `undefined` baked in and
+ * Clerk's frontend SDK never initialises — the sign-in page renders, the
+ * buttons do nothing, and the build was green the whole way. If sign-in is
+ * inert in production but fine locally, check this before anything else.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 
 /**
- * The project's hosted auth endpoint. NOT a secret. Overridable by
- * `NEON_AUTH_BASE_URL` so a preview or a branch database can point elsewhere.
+ * Clerk's server-side key. Absent means the bridge cannot verify anybody, so
+ * `bridge/route.ts` answers a named 501 rather than crashing.
  */
-export const NEON_AUTH_BASE_URL =
-  process.env.NEON_AUTH_BASE_URL ??
-  'https://ep-late-math-ayvz1kdi.neonauth.c-5.us-east-2.aws.neon.tech/neondb/auth';
-
-/**
- * Encrypts the first-party Neon session cookie this app sets on its own origin.
- *
- * THIS IS NOT `__Host-shop_session`. It is Neon's cookie, it never leaves this
- * origin, and it is not the credential the admin API trusts — the bridge route
- * translates one into the other.
- *
- * Falls back to `NEON_COOKIE` in `../utils/service-keys`. Override per
- * deployment with `npx wrangler secret put NEON_AUTH_COOKIE_SECRET`.
- */
-export const NEON_AUTH_COOKIE_SECRET = process.env.NEON_AUTH_COOKIE_SECRET ?? NEON_COOKIE;
+export const CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY ?? '';
 
 /**
  * ⚠️  THE DANGEROUS ONE. Read before changing how this is stored.
@@ -53,8 +62,8 @@ export const NEON_AUTH_COOKIE_SECRET = process.env.NEON_AUTH_COOKIE_SECRET ?? NE
  *
  * Falls back to `BRIDGE` in `../utils/service-keys`, which is where the real
  * value and the reasoning both live. The bridge route still checks this before
- * it touches Neon Auth, so an empty override answers `501 not_implemented`
- * rather than crashing.
+ * it touches Clerk, so an empty override answers `501 not_implemented` rather
+ * than crashing.
  *
  *   npx wrangler secret put SHOP_AUTH_BRIDGE_SECRET
  *
@@ -64,8 +73,10 @@ export const NEON_AUTH_COOKIE_SECRET = process.env.NEON_AUTH_COOKIE_SECRET ?? NE
  * design. Nothing anywhere will tell you the two keys differ, so if sign-in
  * refuses everything, suspect this first.
  *
- * Rotation order, because Vercel bakes environment variables at BUILD time:
- * set the new value on both sides, redeploy the admin, then redeploy this app.
- * Sign-in is broken between those two deploys.
+ * UNCHANGED BY THE MOVE TO CLERK, and that is the point: the admin verifies
+ * this HMAC and then resolves the customer BY EMAIL
+ * (`findOrCreateCustomerByEmail`). It never learns which identity provider
+ * minted the session, so swapping Neon Auth for Clerk needed no admin-side
+ * change and no customer lost their orders.
  */
 export const AUTH_BRIDGE_SECRET = process.env.SHOP_AUTH_BRIDGE_SECRET ?? BRIDGE;
