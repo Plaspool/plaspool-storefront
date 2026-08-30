@@ -164,19 +164,81 @@ console.log('  ✔ Publishable key written to apps/storefront/lib/auth/publishab
 
 /* ── 2. Secret key → wrangler, via stdin, never to disk ──────────────────── */
 if (sk && !skipSecret) {
-  try {
-    execFileSync('npx', ['wrangler', 'secret', 'put', 'CLERK_SECRET_KEY'], {
-      cwd: APP,
-      input: sk,
-      stdio: ['pipe', 'inherit', 'inherit'],
-      shell: true,
-    });
-    console.log('  ✔ Secret key uploaded as a Worker secret (not committed)');
-  } catch {
+  /*
+   * ═══ `versions secret put` FIRST, AND THAT ORDER IS THE FIX ═══
+   *
+   * This Worker is deployed by Workers Builds, which runs
+   * `opennextjs-cloudflare upload` — i.e. it UPLOADS VERSIONS rather than
+   * deploying directly. Against a Worker in that model, plain
+   * `wrangler secret put` refuses outright:
+   *
+   *     Secret edit failed. You attempted to modify a secret, but the latest
+   *     version of your Worker isn't currently deployed.
+   *
+   * That guard exists so editing a secret cannot silently deploy an undeployed
+   * version. `wrangler versions secret put` is the command for this model: it
+   * creates a new version carrying the secret and deploys nothing.
+   *
+   * The plain form is kept as a fallback for a Worker that is NOT on versions,
+   * so this script stays correct if the deployment model ever changes back.
+   */
+  const attempts = [
+    ['versions', 'secret', 'put', 'CLERK_SECRET_KEY'],
+    ['secret', 'put', 'CLERK_SECRET_KEY'],
+  ];
+
+  let ok = false;
+  let lastError = '';
+  for (const args of attempts) {
+    try {
+      execFileSync('npx', ['wrangler', ...args], {
+        cwd: APP,
+        input: sk,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: true,
+      });
+      ok = true;
+      console.log(`  ✔ Secret key uploaded via \`wrangler ${args.join(' ')}\` (not committed)`);
+
+      /*
+       * ASK CLOUDFLARE WHAT IT ACTUALLY HAS, rather than trusting a zero exit
+       * code — the same reason the bundle gets grepped below. Lists NAMES only;
+       * Cloudflare never returns secret values, and this must never print one.
+       */
+      try {
+        const listed = execFileSync('npx', ['wrangler', 'versions', 'secret', 'list'], {
+          cwd: APP,
+          encoding: 'utf8',
+          shell: true,
+        });
+        console.log(
+          listed.includes('CLERK_SECRET_KEY')
+            ? '  ✔ Cloudflare confirms CLERK_SECRET_KEY is set'
+            : '  ! Uploaded, but CLERK_SECRET_KEY was not listed back — check the dashboard',
+        );
+      } catch {
+        /* Non-fatal: the upload above succeeded, this is only corroboration. */
+      }
+      break;
+    } catch (error) {
+      /* Wrangler explains itself well. Show WHAT IT SAID rather than guessing —
+         the previous version of this script asserted "run wrangler login" for
+         every failure, which sent somebody to fix an auth problem they did not
+         have while the real cause was printed directly above it. */
+      lastError = [error?.stdout?.toString(), error?.stderr?.toString()]
+        .filter(Boolean)
+        .join('\n')
+        .trim();
+    }
+  }
+
+  if (!ok) {
     die(
-      'wrangler could not set CLERK_SECRET_KEY.\n' +
-        '    Run `npx wrangler login` from apps/storefront, then re-run this.\n' +
-        '    The publishable key above was still written — re-running is safe.',
+      'wrangler could not set CLERK_SECRET_KEY. It said:\n\n' +
+        lastError.split('\n').map((l) => `      ${l}`).join('\n') +
+        '\n\n    If that mentions authentication, run `npx wrangler login` from\n' +
+        '    apps/storefront. The publishable key was still written, so\n' +
+        '    re-running this is safe and repeats no work.',
     );
   }
 }
