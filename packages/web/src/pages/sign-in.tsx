@@ -154,6 +154,33 @@ function clerkMessage(error: { longMessage?: string; message?: string } | null):
  * `isClerkAPIResponseError` is the guard Clerk exports for exactly this; a
  * runtime/offline error is not an API response and correctly answers `false`.
  */
+/**
+ * Whether Clerk is refusing the SOCIAL PROVIDER itself, rather than refusing
+ * this shopper.
+ *
+ * ═══ THE STRING THIS EXISTS TO KEEP OFF THE PAGE ═══
+ * A Clerk instance can have Google switched on but not `authenticatable` —
+ * enabled as a connection, yet not accepted as a sign-in strategy, which is
+ * what happens on a production instance until Google credentials are supplied.
+ * The API then rejects the attempt with:
+ *
+ *     oauth_google does not match one of the allowed values for parameter
+ *     strategy
+ *
+ * `clerkMessage` passes Clerk's wording straight through, which is right for
+ * "Couldn't find your account." and very wrong for that — it is a validation
+ * message written for whoever configured the instance, and it appeared in a
+ * red box in front of customers who can do nothing about it. Matched on
+ * `meta.paramName === 'strategy'` rather than on the text, so it does not
+ * depend on Clerk's copy staying the same.
+ */
+function isProviderUnavailable(error: unknown): boolean {
+  return (
+    isClerkAPIResponseError(error) &&
+    error.errors.some((e) => e.meta?.paramName === "strategy")
+  );
+}
+
 function isUnknownAccount(error: unknown): boolean {
   return (
     isClerkAPIResponseError(error) &&
@@ -402,7 +429,17 @@ export default function SignInPage({ next = null, bridge = null }: SignInPagePro
     });
     /* A failure here is Clerk refusing before the browser ever leaves — a
        misconfigured provider, usually. Without this the button looks dead. */
-    if (error) setForm({ kind: "provider_error", message: clerkMessage(error) });
+    if (error) {
+      setForm({
+        kind: "provider_error",
+        message: isProviderUnavailable(error)
+          ? /* Names the thing the shopper CAN do. The email field below is
+               configured and working even when the social provider is not, so
+               this is a detour rather than a dead end. */
+            "Google sign-in isn't available right now. Use your email address below instead."
+          : clerkMessage(error),
+      });
+    }
   }, [signIn, returnTo]);
 
   /**
