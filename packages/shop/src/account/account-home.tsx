@@ -121,9 +121,11 @@ export function AccountHomePage({ programName }: { programName: string | null })
       signingOut={signingOut}
       onSignOut={async () => {
         setSigningOut(true);
-        await signOutEverywhere();
-        router.refresh();
-        router.push("/");
+        /* `signOutEverywhere` performs the navigation itself — a full document
+           load, which is what actually ends clerk-js's in-memory session. A
+           `router.push` here would be a client-side transition that keeps it
+           alive. See `auth-api.ts`. */
+        await signOutEverywhere("/");
       }}
     />
   );

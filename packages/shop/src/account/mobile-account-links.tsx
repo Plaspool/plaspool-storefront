@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Link } from "../components/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { LifeBuoy, LogOut, Package, Settings, User } from "lucide-react";
 import { SheetClose, cn } from "@plaspool/ui";
 
@@ -22,7 +22,6 @@ import { readShopSession, signOutEverywhere, type ShopCustomer, type ShopSession
  * out at all.
  */
 export function MobileAccountLinks({ linkClassName }: { linkClassName: string }) {
-  const router = useRouter();
   /* The same return path the dropdown carries — see `sign-in-href.ts`. */
   const signIn = signInHref(usePathname());
   const [session, setSession] = React.useState<ShopSession>({ kind: "unknown" });
@@ -79,10 +78,9 @@ export function MobileAccountLinks({ linkClassName }: { linkClassName: string })
       signingOut={signingOut}
       onSignOut={async () => {
         setSigningOut(true);
-        await signOutEverywhere();
-        setSession({ kind: "guest" });
-        router.refresh();
-        router.push("/");
+        /* The navigation is `signOutEverywhere`'s own, and it is a full
+           document load — see `auth-api.ts`. */
+        await signOutEverywhere("/");
       }}
     />
   );

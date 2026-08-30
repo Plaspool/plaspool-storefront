@@ -3,6 +3,8 @@ import "./globals.css";
 // globally costs nothing on shop routes. See packages/blog/src/styles/blog.css.
 import "@plaspool/blog/styles.css";
 
+import { ClerkProvider } from "@clerk/nextjs";
+
 import { cn, JsonLd, ThemeProvider } from "@plaspool/ui";
 // Nav and Footer moved to `(site)/layout.tsx` — the shop route group brings its
 // own chrome, and rendering both here doubled them on every /store page.
@@ -158,6 +160,37 @@ export default function RootLayout({
           jetbrainsMono.variable,
         )}
       >
+        {/*
+          * INSIDE `<body>`, NEVER WRAPPING `<html>`.
+          *
+          * `ClerkProvider` renders no DOM of its own, so the skip link below
+          * is still the first focusable element on the page — but it does
+          * inject Clerk's script, and a provider placed around `<html>` puts
+          * that above `<head>`, which React refuses to reconcile and Next
+          * reports as a hydration mismatch rather than as a misplaced provider.
+          *
+          * It wraps `ThemeProvider` rather than sitting inside it because
+          * nothing Clerk renders here reads the theme: the site is pinned to
+          * light (`forcedTheme`), and this storefront draws its own sign-in UI
+          * rather than mounting Clerk's prebuilt components.
+          */}
+        <ClerkProvider
+          /*
+           * ═══ TELEMETRY OFF, FOR TWO REASONS ═══
+           * Clerk's hooks post usage events to `clerk-telemetry.com`, an origin
+           * deliberately absent from the CSP in `next.config.ts`. Adding it
+           * would mean allowing a third-party collector purely so a vendor can
+           * count hook calls — and it would fire regardless of the
+           * `vanilla-cookieconsent` decision that gates GA, which is the
+           * inconsistency that actually matters here: this site asks before it
+           * measures, and that has to hold for every vendor or it holds for
+           * none.
+           *
+           * Turning it off closes the CSP gap at the source rather than
+           * widening the policy to accommodate it.
+           */
+          telemetry={false}
+        >
         <JsonLd data={storeJsonLd} />
         {/* Skip link: first focusable element on the page. Visually hidden
             until it receives keyboard focus, then jumps to <main id="content">. */}
@@ -189,6 +222,7 @@ export default function RootLayout({
         <CookieBanner />
         <GoogleAnalytics />
         <VercelAnalytics />
+        </ClerkProvider>
       </body>
     </html>
   );

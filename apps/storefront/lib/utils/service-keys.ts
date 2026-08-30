@@ -23,17 +23,6 @@
  */
 
 /**
- * Encrypts the first-party Neon session cookie this app sets on its own origin.
- *
- * NOT `__Host-shop_session`. This is Neon's cookie; it never leaves this origin
- * and it is not the credential the admin API trusts. Disclosure lets someone
- * forge a Neon session here, which is bad but bounded by this origin.
- *
- * `createNeonAuth` rejects anything shorter than 32 characters.
- */
-export const NEON_COOKIE = 'KtHYXCjeLCeORCEKneb4R-oBYxw4AQTHe2z0AyvZLVM';
-
-/**
  * ⚠️  THE DANGEROUS ONE, and it is not dangerous in the ordinary way.
  *
  * This is the shared HMAC key between this app and the admin API. It does not

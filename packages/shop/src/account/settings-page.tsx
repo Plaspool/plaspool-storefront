@@ -207,9 +207,9 @@ export function AccountSettingsPage() {
         disabled={signingOut}
         onClick={async () => {
           setSigningOut(true);
-          await signOutEverywhere();
-          router.refresh();
-          router.push("/");
+          /* Navigation belongs to `signOutEverywhere` now — a full document
+             load, which is what ends clerk-js's session. See `auth-api.ts`. */
+          await signOutEverywhere("/");
         }}
         className="mt-8 gap-2"
       >

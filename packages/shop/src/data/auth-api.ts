@@ -1,7 +1,7 @@
 import { COMMERCE_API_BASE } from "./config";
 
 /**
- * The sign-in handshake — the storefront's half of Neon Auth → admin bridge.
+ * The sign-in handshake — the storefront's half of the Clerk → admin bridge.
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * TWO STEPS, AND THE SECOND ONE RUNS IN THE BROWSER.
@@ -27,6 +27,15 @@ export type SignInFailureReason =
   | "email_unverified"
   | "not_configured"
   | "assertion"
+  /*
+   * DISTINCT FROM `assertion`, because the admin deliberately distinguishes
+   * them and the shopper's remedy differs. `assertion` means replayed or forged
+   * — nothing to be done. `assertion_expired` means the 60-second window closed
+   * between minting and exchanging, which a slow connection can do on its own,
+   * and the fix is simply to go again. Collapsing the two told somebody on a
+   * bad connection they had reused a link they had never used.
+   */
+  | "assertion_expired"
   | "network";
 
 export type CompleteSignInResult = { ok: true } | { ok: false; reason: SignInFailureReason };
@@ -78,7 +87,13 @@ export async function completeSignIn(): Promise<CompleteSignInResult> {
   }
 
   if (res.status === 501) return { ok: false, reason: "not_configured" };
-  if (res.status === 400) return { ok: false, reason: "assertion" };
+  if (res.status === 400) {
+    const body = (await res.json().catch(() => null)) as { detail?: string } | null;
+    return {
+      ok: false,
+      reason: body?.detail === "assertion_expired" ? "assertion_expired" : "assertion",
+    };
+  }
   if (!res.ok) return { ok: false, reason: "network" };
   return { ok: true };
 }
@@ -137,17 +152,17 @@ export async function readShopSession(): Promise<ShopSession> {
 }
 
 /**
- * Sign out of both sessions, Neon's first.
+ * Sign out of both sessions, the identity provider's first.
  *
  * THE ORDER IS THE WHOLE POINT — see `app/api/auth/sign-out/route.ts`.
- * Clearing the admin session first and leaving a live Neon session behind
+ * Clearing the admin session first and leaving a live Clerk session behind
  * means the next page load just re-bridges: a logout that does not log out.
  */
-export async function signOutEverywhere(): Promise<void> {
+export async function signOutEverywhere(destination?: string): Promise<void> {
   try {
     await fetch("/api/auth/sign-out", { method: "POST" });
   } catch {
-    /* best effort — Neon's own cookie expires on its own schedule regardless */
+    /* best effort — Clerk's own cookie expires on its own schedule regardless */
   }
   try {
     await fetch(`${COMMERCE_API_BASE}/api/shop/customer/logout`, {
@@ -156,5 +171,31 @@ export async function signOutEverywhere(): Promise<void> {
     });
   } catch {
     /* best effort */
+  }
+
+  /*
+   * ═══════════════════════════════════════════════════════════════════════════
+   * A HARD NAVIGATION, AND IT IS PART OF THE LOGOUT — NOT A CONVENIENCE.
+   *
+   * The route above revokes the session at Clerk and deletes its cookies. What
+   * it cannot touch is CLERK-JS ITSELF, which is still running in this page
+   * holding the session in memory. Every caller used to finish with
+   * `router.refresh()` / `router.push()` — client-side navigations that keep
+   * that instance alive. It can then rewrite the very cookies the route just
+   * cleared, and the next visit to `/sign-in` bridges straight back into a
+   * fresh 30-day shop session: a logout that quietly undoes itself.
+   *
+   * Tearing the document down is what actually ends it. The next load boots
+   * clerk-js with no cookies, so it starts signed out.
+   *
+   * `assign` and not `replace`: the page they signed out FROM should still be
+   * in history — they may well want to go back and sign in again.
+   *
+   * Defaults to reloading wherever they are, so signing out of the header menu
+   * on `/store` leaves them on `/store` rather than throwing them home.
+   * ═══════════════════════════════════════════════════════════════════════════
+   */
+  if (typeof window !== "undefined") {
+    window.location.assign(destination ?? window.location.pathname);
   }
 }
