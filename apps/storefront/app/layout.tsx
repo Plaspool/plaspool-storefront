@@ -5,6 +5,8 @@ import "@plaspool/blog/styles.css";
 
 import { ClerkProvider } from "@clerk/nextjs";
 
+import { CLERK_PUBLISHABLE_KEY } from "@/lib/auth/publishable";
+
 import { cn, JsonLd, ThemeProvider } from "@plaspool/ui";
 // Nav and Footer moved to `(site)/layout.tsx` — the shop route group brings its
 // own chrome, and rendering both here doubled them on every /store page.
@@ -175,6 +177,19 @@ export default function RootLayout({
           * rather than mounting Clerk's prebuilt components.
           */}
         <ClerkProvider
+          /*
+           * PASSED EXPLICITLY rather than left to `NEXT_PUBLIC_*`.
+           *
+           * The env variable is inlined by `next build`, and on Workers Builds
+           * a value set only as a runtime secret is invisible at build time —
+           * so the bundle shipped without it, Clerk never initialised, and the
+           * sign-in page rendered perfectly while doing nothing. Green build,
+           * dead feature. `lib/auth/publishable.ts` has the whole story.
+           *
+           * `|| undefined` so an empty constant falls back to the env variable
+           * instead of handing Clerk a "" it would reject.
+           */
+          publishableKey={CLERK_PUBLISHABLE_KEY || undefined}
           /*
            * ═══ TELEMETRY OFF, FOR TWO REASONS ═══
            * Clerk's hooks post usage events to `clerk-telemetry.com`, an origin
