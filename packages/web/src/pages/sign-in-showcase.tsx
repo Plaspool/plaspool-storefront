@@ -44,8 +44,8 @@ const ADVANCE_MS = 6000;
 interface Scene {
   /** Stable key, also the dot's accessible name. */
   id: string;
+  /** Not rendered. The dot's accessible name — a photograph needs one. */
   title: string;
-  body: string;
   /** Path under `/public`. */
   src: string;
   /**
@@ -59,35 +59,30 @@ const SCENES: Scene[] = [
   {
     id: "printers-row",
     title: "Filament that prints the first time",
-    body: "Tight diameter tolerance, so the slicer's numbers and the nozzle's reality agree.",
     src: "/brand/sign-in/printers-row.jpg",
     alt: "A row of desktop 3D printers on a workbench, one part-way through printing a set of blue cylinders.",
   },
   {
     id: "first-layer",
     title: "A first layer that just sticks",
-    body: "Consistent flow from the first millimetre, so a print is not lost an hour in.",
     src: "/brand/sign-in/first-layer.jpg",
     alt: "Close-up of a 3D printer hot end laying its first layer across the build plate.",
   },
   {
     id: "hotend-dark",
     title: "Lays down clean, layer after layer",
-    body: "Every spool is printed from before it ships — the batch you buy, not a sample of it.",
     src: "/brand/sign-in/hotend-dark.jpg",
     alt: "A printer's extruder against a black background, building a small red part on the bed.",
   },
   {
     id: "printing-yellow",
     title: "Colours that match the last spool",
-    body: "Reorder a colour months later and it still lands where the first one did.",
     src: "/brand/sign-in/printing-yellow.jpg",
     alt: "A yellow object part-way through printing, lit by the printer's blue status light.",
   },
   {
     id: "machine-violet",
     title: "Stocked in Nigeria, delivered from here",
-    body: "No customs wait and no month-long shipping. It leaves Lagos, not Shenzhen.",
     src: "/brand/sign-in/machine-violet.jpg",
     alt: "A machine head moving over a work surface under violet light.",
   },
@@ -142,14 +137,19 @@ export function SignInShowcase() {
 
   return (
     <div
-      className="relative h-full w-full overflow-hidden rounded-2xl border-2 border-foreground bg-brand-soft"
+      /* NO BORDER AND NO GROUND. The panel used to be a 2px black frame around
+         a tinted lilac field with a bordered caption plate across the bottom —
+         three pieces of chrome competing with the photograph they surrounded.
+         The picture is the panel now; the only things drawn on top of it are
+         the controls, and those carry their own legibility. */
+      className="relative h-full w-full overflow-hidden"
       onMouseEnter={() => setVisiting(true)}
       onMouseLeave={() => setVisiting(false)}
       onFocusCapture={() => setVisiting(true)}
       onBlurCapture={() => setVisiting(false)}
-      /* A region rather than a live region: the captions are decorative
-         reassurance, and announcing each rotation would interrupt somebody
-         filling in the form beside it. */
+      /* A region rather than a live region: these are reassurance beside a
+         form, and announcing each rotation would interrupt somebody typing
+         into it. */
       role="group"
       aria-roledescription="carousel"
       aria-label="What PlaSpool sells, and why an account helps"
@@ -162,7 +162,7 @@ export function SignInShowcase() {
             i === index ? "opacity-100" : "opacity-0",
           ].join(" ")}
           /* Hidden from assistive tech AND from tab order when off-screen —
-             `opacity: 0` alone would leave five stacked captions readable. */
+             `opacity: 0` alone would leave five stacked images in the tree. */
           aria-hidden={i !== index}
           inert={i !== index}
           role="group"
@@ -183,23 +183,28 @@ export function SignInShowcase() {
             className="h-full w-full object-cover"
           />
 
-          {/* The caption plate. Its own solid ground rather than a gradient
-              over the art, so contrast is a known quantity on every scene
-              instead of depending on what happens to be behind it. */}
-          <div className="absolute inset-x-0 bottom-0 border-t-2 border-foreground bg-background/95 px-6 pb-12 pt-5 backdrop-blur-sm sm:px-8 sm:pt-6">
-            <p className="text-lg font-semibold leading-tight text-foreground sm:text-xl">
-              {scene.title}
-            </p>
-            <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
-              {scene.body}
-            </p>
-          </div>
         </div>
       ))}
 
       {/* Dots, sitting in the padding the caption plate reserves for them.
           Real buttons: reachable by keyboard, and each says which scene it goes
           to rather than "slide 3". */}
+      {/*
+        * A SHORT SCRIM, ONLY UNDER THE CONTROLS.
+        *
+        * White dots on a photograph are legible over the dark frames and
+        * invisible over the pale ones, and these five run from a near-black
+        * hot end to a bright workshop. A full-height gradient would be the old
+        * caption plate by another name, so this is a shallow one — the bottom
+        * ~22% — which the eye reads as depth in the image rather than as a bar
+        * laid over it. `pointer-events-none` so it never eats a click meant for
+        * a dot.
+        */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-[22%] bg-gradient-to-t from-black/55 to-transparent"
+      />
+
       <div className="absolute inset-x-0 bottom-5 z-10 flex items-center gap-2 px-6 sm:px-8">
         {SCENES.map((scene, i) => (
           <button
@@ -216,12 +221,12 @@ export function SignInShowcase() {
           >
             <span
               className={[
-                "block h-1.5 rounded-full border border-foreground",
+                /* White, no border. `drop-shadow` is what keeps an inactive
+                   dot visible where the photograph behind it is bright. */
+                "block h-1.5 rounded-full drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]",
                 "transition-all motion-reduce:transition-none",
-                "group-focus-visible:ring-2 group-focus-visible:ring-brand group-focus-visible:ring-offset-2",
-                i === index
-                  ? "w-8 bg-foreground"
-                  : "w-4 bg-transparent group-hover:bg-brand-line",
+                "group-focus-visible:ring-2 group-focus-visible:ring-white group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-black/40",
+                i === index ? "w-8 bg-white" : "w-4 bg-white/55 group-hover:bg-white/85",
               ].join(" ")}
             />
           </button>
@@ -244,7 +249,7 @@ export function SignInShowcase() {
           type="button"
           onClick={() => setPaused((p) => !p)}
           aria-pressed={paused}
-          className="ml-1 -my-5 rounded-md px-1.5 py-5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+          className="ml-1 -my-5 rounded-md px-1.5 py-5 text-white/75 drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)] transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black/40"
         >
           <span className="sr-only">
             {paused ? "Resume the slideshow" : "Pause the slideshow"}

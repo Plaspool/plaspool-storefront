@@ -669,7 +669,7 @@ export default function SignInPage({ next = null, bridge = null }: SignInPagePro
                          `pr-[0.4em]` gives back the trailing letter-space that
                          `tracking` adds inside the measured width, which
                          otherwise pushes the digits left of true centre. */
-                      className="h-12 border-2 border-foreground pr-[0.4em] text-center text-lg tracking-[0.4em] md:text-lg"
+                      className="h-12 border-muted-foreground pr-[0.4em] text-center text-lg tracking-[0.4em] md:text-lg"
                     />
                   </div>
                   <Button
@@ -737,12 +737,14 @@ export default function SignInPage({ next = null, bridge = null }: SignInPagePro
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         disabled={working}
-                        /* The default `border-input` is #E5E5E5 on white —
-                           1.26:1, under SC 1.4.11's 3:1 for a control boundary,
-                           and the only field on the page. Matched to the
-                           buttons' 2px foreground rule so the field and its own
-                           submit read as one control pair. */
-                        className="h-12 border-2 border-foreground"
+                        /* ONE PIXEL, MID-GREY — not the 2px black rule this
+                           briefly had. The shadcn default `border-input` is
+                           #E5E5E5 on white, which measures 1.26:1 and fails
+                           SC 1.4.11's 3:1 for a control boundary on the only
+                           field on the page; `border-muted-foreground` is
+                           #686868, about 5.9:1, and reads as a quiet field
+                           rather than a heavy outline. */
+                        className="h-12 border-muted-foreground"
                       />
                     </div>
                     <Button
@@ -787,9 +789,12 @@ export default function SignInPage({ next = null, bridge = null }: SignInPagePro
         </footer>
       </div>
 
-      {/* The showcase. `hidden lg:block` rather than a responsive height, so a
-          phone never downloads or paints it at all. */}
-      <div className="hidden bg-brand-soft/40 p-4 lg:block">
+      {/* The showcase, running to the edges of its column — no gutter and no
+          tinted ground behind it, so the photograph IS the right half of the
+          page rather than a framed picture sitting on one. `hidden lg:block`
+          rather than a responsive height, so a phone never downloads or paints
+          it at all. */}
+      <div className="hidden lg:block">
         <SignInShowcase />
       </div>
     </div>
