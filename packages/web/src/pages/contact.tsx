@@ -76,7 +76,7 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     }
   } catch (error) {
     console.error("Error submitting form:", error);
-    alert("Failed to send message. Please try again later.");
+    errorNotify("Failed to send message. Please try again later.");
     setSubmitting(false);
   }
 };
