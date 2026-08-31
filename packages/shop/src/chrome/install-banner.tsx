@@ -265,7 +265,15 @@ export function InstallBanner() {
               is never the most important thing on the page it appears over.
               `border-brand-ink` rather than a token: this bar is the one
               surface in the shop painted `bg-brand`, so its own foreground is
-              the only stroke with contrast against it. */}
+              the only stroke with contrast against it.
+
+              THE SAME ARGUMENT NOW EXCUSES IT FROM `controlSurface()`, and for
+              a second reason on top: the machined treatment is light-ground by
+              construction — its top highlight assumes light falling onto a
+              light page — and this bar is inverted. It is NOT flag-pinned,
+              because there is no flag position in which a raised key belongs
+              here. Same call as `announcement-bar.tsx` and `rewards-band.tsx`,
+              which refuse the treatment on identical grounds. */}
           <button
             type="button"
             onClick={install}

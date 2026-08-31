@@ -222,7 +222,7 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
                   <div className="space-y-4">
                     
 
-                    <Button type="submit" className="w-full text-white bg-brand hover:bg-brand-hover font-mono">
+                    <Button type="submit" className="w-full font-mono">
                       {submitting ? "Submitting" : "Submit Message"} <Send className="ml-2 w-4 h-4" />
                     </Button>
                   </div>

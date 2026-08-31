@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { buttonVariants, cn } from "@plaspool/ui"
+import { buttonVariants, cn, controlSurface } from "@plaspool/ui"
 import { BrandLogo } from "@plaspool/brand"
 import { AccountMenu } from "@plaspool/shop"
 
@@ -104,8 +104,12 @@ export default function Nav() {
                         href="/store"
                         prefetch={false}
                         className={cn(
-                          buttonVariants(),
-                          "whitespace-nowrap bg-brand text-white hover:bg-brand-hover"
+                          /* `variant: "surfaced"` keeps the geometry and drops
+                             the stock fill, ring and disabled fade, all four of
+                             which fight the bevel. */
+                          buttonVariants({ variant: "surfaced" }),
+                          "whitespace-nowrap",
+                          controlSurface("primary")
                         )}
                       >
                         Shop Filaments

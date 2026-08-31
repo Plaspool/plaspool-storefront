@@ -1,3 +1,8 @@
+/* The machined-key button treatment, from ONE shared file rather than pasted
+   into each globals.css. See the note at the top of that file about
+   `--neo-shadow`, which was pasted and then defined in only one of five. */
+@import "../../../packages/ui/src/styles/machined.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

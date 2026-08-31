@@ -2,23 +2,24 @@
 
 import * as React from "react";
 import { Check, ShoppingCart } from "lucide-react";
-import { Button, cn, NEO_SURFACE } from "@plaspool/ui";
+import { Button, cn } from "@plaspool/ui";
 
 /**
- * THE DEEP BLUE, AND WHY IT IS NOT A NEW HEX.
+ * THE DEEP BLUE, AND WHERE IT WENT.
  *
  * Issue #10 asked for the black fill to become a rich deep blue, and to
  * confirm the shade with design so it lands in the palette rather than as a
  * one-off. The palette already has it: `--brand-accent` is a deep indigo-navy
  * (`#231c50`), it is the accent the whole storefront is built around, and
  * `--brand-ink` is its paired foreground. So this is the ramp doing its job,
- * not a colour invented for one button.
+ * not a colour invented for one button. Contrast of white on `#231c50` is
+ * roughly 13:1, comfortably past WCAG AA's 4.5:1 and AAA's 7:1.
  *
- * The button was `bg-primary`, which is `0 0% 9%` — near-black, and a shadcn
- * default nobody chose. Contrast of white on `#231c50` is roughly 13:1,
- * comfortably past WCAG AA's 4.5:1 for body text and AAA's 7:1.
+ * The literal `bg-brand text-brand-ink hover:bg-brand-hover` that used to sit
+ * here is now the `primary` row of the `neo` table in
+ * `packages/ui/src/surface.ts`, reached by the `surface="neo"` pin below. The
+ * fill is byte-identical; it is simply no longer this file's opinion.
  */
-const DEEP_BLUE = "bg-brand text-brand-ink hover:bg-brand-hover";
 
 import { useCart } from "./cart-context";
 import type { CartLineKey } from "./types";
@@ -113,15 +114,18 @@ export function AddToCartButton({
         /* Always set, not only when disabled: the visible label may be an
            abbreviation, and the out-of-stock reason belongs in the name. */
         aria-label={disabled ? `${name} — out of stock` : name}
+        /* ═══ SURFACE PIN — EXCUSED FROM THE FLAG, ON PURPOSE ═══════════════
+           Owner decision: "for now leave the add to cart and buy now buttons
+           they are okay". This one prop is the ENTIRE exception — delete it
+           and the button rejoins `DEFAULT_BUTTON_SURFACE` with no other edit.
+           Keep it matched to `BuyNowButton`, which carries the same pin: the
+           two sit side by side and must not split into two looks. */
+        surface="neo"
         className={cn(
           // Taller than the shadcn default `h-10`, with the label stepped up
           // to match: this is the page's primary action and it is thumbed on
           // a phone. 48px is also the tap target Android and iOS both ask for.
           "h-12 px-5 text-base",
-          NEO_SURFACE,
-          // `variant="outline"` callers keep their own fill; only the default
-          // variant is the deep blue.
-          variant === "default" && DEEP_BLUE,
           className,
         )}
       >

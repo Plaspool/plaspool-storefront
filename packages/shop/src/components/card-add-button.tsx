@@ -58,6 +58,23 @@ export function CardAddButton({ product }: { product: Product }) {
         onClick={handleClick}
         disabled={soldOut}
         aria-label={soldOut ? `${label} — out of stock` : label}
+        /* ═══ SURFACE PIN — EXCUSED FROM THE FLAG, ON PURPOSE ═══════════════
+           Owner decision: "for now leave the add to cart and buy now buttons
+           they are okay". This is the third member of that family, alongside
+           `cart/add-to-cart.tsx` and `product/buy-box.tsx`, which each carry
+           `surface="neo"`.
+
+           IT IS PINNED BY OMISSION RATHER THAN BY `controlSurface(..., "neo")`,
+           and that is a deliberate difference from its two siblings. This
+           control never wore the neobrutalist treatment: it is a small
+           hover-revealed overlay on a product card with its own `bg-brand`
+           fill, `shadow-sm` and 9px height. Routing it through the `neo` table
+           would ADD a 2px stroke and a 4px hard shadow — a visible change to a
+           button the owner asked to leave alone. So the fill below stays
+           hand-written, and this comment is the exception record.
+
+           To opt it back in: delete the colour utilities on the next four
+           lines and add `controlSurface("primary")`. */
         className={cn(
           /* Above the link's stretched overlay, so the click lands here. */
           "absolute inset-x-2 bottom-2 z-10 inline-flex h-9 items-center justify-center gap-2",

@@ -4,7 +4,7 @@ import * as React from "react";
 import { Link } from "../components/link";
 import { useRouter } from "next/navigation";
 import { Recycle } from "lucide-react";
-import { Button, NEO_SURFACE, SkeletonRegion, TextSkeleton, cn } from "@plaspool/ui";
+import { Button, SkeletonRegion, TextSkeleton } from "@plaspool/ui";
 
 import { EmptyState } from "../components/empty-state";
 import { readShopSession } from "../data/auth-api";
@@ -176,7 +176,7 @@ export function ReturnsView({
                  state — same reasoning as the rewards page's own empty
                  state: a page with cards on it has nothing left to raise a
                  second CTA over. */
-              <Button asChild className={cn(NEO_SURFACE, "h-11 px-5")}>
+              <Button asChild tone="primary" className="h-11 px-5">
                 <Link href="/returns">Request a pickup</Link>
               </Button>
             }

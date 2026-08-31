@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth, useSignIn, useSignUp } from "@clerk/nextjs";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { BrandLogo } from "@plaspool/brand";
-import { Button, Input, Label, Separator, cn, NEO_SURFACE } from "@plaspool/ui";
+import { Button, Input, Label, Separator } from "@plaspool/ui";
 import {
   completeSignIn,
   getShopCustomer,
@@ -712,10 +712,8 @@ export default function SignInPage({ next = null, bridge = null }: SignInPagePro
                   <Button
                     type="submit"
                     disabled={working}
-                    className={cn(
-                      "h-12 w-full justify-center border-2 border-foreground bg-brand text-base text-brand-ink hover:bg-brand-hover",
-                      NEO_SURFACE,
-                    )}
+                    tone="primary"
+                    className="h-12 w-full justify-center text-base"
                   >
                     {form.kind === "verifying" ? "Checking…" : "Continue"}
                   </Button>
@@ -742,10 +740,8 @@ export default function SignInPage({ next = null, bridge = null }: SignInPagePro
                     type="button"
                     onClick={handleGoogle}
                     disabled={working || !ready}
-                    className={cn(
-                      "mt-8 h-12 w-full justify-center gap-3 border-2 border-foreground bg-background text-base text-foreground hover:bg-brand-soft",
-                      NEO_SURFACE,
-                    )}
+                    tone="default"
+                    className="mt-8 h-12 w-full justify-center gap-3 text-base"
                   >
                     <GoogleMark />
                     Continue with Google
@@ -787,10 +783,8 @@ export default function SignInPage({ next = null, bridge = null }: SignInPagePro
                     <Button
                       type="submit"
                       disabled={working || !ready}
-                      className={cn(
-                        "h-12 w-full justify-center border-2 border-foreground bg-brand text-base text-brand-ink hover:bg-brand-hover",
-                        NEO_SURFACE,
-                      )}
+                      tone="primary"
+                      className="h-12 w-full justify-center text-base"
                     >
                       {form.kind === "sending_code" ? "Sending…" : "Continue"}
                     </Button>

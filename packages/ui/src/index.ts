@@ -4,6 +4,7 @@ export * from "./craft";
 export { cn } from "./cn";
 export * from "./json-ld";
 export * from "./neo";
+export * from "./surface";
 export * from "./primitives/button";
 export * from "./primitives/badge";
 export * from "./primitives/card";
