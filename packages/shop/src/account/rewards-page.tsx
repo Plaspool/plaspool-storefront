@@ -4,7 +4,7 @@ import * as React from "react";
 import { Link } from "../components/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Gift } from "lucide-react";
-import { Button, NEO_SURFACE, Skeleton, SkeletonRegion, TextSkeleton, cn } from "@plaspool/ui";
+import { Button, Skeleton, SkeletonRegion, TextSkeleton, cn } from "@plaspool/ui";
 
 import { EmptyState } from "../components/empty-state";
 import { TabRow, TabRowSkeleton } from "./tab-row";
@@ -220,7 +220,7 @@ export function RewardsView({
                  same reasoning as the orders list's empty state. A page with
                  history on it has filters and a pager, and neither is a call to
                  action. */
-              <Button asChild className={cn(NEO_SURFACE, "h-11 px-5")}>
+              <Button asChild tone="primary" className="h-11 px-5">
                 <Link href="/store">Go to the store</Link>
               </Button>
             }

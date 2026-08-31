@@ -2,7 +2,7 @@
 
 import { Link } from "../components/link";
 import { ShoppingCart } from "lucide-react";
-import { Button, NEO_SURFACE, cn } from "@plaspool/ui";
+import { Button } from "@plaspool/ui";
 
 import { EmptyState } from "../components/empty-state";
 import { Price } from "../components/price";
@@ -85,7 +85,7 @@ export function CartPage() {
         <Button
           asChild
           variant="outline"
-          className="mt-4 focus-visible:ring-brand focus-visible:ring-offset-background"
+          className="mt-4"
         >
           <Link href="/store">Browse the store</Link>
         </Button>
@@ -101,7 +101,7 @@ export function CartPage() {
           title="Your cart is empty"
           body="Browse PLA, PETG and TPU by the spool or by the box."
           action={
-            <Button asChild className="focus-visible:ring-brand focus-visible:ring-offset-background">
+            <Button asChild>
               <Link href="/store">Browse the store</Link>
             </Button>
           }
@@ -203,13 +203,14 @@ export function CartPage() {
               button here sends the shopper on a round trip back to the notice
               already on this page. Disabled, with that notice as the reason. */}
           {cart.unsellable.length > 0 ? (
-            <Button type="button" disabled className={cn("mt-4 w-full h-12 text-base", NEO_SURFACE)}>
+            <Button type="button" disabled tone="primary" className="mt-4 w-full h-12 text-base">
               Checkout
             </Button>
           ) : (
             <Button
               asChild
-              className={cn("mt-4 w-full h-12 text-base", NEO_SURFACE)}
+              tone="primary"
+              className="mt-4 w-full h-12 text-base"
             >
               <Link href="/checkout">Checkout</Link>
             </Button>

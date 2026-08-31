@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Link } from "../components/link";
 import { AlertTriangle, ArrowLeft, Loader2, ShieldAlert } from "lucide-react";
-import { Button, Input, Label, NEO_SURFACE, Skeleton, SkeletonRegion, cn } from "@plaspool/ui";
+import { Button, Input, Label, Skeleton, SkeletonRegion, cn } from "@plaspool/ui";
 
 import { EmptyState } from "../components/empty-state";
 import { formatNaira } from "../data/money";
@@ -595,7 +595,6 @@ export function CheckoutFlow() {
             <Button
               type="button"
               onClick={() => window.location.reload()}
-              className="focus-visible:ring-brand focus-visible:ring-offset-background"
             >
               Try again
             </Button>
@@ -613,7 +612,7 @@ export function CheckoutFlow() {
           title="Your cart is empty"
           body="There is nothing to check out yet. Browse PLA, PETG and TPU by the spool or by the box."
           action={
-            <Button asChild className="focus-visible:ring-brand focus-visible:ring-offset-background">
+            <Button asChild>
               <Link href="/store">Browse the store</Link>
             </Button>
           }
@@ -643,7 +642,6 @@ export function CheckoutFlow() {
                   asChild
                   variant="outline"
                   size="sm"
-                  className="border-2 border-foreground bg-background hover:bg-background"
                 >
                   <Link href="/cart">Back to cart</Link>
                 </Button>
@@ -823,7 +821,8 @@ export function CheckoutFlow() {
             <Button
               type="submit"
               disabled={busy}
-              className={cn("mt-2 h-12 text-base", NEO_SURFACE)}
+              tone="primary"
+              className="mt-2 h-12 text-base"
             >
               {busy && <Loader2 aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" />}
               Continue to delivery
@@ -867,7 +866,8 @@ export function CheckoutFlow() {
             <Button
               type="submit"
               disabled={busy || !selectedShippingId}
-              className={cn("mt-2 h-12 text-base", NEO_SURFACE)}
+              tone="primary"
+              className="mt-2 h-12 text-base"
             >
               {busy && <Loader2 aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" />}
               Continue to contact
@@ -915,7 +915,8 @@ export function CheckoutFlow() {
             <Button
               type="submit"
               disabled={busy || !email}
-              className={cn("mt-2 h-12 text-base", NEO_SURFACE)}
+              tone="primary"
+              className="mt-2 h-12 text-base"
             >
               Continue to review
             </Button>
@@ -1026,7 +1027,8 @@ export function CheckoutFlow() {
                   type="button"
                   onClick={payNow}
                   disabled={busy || redirecting || error?.code === "gone"}
-                  className={cn("h-12 text-base", NEO_SURFACE)}
+                  tone="primary"
+                  className="h-12 text-base"
                 >
                   {(busy || redirecting) && (
                     <Loader2 aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" />

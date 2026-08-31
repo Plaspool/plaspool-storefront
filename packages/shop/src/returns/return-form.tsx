@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Link } from "../components/link";
 import { Check, Loader2 } from "lucide-react";
-import { Button, Input, Label, NEO_SURFACE, Textarea, cn } from "@plaspool/ui";
+import { Button, Input, Label, Textarea, cn } from "@plaspool/ui";
 
 import { ReturnRequestError, listMyReturns, requestReturn } from "../data/returns-api";
 import type { MyReturn, ReturnConfirmation, ServiceArea } from "../data/returns-api";
@@ -783,7 +783,7 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
         </p>
       )}
 
-      <Button type="submit" disabled={sending || noAreas} className={cn("h-12 text-base", NEO_SURFACE)}>
+      <Button type="submit" disabled={sending || noAreas} tone="primary" className="h-12 text-base">
         {sending && <Loader2 aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" />}
         Send return request
       </Button>

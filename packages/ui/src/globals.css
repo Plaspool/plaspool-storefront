@@ -8,6 +8,11 @@
    file doesn't exist. Keep it in sync with the `:root` block duplicated in
    apps/storefront/app/globals.css and packages/{blog,web}/dev/app/globals.css
    if you accept new variables here via `npx shadcn add`. */
+/* The machined-key button treatment, from ONE shared file rather than pasted
+   into each globals.css. See the note at the top of that file about
+   `--neo-shadow`, which was pasted and then defined in only one of five. */
+@import "./styles/machined.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -57,6 +62,10 @@
     --radius: 0.5rem;
 
     --brand-accent: 248.1 48.1% 21.2%;
+    /* Default colour of the neobrutalist hard shadow (packages/ui/src/neo.ts).
+       This harness was missing it, so neo buttons here rendered with NO hard
+       shadow and the page quietly misreported what production looks like. */
+    --neo-shadow: 0 0% 3.9%;
     --brand-hover: 248.6 60.5% 15.9%;
     --brand-soft: 250 33.3% 92.9%;
     --brand-line: 250 30.5% 76.9%;

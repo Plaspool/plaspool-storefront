@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Link } from "../components/link";
-import { cn } from "@plaspool/ui";
+import { cn, controlSurface } from "@plaspool/ui";
 
 import { HERO_COLOURS as COLOURS } from "../data/catalog";
 import type { CategoryLink } from "../data/catalog";
@@ -112,9 +112,8 @@ export function HeroCarousel({ primary }: { primary: CategoryLink }) {
               <Link
                 href={primary.href}
                 className={cn(
-                  "inline-flex h-11 items-center justify-center rounded-md bg-brand px-6 text-sm font-medium text-brand-ink",
-                  "transition-colors hover:bg-brand-hover motion-reduce:transition-none",
-                  BUTTON_FOCUS,
+                  "inline-flex h-11 items-center justify-center rounded-md px-6 text-sm font-medium",
+                  controlSurface("primary"),
                 )}
               >
                 {primary.label}
@@ -128,9 +127,8 @@ export function HeroCarousel({ primary }: { primary: CategoryLink }) {
               <Link
                 href="/store/all"
                 className={cn(
-                  "inline-flex h-11 items-center justify-center rounded-md border border-brand-line bg-background px-6 text-sm font-medium text-foreground",
-                  "transition-colors hover:bg-brand-soft motion-reduce:transition-none",
-                  BUTTON_FOCUS,
+                  "inline-flex h-11 items-center justify-center rounded-md px-6 text-sm font-medium",
+                  controlSurface("default"),
                 )}
               >
                 Browse all filament

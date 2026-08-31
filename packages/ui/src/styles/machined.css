@@ -1,0 +1,287 @@
+/* ═══ THE MACHINED KEY ═════════════════════════════════════════════════════
+   Ported to the half-pixel from the admin's v2 button
+   (`plaspool-admin/src/v2/styles/{tokens,ui}.css`). Owned entirely by
+   `controlSurface()` in `packages/ui/src/surface.ts` — no call site writes
+   `.mach` by hand.
+
+   ═══ WHY THIS IS REAL CSS AND NOT TAILWIND ═══
+   Four tones × four states is ~16 box-shadow declarations. As Tailwind
+   arbitrary values those are unreadable strings nobody can safely edit, and
+   `ring-*` compiles to `box-shadow` — so a `focus-visible:ring-2` would wipe
+   the bevel out the moment a keyboard user tabs to the button. The focus
+   indicator here is `outline`, which does not touch `box-shadow` at all.
+
+   ═══ ONE FILE, IMPORTED FIVE TIMES ═══
+   `@import`ed by every globals.css in the monorepo (the app plus the four
+   package dev harnesses) rather than pasted into each. `--neo-shadow` is the
+   cautionary tale: it was pasted, then defined in only ONE of the five, so
+   neo buttons in the dev kit have been rendering without their hard shadow
+   and the kit page has been quietly lying about what production looks like.
+   Do not copy this block anywhere. Add an `@import` instead.
+--------------------------------------------------------------------------- */
+
+:root {
+  /* THE PRESS IS INSTANT, THE RELEASE SPRINGS — see `.mach:active` below. */
+  --mach-ease: cubic-bezier(0.4, 0.14, 0.3, 1);
+
+  /* ── faces ───────────────────────────────────────────────────────────────
+     Raw hex, not the storefront's HSL ramp, and DELIBERATELY so.
+
+     `--mach-ink` is #303030 and NOT `--primary` (0 0% 9% ≈ #171717). The
+     reason is structural rather than taste: the primary bevel's bottom shade
+     is 80% black, so it only reads as an edge if the fill sits a step off
+     true black. On #171717 that shade disappears into the fill and the key
+     flattens into a grey pill. Hover is where it deepens toward near-black.
+     If someone "fixes" this back to `--primary`, the effect is gone. */
+  --mach-ink: #303030;
+  --mach-ink-strong: #1a1a1a;
+  --mach-ink-held: #262626;
+  --mach-ink-pressed: #1a1a1a;
+  --mach-on-ink: #ffffff;
+
+  --mach-surface: #ffffff;
+  --mach-surface-sub: #fafafa; /* default hover */
+  --mach-surface-sunken: #f7f7f7; /* default held-open, disabled */
+  --mach-surface-hover: #f1f1f1; /* plain hover */
+  --mach-surface-active: #ebebeb; /* plain press */
+  --mach-surface-pressed: #f2f2f2; /* default press */
+  --mach-ink-disabled: #b5b5b5;
+  --mach-plain-ink: var(--mach-ink);
+
+  --mach-critical: #8e1f0b;
+  --mach-critical-hover: #6f1707;
+  --mach-critical-fg: #ffffff;
+
+  /* ── the bevel ───────────────────────────────────────────────────────────
+     THE ONE EFFECT COPIED EXACTLY. Three inset shadows and NO BORDER:
+       · a dark hairline along the BOTTOM only    → the key has thickness
+       · a full 1px ring                          → it has an edge
+       · a HALF-PIXEL WHITE LINE ACROSS THE TOP,
+         1.5px wide so it rounds into the corners → light lands on it
+     A `border` cannot express any of this, because a border is identical on
+     all four sides and this effect is deliberately heavier along the bottom.
+     The admin's first pass had two of the three; THE MISSING TOP LIGHT IS
+     MOST OF THE DIFFERENCE between "grey pill" and "machined key". It looks
+     like a rounding error in the source. It is the highlight. Leave it. */
+  --mach-bevel: 0 -1px 0 0 #b5b5b5 inset, 0 0 0 1px rgb(0 0 0 / 0.1) inset,
+    0 0.5px 0 1.5px #ffffff inset;
+  --mach-bevel-primary: 0 -1px 0 1px rgb(0 0 0 / 0.8) inset,
+    0 0 0 1px #303030 inset, 0 0.5px 0 1.5px rgb(255 255 255 / 0.25) inset;
+  --mach-bevel-critical: 0 -1px 0 1px rgb(0 0 0 / 0.45) inset,
+    0 0 0 1px #8e1f0b inset, 0 0.5px 0 1.5px rgb(255 255 255 / 0.22) inset;
+}
+
+/* ═══ NOT A DARK VARIANT — A RESCUE ════════════════════════════════════════
+   The bevel is light-ground BY CONSTRUCTION: its top highlight is light
+   falling from above onto a light page, and there is no dark equivalent that
+   is simply a recolour. The app is pinned to light (`apps/storefront/app/
+   globals.css`), so this exists only for the four package dev harnesses, which
+   do carry `.dark` tokens.
+
+   WHAT IT FIXES AND NOTHING MORE: `plain` is transparent and takes its ink
+   from `--mach-ink` (#303030), which on a #0a0a0a page is invisible — a
+   control you cannot see is worse than one that looks wrong. Its hover and
+   press fills are light greys for the same reason. `primary`, `default` and
+   `critical` all paint their own opaque face and read correctly as they are,
+   so they are deliberately left alone.
+
+   Do not grow this into a full dark treatment without redrawing the bevel;
+   inverting these three tokens is not the same job. */
+.dark {
+  --mach-plain-ink: #ededed;
+  --mach-surface-hover: rgb(255 255 255 / 0.08);
+  --mach-surface-active: rgb(255 255 255 / 0.14);
+}
+
+/* ═══ THESE RULES SIT BEFORE TAILWIND'S OUTPUT, ON PURPOSE ══════════════════
+   The `@import` above is the FIRST line of every globals.css, so everything
+   here is emitted ahead of Preflight and the utilities. That ordering is the
+   whole specificity story, and it is deliberate on both sides:
+
+     · `.mach--primary` (0-1-0) beats Preflight's `button { background-color:
+       transparent }` (0-0-1) on specificity, so the fill lands.
+     · `.mach--primary` TIES with `.bg-brand` (0-1-0) and therefore LOSES on
+       source order, so a genuine one-off override can still win from a
+       utility — it just has to be intentional.
+
+   NOTE THE TRAP IN THAT SECOND POINT. `cn()` is tailwind-merge: it resolves
+   conflicts BETWEEN TAILWIND UTILITIES and has no idea `.mach--primary` sets a
+   background. A call site that keeps `bg-brand` next to it renders PURPLE WITH
+   A MACHINED BEVEL, which looks almost right, which is worse. CONVERTING A
+   CALL SITE MEANS DELETING ITS COLOUR UTILITIES, not just adding a class.
+
+   (No `@layer components` wrapper: this file is `@import`ed and Tailwind never
+   sees it, so the directive would survive into the output as a NATIVE cascade
+   layer — and native layers always lose to Tailwind v3's unlayered utilities,
+   which would sink `.mach` below even non-conflicting ones. Source order does
+   the same job here, honestly.) */
+.mach {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* NO BORDER ON ANY TONE. Every edge you see is an inset shadow. */
+  border: 0;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  text-decoration: none;
+  /* The RELEASE is animated; the PRESS is not — see `:active`. */
+  transition: background-color 140ms var(--mach-ease),
+    box-shadow 140ms var(--mach-ease), transform 140ms var(--mach-ease);
+}
+
+.mach:hover {
+  text-decoration: none;
+}
+
+/* THE PRESS IS INSTANT. A button that eases downward over 100ms feels like
+   it is deciding whether to obey; a key drops the moment your finger lands
+   and only the release springs. This one line is most of the feel — do not
+   average it into a single duration. The travel is a FULL pixel, because
+   0.5px rounds to nothing on a 1× display. */
+.mach:active {
+  transition: none;
+}
+
+/* ── default: white, machined ───────────────────────────────────────── */
+.mach--default {
+  background: var(--mach-surface);
+  color: var(--mach-ink);
+  box-shadow: var(--mach-bevel);
+}
+
+.mach--default:hover {
+  background: var(--mach-surface-sub);
+}
+
+/* Pressed: the top light goes out, the fill darkens one step, and the whole
+   face sinks by the height of its own bottom hairline. The rest bevel is
+   REPLACED, not added to. The 1px translate is what sells it — the shadow
+   alone reads as a colour change. */
+.mach--default:active {
+  background: var(--mach-surface-pressed);
+  box-shadow: 0 2px 1px 0 rgb(0 0 0 / 0.14) inset,
+    0 0 0 1px rgb(0 0 0 / 0.12) inset;
+  transform: translateY(1px);
+}
+
+/* ── primary: the ink key ───────────────────────────────────────────── */
+.mach--primary {
+  background: var(--mach-ink);
+  color: var(--mach-on-ink);
+  box-shadow: var(--mach-bevel-primary);
+}
+
+.mach--primary:hover {
+  background: var(--mach-ink-strong);
+}
+
+.mach--primary:active {
+  background: var(--mach-ink-pressed);
+  box-shadow: 0 3px 2px 0 rgb(0 0 0 / 0.75) inset, 0 0 0 1px #000000 inset;
+  transform: translateY(1px);
+}
+
+/* ── plain: no chrome at all until hovered ──────────────────────────── */
+.mach--plain {
+  background: transparent;
+  /* Its OWN token rather than `--mach-ink`, which is also the primary tone's
+     FILL — the two have to move independently under `.dark` (see below). */
+  color: var(--mach-plain-ink);
+  box-shadow: none;
+}
+
+.mach--plain:hover {
+  background: var(--mach-surface-hover);
+}
+
+.mach--plain:active {
+  background: var(--mach-surface-active);
+  transform: translateY(1px);
+}
+
+/* ── critical ───────────────────────────────────────────────────────── */
+.mach--critical {
+  background: var(--mach-critical);
+  color: var(--mach-critical-fg);
+  box-shadow: var(--mach-bevel-critical);
+}
+
+.mach--critical:hover {
+  background: var(--mach-critical-hover);
+}
+
+.mach--critical:active {
+  background: var(--mach-critical-hover);
+  box-shadow: 0 3px 2px 0 rgb(0 0 0 / 0.45) inset,
+    0 0 0 1px var(--mach-critical-hover) inset;
+  transform: translateY(1px);
+}
+
+/* ── HELD OPEN = HELD DOWN ──────────────────────────────────────────────
+   A button that owns an open dropdown, drawer or sheet keeps the pressed
+   face for as long as the menu stands. `[data-state='open']` is matched as
+   well as `.is-open` so every Radix trigger gets this for free — the cart
+   drawer, the filter sheet and the account menu all set it themselves. */
+.mach--default.is-open,
+.mach--default[data-state='open'] {
+  background: var(--mach-surface-sunken);
+  box-shadow: 0 2px 1px 0 rgb(0 0 0 / 0.1) inset,
+    0 0 0 1px rgb(0 0 0 / 0.1) inset;
+}
+
+.mach--primary.is-open,
+.mach--primary[data-state='open'] {
+  /* One step down from rest, NOT all the way to the pressed colour — a
+     pressed key stays recognisably the same key. */
+  background: var(--mach-ink-held);
+  box-shadow: 0 2px 2px 0 rgb(0 0 0 / 0.5) inset, 0 0 0 1px #111111 inset;
+}
+
+.mach--plain.is-open,
+.mach--plain[data-state='open'] {
+  background: var(--mach-surface-active);
+}
+
+/* ── focus ──────────────────────────────────────────────────────────────
+   `outline`, NEVER `ring-*`. Tailwind implements `ring-2` as a box-shadow
+   composed from `--tw-ring-*`, and the bevel is also a box-shadow, so a
+   ring utility on a machined button flattens it the instant it is focused.
+   `outline` is a different property entirely and composes cleanly. */
+.mach:focus-visible {
+  outline: 2px solid hsl(var(--brand-accent));
+  outline-offset: 2px;
+}
+
+/* ── disabled ───────────────────────────────────────────────────────────
+   A real disabled FACE, not a faded live one. 50% opacity over three inset
+   shadows turns the bevel into a grey smear, which is why every converted
+   call site drops `disabled:opacity-50`. */
+.mach:disabled,
+.mach[aria-disabled='true'] {
+  cursor: not-allowed;
+  background: var(--mach-surface-sunken);
+  color: var(--mach-ink-disabled);
+  /* The bevel is replaced by a flat ring — nothing to press. */
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.06) inset;
+  transform: none;
+}
+
+/* A button whose work is in flight. The LABEL STAYS PUT — swapping it for
+   "Saving…" changes the button's width mid-press and moves the thing under
+   the cursor. Call sites show a spinner beside an unchanged label. */
+.mach--busy {
+  cursor: progress;
+}
+
+/* Reduced motion keeps every colour and shadow change and drops the travel
+   only — the same bargain `neo.ts` strikes with its NO_TRAVEL constant. */
+@media (prefers-reduced-motion: reduce) {
+  .mach {
+    transition: none;
+  }
+
+  .mach:active {
+    transform: none;
+  }
+}

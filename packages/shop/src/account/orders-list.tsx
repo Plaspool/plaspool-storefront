@@ -4,7 +4,7 @@ import * as React from "react";
 import { Link } from "../components/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PackageSearch, ShoppingBag } from "lucide-react";
-import { Button, NEO_SURFACE, Skeleton, SkeletonRegion, cn } from "@plaspool/ui";
+import { Button, Skeleton, SkeletonRegion, cn } from "@plaspool/ui";
 
 import { EmptyState } from "../components/empty-state";
 import { TabRow, TabRowSkeleton } from "./tab-row";
@@ -247,7 +247,7 @@ export function OrdersList({
                  be the page guessing which order you came for. An account with
                  NO orders has exactly one useful next move, and nothing to
                  compete with it. */
-              <Button asChild className={cn(NEO_SURFACE, "h-11 px-5")}>
+              <Button asChild tone="primary" className="h-11 px-5">
                 <Link href="/store">Go to the store</Link>
               </Button>
             }

@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react"
 
 import { cn } from "../cn"
 import { ButtonProps, buttonVariants } from "./button"
+import { controlSurface } from "../surface"
 
 const Pagination = ({ className, ...props }: React.ComponentProps<"nav">) => (
   <nav
@@ -48,10 +49,12 @@ const PaginationLink = ({
   <a
     aria-current={isActive ? "page" : undefined}
     className={cn(
-      buttonVariants({
-        variant: isActive ? "outline" : "ghost",
-        size,
-      }),
+      /* A page number is a control like any other, so it names a ROLE and lets
+         `DEFAULT_BUTTON_SURFACE` decide the look: the current page is a
+         `default` key, the rest are `plain`. `variant: "surfaced"` keeps the
+         geometry and drops the stock fill and ring. */
+      buttonVariants({ variant: "surfaced", size }),
+      controlSurface(isActive ? "default" : "plain"),
       className
     )}
     {...props}

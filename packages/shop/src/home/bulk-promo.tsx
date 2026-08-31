@@ -1,5 +1,5 @@
 import { Link } from "../components/link";
-import { cn } from "@plaspool/ui";
+import { cn, controlSurface } from "@plaspool/ui";
 
 import { listProducts, STANDARD_TIERS } from "../data/catalog";
 import { formatNaira } from "../data/money";
@@ -98,9 +98,11 @@ export async function BulkPromo() {
             <Link
               href="/store/all"
               className={cn(
-                "mt-7 inline-flex h-11 items-center justify-center rounded-md bg-brand-ink px-6 text-sm font-medium text-brand",
-                "transition-opacity hover:opacity-90 motion-reduce:transition-none",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2 focus-visible:ring-offset-brand",
+                "mt-7 inline-flex h-11 items-center justify-center rounded-md px-6 text-sm font-medium",
+                /* `default`, not `primary`: this band is brand-painted, and the
+                   white key is both what was already here and the only one that
+                   clears 3:1 against it. Same call as the marketing hero. */
+                controlSurface("default"),
               )}
             >
               Browse every spool

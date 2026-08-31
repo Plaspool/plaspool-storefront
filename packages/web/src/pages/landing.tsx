@@ -46,7 +46,15 @@ export default function PlaspoolLanding() {
                     It was a <Button> nested inside an <a>, which is invalid
                     HTML and breaks keyboard activation — the same trap
                     `nav.tsx` documents beside its own CTA. */}
-                <Button asChild size="lg" className="bg-brand text-brand-ink hover:bg-brand-hover font-mono">
+                {/* `default`, NOT `primary`, AND THE HERO IS WHY. The machined
+                    table is built for a light ground (see `machined.css`), so
+                    its `primary` row is a #303030 key — which against this
+                    section's #231c50 gradient measures about 1.1:1 and fails
+                    SC 1.4.11's 3:1 for a control boundary outright. The white
+                    key is 15.5:1 here and is unmistakably the page's one call
+                    to action. The ROLE is still primary; the TONE that renders
+                    it correctly on an inverted band is `default`. */}
+                <Button asChild size="lg" tone="default" className="font-mono">
                   <Link href="/store" prefetch={false}>
                     Shop Filaments <ArrowRight className="ml-2 w-4 h-4" />
                   </Link>
@@ -60,7 +68,17 @@ export default function PlaspoolLanding() {
                      (`bg-slate-800` against the primary's `bg-blue-800`). Mapping
                      both fills onto `bg-brand` made two identical CTAs with no
                      hierarchy between them, so the fill comes off and the border
-                     carries it — which is what `variant="outline"` meant here. */
+                     carries it — which is what `variant="outline"` meant here.
+
+                     `tone="none"` — THE ONE PLACE THE TREATMENT DOES NOT REACH.
+                     A second white machined key here would erase the hierarchy
+                     the comment above exists to protect, and the machined table
+                     has no inverted row to be quiet in: it is light-ground by
+                     construction, its top highlight assumes light falling onto
+                     a light page. So this stays a hand-drawn outline on the
+                     dark band. It is NOT excused from the flag — there is no
+                     flag position in which a bevel belongs here. */
+                  tone="none"
                   className="border-brand-line bg-transparent text-brand-ink hover:bg-brand-hover hover:text-brand-ink font-mono"
                 >
                   View Specifications
@@ -345,7 +363,7 @@ export default function PlaspoolLanding() {
                   <span className="text-sm text-muted-foreground font-mono">Fast & Safe Delivery</span>
                 </div>
                 <Link target="blank" href="https://docs.google.com/forms/d/e/1FAIpQLSenTtkWn7eUcv1npGgnYCWojXxJiwbF3FVLvxurB8fgWPjMmA/viewform?usp=dialog" className="inline-block">
-                <Button className="bg-brand text-brand-ink hover:bg-brand font-mono">
+                <Button className="font-mono">
                   Become a Partner <ArrowRight className="ml-2 w-4 h-4" />
                 </Button>
                 </Link>
@@ -443,7 +461,7 @@ export default function PlaspoolLanding() {
           </div>
 
           <div className="text-center mt-12">
-            <Button asChild variant="outline" className="border-brand-line text-brand hover:bg-brand-soft font-mono">
+            <Button asChild variant="outline" className="font-mono">
               <Link href="/privacy">
                 Read our privacy policy <ArrowRight className="ml-2 w-4 h-4" />
               </Link>
@@ -462,7 +480,10 @@ export default function PlaspoolLanding() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             {/* One anchor styled as a button — see the hero CTA above. */}
-            <Button asChild size="lg" className="bg-white w-full text-brand hover:bg-muted font-mono">
+            {/* `default` for the same reason as the hero CTA above: this band
+                is brand-painted, and the white key is the readable one on it.
+                The button was already white — it just says so as a role now. */}
+            <Button asChild size="lg" tone="default" className="w-full font-mono">
               <Link href="/store" prefetch={false}>
                 Shop Now <ArrowRight className="ml-2 w-4 h-4" />
               </Link>

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Check, Truck } from "lucide-react";
-import { Button, cn, NEO_SURFACE } from "@plaspool/ui";
+import { Button, cn } from "@plaspool/ui";
 
 import type { Colour, Product, SizeOption } from "../data/types";
 import { tierFor } from "../data/bulk";
@@ -61,6 +61,12 @@ export function BuyNowButton({
       variant="outline"
       disabled={disabled}
       aria-label={disabled ? "Buy Now — out of stock" : undefined}
+      /* ═══ SURFACE PIN — EXCUSED FROM THE FLAG, ON PURPOSE ═══════════════
+         Owner decision: "for now leave the add to cart and buy now buttons
+         they are okay". Delete this one prop and the button rejoins
+         `DEFAULT_BUTTON_SURFACE`. Matched to `AddToCartButton`, which carries
+         the same pin — the pair reads as one control and must stay that way. */
+      surface="neo"
       onClick={() => {
         cart.add(line, qty);
         cart.open();
@@ -69,14 +75,10 @@ export function BuyNowButton({
         // Matched to AddToCartButton so the pair reads as one control: same
         // height, same label size, same stroke and press. The fill stays
         // white — it is the secondary of the two, and #10 kept its colour.
+        // `variant="outline"` resolves to the `default` tone, whose `neo` row
+        // IS that white fill and 2px foreground stroke, so nothing is written
+        // out here any more.
         "h-12 px-5 text-base",
-        NEO_SURFACE,
-        // `variant="outline"` brings `border border-input`; the neobrutalist
-        // stroke is 2px and foreground-coloured, and tailwind-merge only
-        // resolves conflicts within a class group — `border-input` and
-        // `border-foreground` are both colour, so the later one wins, but the
-        // width needs its own token to beat `border`.
-        "border-2 border-foreground bg-background hover:bg-background",
         className,
       )}
     >

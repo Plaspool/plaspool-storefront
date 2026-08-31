@@ -4,7 +4,7 @@ import * as React from "react";
 import { Link } from "../components/link";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Clock, Link as LinkIcon, ShoppingCart, XCircle } from "lucide-react";
-import { Button, NEO_SURFACE, cn } from "@plaspool/ui";
+import { Button } from "@plaspool/ui";
 
 import { EmptyState } from "../components/empty-state";
 import { confirmPaymentIntent, getPaymentIntent } from "../data/checkout-api";
@@ -208,7 +208,7 @@ export function CheckoutComplete() {
           title="Nothing to confirm here"
           body="This page confirms a payment coming back from checkout. If you were sent here directly, head to the store instead."
           action={
-            <Button asChild className="focus-visible:ring-brand focus-visible:ring-offset-background">
+            <Button asChild>
               <Link href="/store">Go to the store</Link>
             </Button>
           }
@@ -226,11 +226,11 @@ export function CheckoutComplete() {
           }
           action={
             signedIn ? (
-              <Button asChild className="focus-visible:ring-brand focus-visible:ring-offset-background">
+              <Button asChild>
                 <Link href="/account/orders">View your orders</Link>
               </Button>
             ) : (
-              <Button asChild className="focus-visible:ring-brand focus-visible:ring-offset-background">
+              <Button asChild>
                 <Link href="/store">Continue shopping</Link>
               </Button>
             )
@@ -247,7 +247,6 @@ export function CheckoutComplete() {
             <Button
               type="button"
               onClick={() => window.location.reload()}
-              className="focus-visible:ring-brand focus-visible:ring-offset-background"
             >
               Check again
             </Button>
@@ -269,7 +268,7 @@ export function CheckoutComplete() {
               : "This payment was not captured. Your cart still has the items — go back and try again."
           }
           action={
-            <Button asChild className={cn(NEO_SURFACE, "border-2 border-foreground bg-background hover:bg-background")}>
+            <Button asChild tone="default">
               <Link href="/cart">
                 <ShoppingCart aria-hidden="true" className="mr-2 h-4 w-4" />
                 Back to cart
@@ -285,7 +284,7 @@ export function CheckoutComplete() {
           title="Couldn't find that payment"
           body="This reference doesn't match a payment we know about. If you were charged, the amount will show on your statement — contact support with that reference rather than retrying."
           action={
-            <Button asChild className="focus-visible:ring-brand focus-visible:ring-offset-background">
+            <Button asChild>
               <Link href="/store">Go to the store</Link>
             </Button>
           }
