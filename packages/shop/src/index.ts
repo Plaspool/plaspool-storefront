@@ -50,7 +50,6 @@ export * from "./cart/add-to-cart";
 export * from "./chrome/announcement-bar";
 export * from "./chrome/shop-nav";
 export * from "./chrome/shop-footer";
-export * from "./chrome/install-banner";
 export * from "./chrome/shop-shell";
 
 // `/store` — the shop home. Six sections between the shell's chrome, plus the

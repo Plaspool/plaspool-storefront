@@ -4,7 +4,6 @@ import { listCategories, listProducts } from "../data/catalog";
 import { CartProvider } from "../cart/cart-context";
 import { CartDrawer } from "../cart/cart-drawer";
 import { AnnouncementBar } from "./announcement-bar";
-import { InstallBanner } from "./install-banner";
 import { ShopFooter } from "./shop-footer";
 import { ShopNav } from "./shop-nav";
 
@@ -88,13 +87,6 @@ export async function ShopShell({ children }: ShopShellProps) {
         home-indicator inset the bar also pads itself by.
       */}
       <div className="flex min-h-screen flex-col has-[[data-cta-bar]]:pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
-        {/* ABOVE THE ANNOUNCEMENT BAR, AND ABOVE EVERYTHING ELSE. It appears
-            after hydration (see its own header), so it has to push the whole
-            page down by one uniform amount rather than reflow anything
-            internally — which means it has to be the first thing in the
-            column. It renders nothing at all unless the browser has said an
-            install is possible, so on most visits this line costs a null. */}
-        <InstallBanner />
         <AnnouncementBar />
         <ShopNav categories={categories} />
         {/* id/tabIndex: the root layout's skip link jumps here. Each route
