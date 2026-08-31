@@ -191,7 +191,7 @@ export function RewardsView({
   loading: boolean;
   failed: boolean;
   onLoadMore: () => void;
-  /** Which movements are on screen. A prop rather than internal state so the
+  /** Which points are on screen. A prop rather than internal state so the
    *  URL owns it, and so the bench can render all three at once. */
   filter?: Filter;
 }) {
@@ -448,7 +448,7 @@ function LedgerRow({
 function RewardsFilters({ filter, className }: { filter: Filter; className?: string }) {
   return (
     <TabRow
-      label="Which movements"
+      label="Which points"
       current={filter}
       className={className}
       items={FILTERS.map(({ key, label }) => ({ key, label, href: filterHref(key) }))}
