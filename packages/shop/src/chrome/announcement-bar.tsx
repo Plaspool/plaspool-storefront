@@ -97,7 +97,7 @@ export async function AnnouncementBar() {
   const perReturn = program ? program.minUnitsPerReturn * program.pointsPerUnit : 0;
 
   return (
-    <p className="m-0 bg-brand px-4 py-2 text-center text-xs text-brand-ink">
+    <p data-print-hide className="m-0 bg-brand px-4 py-2 text-center text-xs text-brand-ink">
       {banner ? (
         <>
           {/* Title and body are one sentence in this space, not a heading and a
