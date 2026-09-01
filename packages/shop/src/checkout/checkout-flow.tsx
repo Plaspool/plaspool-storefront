@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Link } from "../components/link";
-import { AlertTriangle, ArrowLeft, Loader2, ShieldAlert } from "lucide-react";
+import { AlertTriangle, ArrowLeft, LifeBuoy, Loader2, ShieldAlert } from "lucide-react";
 import { Button, Input, Label, Skeleton, SkeletonRegion, cn } from "@plaspool/ui";
 
 import { EmptyState } from "../components/empty-state";
@@ -11,6 +11,7 @@ import { readShopSession } from "../data/auth-api";
 import { listSavedAddresses, type SavedAddress } from "../data/orders-api";
 import { listServiceAreas, type ServiceArea } from "../data/returns-api";
 import { BLANK_ADDRESS, NEW_ADDRESS, keyOfSaved, readSavedAddress } from "./saved-address";
+import { errorCopy } from "./checkout-error-copy";
 import { getPointsBalance } from "../data/points-api";
 import type { PointsBalance } from "../data/points-api";
 import { PointsOffer } from "./points-offer";
@@ -69,49 +70,6 @@ function StepHeader({ step }: { step: Step }) {
   );
 }
 
-/** The register from `empty-state.tsx`: what happened, and what to do about
- *  it. Never "Sorry", never vague. */
-function errorCopy(error: CheckoutError): { title: string; body: string } {
-  switch (error.code) {
-    case "empty_cart":
-      return { title: "Your cart is empty", body: "Add something to the cart before checking out." };
-    case "insufficient_stock":
-      return {
-        title: "Not enough in stock",
-        body: `${error.shortfalls.length} item${error.shortfalls.length === 1 ? "" : "s"} in the cart no longer have enough stock. Go back to the cart and adjust the quantity.`,
-      };
-    case "no_shipping_address":
-      return { title: "No delivery address on file", body: "Enter a delivery address before choosing a delivery option." };
-    case "outside_delivery_area":
-      return {
-        title: "We don't deliver to that district yet",
-        body: "Pick a different district — or leave the district blank to use your state's standard delivery.",
-      };
-    case "unresolved_lines":
-      return { title: "An item in the cart is no longer available", body: "Go back to the cart and remove it, then try again." };
-    case "currency_mismatch":
-      return { title: "Currency mismatch", body: "The store currency changed mid-checkout. Start again from the cart." };
-    case "gone":
-      return {
-        title: "This checkout has expired",
-        body: "The stock held for this order was released. Your cart still has the items — start checkout again.",
-      };
-    case "bad_revision":
-      return { title: "The cart changed elsewhere", body: "Reload and try again — something else updated this cart in the meantime." };
-    case "field":
-      return {
-        title: `Check the ${error.field}`,
-        body:
-          error.field === "email"
-            ? "That email address was refused. Use one the payment provider will accept."
-            : `The ${error.field} field was refused. Check it and try again.`,
-      };
-    case "network":
-      return { title: "Couldn't reach the store", body: "Check your connection and try again." };
-    default:
-      return { title: "That didn't go through", body: "Try again — if it keeps happening, come back later." };
-  }
-}
 
 function ErrorBanner({
   error,
@@ -124,6 +82,9 @@ function ErrorBanner({
   action?: React.ReactNode;
 }) {
   const { title, body } = errorCopy(error);
+  /* Only the two codes that carry one. `errorCopy` decides its wording from
+     the same value, so the sentence and the line under it cannot disagree. */
+  const reference = "requestId" in error ? error.requestId : null;
   return (
     /* `bg-destructive/10` stays on the BASE token — a tint is a fill, which is
        what that token is tuned for. Only the glyph moves: an icon owes 3:1 and
@@ -134,6 +95,19 @@ function ErrorBanner({
       <div>
         <p className="text-sm font-semibold text-foreground">{title}</p>
         <p className="mt-0.5 text-sm text-muted-foreground">{body}</p>
+        {/* ═══ THE ONE THING THAT MAKES A REPORT ANSWERABLE ═══
+            The API stamps every error with a `requestId` and logs the detail
+            it will not put in a response — the stack, the SQLSTATE — beside
+            the same string. Rendered, it is the difference between "checkout
+            didn't work yesterday" and a line somebody can grep for. Selectable
+            and monospaced because it exists to be copied, and `select-all` so
+            one tap on a phone takes all of it and none of the words around it,
+            which is where this failure was photographed. */}
+        {reference && (
+          <p className="mt-2 select-all font-mono text-xs text-muted-foreground">
+            Reference: {reference}
+          </p>
+        )}
         {action && <div className="mt-3">{action}</div>}
       </div>
     </div>
@@ -179,6 +153,35 @@ export function CheckoutFlow() {
   const [step, setStep] = React.useState<Step>("address");
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<CheckoutError | null>(null);
+
+  /**
+   * Whether the API is currently refusing this cart for trying too often.
+   *
+   * ═══ THE BUTTON HAS TO STOP, NOT JUST THE SENTENCE ═══
+   * The old banner's advice — "try again" — is what spends the ten attempts
+   * `/checkout/start` allows per cart per fifteen minutes, and a shopper who
+   * has just been told to wait is still looking at a live submit button. Copy
+   * that says one thing while the control invites the opposite is copy nobody
+   * believes; so the control agrees with it.
+   *
+   * ONE TIMEOUT, NOT A TICKING CLOCK. The banner names the wait in words, so
+   * nothing on screen counts down and nothing needs to re-render every second
+   * to stay true. The timer's only job is to hand the button back.
+   */
+  const [rateLimited, setRateLimited] = React.useState(false);
+  const applyError = React.useCallback((next: CheckoutError) => {
+    setError(next);
+    if (next.code === "rate_limited") setRateLimited(true);
+  }, []);
+  React.useEffect(() => {
+    if (!error || error.code !== "rate_limited") return;
+    /* `retryAfter` is seconds and can be absent; a minute is the smallest
+       honest guess when the API named nothing, and the shopper is never held
+       longer than the window they were actually told about. */
+    const ms = (error.retryAfter ?? 60) * 1000;
+    const timer = setTimeout(() => setRateLimited(false), ms);
+    return () => clearTimeout(timer);
+  }, [error]);
 
   const [address, setAddress] = React.useState<Address>(BLANK_ADDRESS);
 
@@ -455,7 +458,7 @@ export function CheckoutFlow() {
          nothing extra). */
       const started = await startCheckout();
       if (!started.ok) {
-        setError(started.error);
+        applyError(started.error);
         return;
       }
       const rev2 = await currentCartRevision();
@@ -465,7 +468,7 @@ export function CheckoutFlow() {
       }
       const result = await setCheckoutAddress(effectiveAddress, rev2.revision);
       if (!result.ok) {
-        setError(result.error);
+        applyError(result.error);
         return;
       }
       setShippingOptions(result.data.options);
@@ -489,7 +492,7 @@ export function CheckoutFlow() {
       }
       const result = await setCheckoutShipping(selectedShippingId, rev.revision);
       if (!result.ok) {
-        setError(result.error);
+        applyError(result.error);
         return;
       }
       setStep("contact");
@@ -521,7 +524,7 @@ export function CheckoutFlow() {
       }
       const result = await freezeCheckout(rev.revision, redeemPoints);
       if (!result.ok) {
-        setError(result.error);
+        applyError(result.error);
         return;
       }
       setTotals(result.data.totals);
@@ -554,11 +557,11 @@ export function CheckoutFlow() {
     try {
       const result = await createPaymentIntent(checkoutId, email, idempotencyKey);
       if (!result.ok) {
-        setError(result.error);
+        applyError(result.error);
         return;
       }
       if (!result.data.authorizationUrl) {
-        setError({ code: "unknown", status: 0, detail: "no_authorization_url" });
+        setError({ code: "unknown", status: 0, detail: "no_authorization_url", requestId: null });
         return;
       }
       handingOff = true;
@@ -637,13 +640,28 @@ export function CheckoutFlow() {
           <ErrorBanner
             error={error}
             action={
-              error.code === "gone" ? (
+              /* A WAY OUT FOR EVERY REFUSAL THAT HAS ONE. Retrying the same
+                 step is what the form's own submit already offers, so a button
+                 goes here only when the next move is somewhere ELSE — the cart
+                 for a checkout with nothing in it, and us for the two the
+                 shopper cannot fix by trying harder. */
+              error.code === "gone" || error.code === "empty_cart" ? (
                 <Button
                   asChild
                   variant="outline"
                   size="sm"
                 >
                   <Link href="/cart">Back to cart</Link>
+                </Button>
+              ) : error.code === "server" || error.code === "unknown" ? (
+                /* Matching `PaymentHelpAction` on the order page: same
+                   variant, same glyph, same destination. A shopper who has met
+                   one of these should recognise the other. */
+                <Button asChild variant="outline" size="sm" className="gap-2">
+                  <Link href="/contact">
+                    <LifeBuoy aria-hidden="true" className="h-4 w-4" />
+                    Ask us about this
+                  </Link>
                 </Button>
               ) : undefined
             }
@@ -820,7 +838,7 @@ export function CheckoutFlow() {
 
             <Button
               type="submit"
-              disabled={busy}
+              disabled={busy || rateLimited}
               tone="primary"
               className="mt-2 h-12 text-base"
             >
@@ -865,7 +883,7 @@ export function CheckoutFlow() {
             ))}
             <Button
               type="submit"
-              disabled={busy || !selectedShippingId}
+              disabled={busy || rateLimited || !selectedShippingId}
               tone="primary"
               className="mt-2 h-12 text-base"
             >
@@ -914,7 +932,7 @@ export function CheckoutFlow() {
             />
             <Button
               type="submit"
-              disabled={busy || !email}
+              disabled={busy || rateLimited || !email}
               tone="primary"
               className="mt-2 h-12 text-base"
             >
@@ -1026,7 +1044,7 @@ export function CheckoutFlow() {
                 <Button
                   type="button"
                   onClick={payNow}
-                  disabled={busy || redirecting || error?.code === "gone"}
+                  disabled={busy || redirecting || rateLimited || error?.code === "gone"}
                   tone="primary"
                   className="h-12 text-base"
                 >
