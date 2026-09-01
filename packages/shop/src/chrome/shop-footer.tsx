@@ -72,7 +72,7 @@ export async function ShopFooter() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="bg-brand text-brand-ink">
+    <footer data-print-hide className="bg-brand text-brand-ink">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1fr]">
           <div>

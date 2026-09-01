@@ -11,6 +11,7 @@ import { readShopSession } from "../data/auth-api";
 import { listSavedAddresses, type SavedAddress } from "../data/orders-api";
 import { listServiceAreas, type ServiceArea } from "../data/returns-api";
 import { BLANK_ADDRESS, NEW_ADDRESS, keyOfSaved, readSavedAddress } from "./saved-address";
+import { saveReceiptSnapshot } from "./receipt-snapshot";
 import { getPointsBalance } from "../data/points-api";
 import type { PointsBalance } from "../data/points-api";
 import { PointsOffer } from "./points-offer";
@@ -561,6 +562,65 @@ export function CheckoutFlow() {
         setError({ code: "unknown", status: 0, detail: "no_authorization_url" });
         return;
       }
+      /* ═══ THE RECEIPT, WRITTEN DOWN BEFORE WE LEAVE ═══
+         `/checkout/complete` comes back with a `reference` and nothing else —
+         no lines, no address, no breakdown — and there is no join from a
+         payment intent to an order, so it cannot fetch any of that either.
+         See `receipt-snapshot.ts`. This is the only moment the whole receipt
+         is in one place, so it is the moment to record it.
+
+         AFTER the intent exists, because the snapshot is keyed to its id: a
+         second attempt in this tab must not read the first attempt's basket.
+         Deliberately not awaited or error-checked — `saveReceiptSnapshot`
+         swallows its own failures, and nothing here may stand between the
+         shopper and the payment page. */
+      saveReceiptSnapshot({
+        v: 1,
+        intentId: result.data.id,
+        startedAt: Date.now(),
+        email,
+        currency: totals?.currency ?? result.data.currency,
+        lines: cart.resolved.map((line) => ({
+          variantId: line.product.variantIds[`${line.colour.id}:${line.size.id}`] ?? "",
+          title: line.product.name,
+          colour: line.colour.name,
+          size: line.size.label,
+          qty: line.qty,
+          unitPrice: line.unitPrice,
+          effectiveUnitPrice: line.effectiveUnitPrice,
+          bulkPercentBps: line.bulkPercentBps,
+          lineTotal: line.total,
+        })),
+        address: {
+          name: address.name,
+          line1: address.line1,
+          line2: address.line2 ?? null,
+          city: address.city,
+          region: address.region ?? null,
+          postalCode: address.postalCode ?? null,
+          countryCode: address.countryCode,
+          phone: address.phone ?? null,
+        },
+        totals: {
+          subtotal: totals?.subtotal.amount ?? 0,
+          shippingTotal: totals?.shippingTotal.amount ?? 0,
+          taxTotal: totals?.taxTotal.amount ?? 0,
+          adjustmentTotal: totals?.adjustmentTotal.amount ?? 0,
+          grandTotal: totals?.grandTotal.amount ?? result.data.amount,
+          shippingLabel: totals?.shipping?.label ?? null,
+          /* The API's own wording, never a noun invented here — see
+             `FrozenTotals["tax"]`. Absent means the shop was not registered
+             when this total was frozen, and the line is simply not drawn. */
+          taxLabel: totals?.tax?.label ?? null,
+          taxRateBps: totals?.tax?.rateBps ?? null,
+          adjustments: (totals?.adjustments ?? []).map((adjustment) => ({
+            code: adjustment.code,
+            label: adjustment.label,
+            amount: adjustment.amount.amount,
+          })),
+        },
+      });
+
       handingOff = true;
       setRedirecting(true);
       /* The storefront never touches card data — this is a top-level redirect

@@ -74,10 +74,24 @@ import type { OrderLine } from "../data/orders-api";
  */
 const DEFAULT_SIZE = 48;
 
+/**
+ * THE THREE FIELDS THIS COMPONENT ACTUALLY READS, rather than a whole
+ * `OrderLine`.
+ *
+ * It asked for `OrderLine` while the order pages were its only callers.
+ * `/checkout/complete` draws the same row from a receipt snapshot written
+ * before the order exists (see `checkout/receipt-snapshot.ts`), which has no
+ * `id`, `lineNo`, `sku` or `fulfilledQty` to give it and no honest way to
+ * invent them. Narrowing to what is read costs nothing — `OrderLine` still
+ * satisfies this, so every existing call site is unchanged — and it keeps the
+ * next caller from fabricating five fields to get a picture.
+ */
+export type ThumbLine = Pick<OrderLine, "variantId" | "title" | "optionValues">;
+
 export interface LineThumbProps {
   /** The line to picture. Only `variantId` finds the image; `title` and
    *  `optionValues` are read solely to NAME it, and only when named. */
-  line: OrderLine;
+  line: ThumbLine;
   /** One catalogue read, shared by every line on the page. See
    *  `getLineImages()`. */
   images: LineImageIndex;
@@ -255,7 +269,7 @@ export function LineThumb({
  * is invisible in a screenshot, which is how this class of bug survived three
  * reviews of these surfaces — and a fourth.
  */
-export function lineImageAlt(line: OrderLine, image: LineImage | undefined): string {
+export function lineImageAlt(line: ThumbLine, image: LineImage | undefined): string {
   /* NOTHING IS DRAWN, SO NOTHING IS NAMED. Kept in step with `LineThumb`'s
      `drawable`: the two must agree about which entries produce a picture, or a
      placeholder acquires an accessible name describing goods it does not show. */
