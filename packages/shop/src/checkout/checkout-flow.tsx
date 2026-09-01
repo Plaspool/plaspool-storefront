@@ -168,20 +168,36 @@ export function CheckoutFlow() {
    * nothing on screen counts down and nothing needs to re-render every second
    * to stay true. The timer's only job is to hand the button back.
    */
-  const [rateLimited, setRateLimited] = React.useState(false);
+  const [retryUntil, setRetryUntil] = React.useState<number | null>(null);
+  const rateLimited = retryUntil !== null;
+  /**
+   * ═══ EVERY ERROR DECIDES THE HOLD, SO IT CANNOT BE LEFT STANDING ═══
+   * Written first as "set a flag on rate_limited, clear it on a timer", which
+   * had a dead-checkout bug in it: the timer lived in an effect keyed on
+   * `error`, so an error arriving after a rate limit cancelled the pending
+   * timeout and then declined to replace it, leaving every submit disabled
+   * until a reload. Deciding it HERE — where all five error paths already
+   * converge, one branch, no effect — removes the state that could go stale
+   * rather than patching what clears it.
+   *
+   * `retryAfter` is seconds and can be absent; a minute is the smallest honest
+   * guess when the API named nothing, and the shopper is never held longer
+   * than the window they were actually told about.
+   */
   const applyError = React.useCallback((next: CheckoutError) => {
     setError(next);
-    if (next.code === "rate_limited") setRateLimited(true);
+    setRetryUntil(
+      next.code === "rate_limited" ? Date.now() + (next.retryAfter ?? 60) * 1000 : null,
+    );
   }, []);
+  /* The timer's only job is handing the button back; the banner names the wait
+     in words, so nothing on screen counts down and nothing re-renders while it
+     runs. */
   React.useEffect(() => {
-    if (!error || error.code !== "rate_limited") return;
-    /* `retryAfter` is seconds and can be absent; a minute is the smallest
-       honest guess when the API named nothing, and the shopper is never held
-       longer than the window they were actually told about. */
-    const ms = (error.retryAfter ?? 60) * 1000;
-    const timer = setTimeout(() => setRateLimited(false), ms);
+    if (retryUntil === null) return;
+    const timer = setTimeout(() => setRetryUntil(null), Math.max(0, retryUntil - Date.now()));
     return () => clearTimeout(timer);
-  }, [error]);
+  }, [retryUntil]);
 
   const [address, setAddress] = React.useState<Address>(BLANK_ADDRESS);
 
