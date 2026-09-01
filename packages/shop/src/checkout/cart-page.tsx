@@ -26,6 +26,41 @@ function toKey(line: ResolvedLine): CartLineKey {
   return { productSlug: line.product.slug, colourId: line.colour.id, sizeId: line.size.id };
 }
 
+/* ═══ THE TRACK HAS TO BE ALLOWED TO SHRINK, OR THE PHONE SCROLLS SIDEWAYS ═══
+   Every name on this page is `truncate`, which is `white-space: nowrap` — so a
+   row's MIN-CONTENT width is the product name at full length, ellipsis or not.
+   A grid track written `1fr` is `minmax(auto, 1fr)`, and `auto` as a MINIMUM is
+   exactly that min-content: the column is floored at the longest name, and the
+   items overflow a container that is itself the correct width.
+
+   Measured on the live cart at a 375px viewport, one line, one ordinary
+   product name:
+
+       80 photo + 16 gap + 319 name + 12 gap + 64 price = a 491px track
+
+   inside a grid box measuring 375px — 132px of horizontal scroll on every
+   phone, which drags the header, the footer and the cookie banner off-screen
+   with it. The `min-w-0` further down the row does NOT reach this. That lets a
+   FLEX item shrink once a width is being distributed; the track is sized from
+   min-content CONTRIBUTIONS before any of that applies.
+
+   `minmax(0, 1fr)` drops the floor to zero, which is what finally lets
+   `truncate` truncate. Same trap and same fix as `ROW_BOX` in
+   `account/orders-list.tsx`, whose comment is worth reading next to this one.
+
+   BOTH tracks are spelled out on purpose. Bare `grid` leaves an IMPLICIT
+   `auto` column carrying the identical floor, so the phone layout needs its
+   own declaration rather than inheriting one; and `lg` gets `minmax(0, …)`
+   too, so a long enough product name cannot push the desktop layout out by the
+   same mechanism. `grid-cols-2` and friends compile to `repeat(N, minmax(0,
+   1fr))` for this reason — an arbitrary track opts out of that protection.
+
+   Exported so a test can read it: this page returns null until `cart.hydrated`,
+   so the class never appears in server-rendered markup and cannot be asserted
+   the way `orders-list.test.tsx` asserts its row box. */
+export const CART_GRID =
+  "mx-auto grid max-w-5xl grid-cols-[minmax(0,1fr)] gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:py-16";
+
 export function CartPage() {
   const cart = useCart();
 
@@ -111,7 +146,7 @@ export function CartPage() {
   }
 
   return (
-    <div className="mx-auto grid max-w-5xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_320px] lg:py-16">
+    <div className={CART_GRID}>
       <div>
         <h1 className="mb-6 text-2xl font-bold text-foreground">Your cart</h1>
         <UnsellableNotice

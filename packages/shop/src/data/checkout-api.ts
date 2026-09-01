@@ -49,6 +49,40 @@ export interface Address {
    * and the picker writes `null` for "none" rather than an empty string.
    */
   district?: string | null;
+  /**
+   * Where the door actually is, when the shopper offered it.
+   *
+   * FOR THE RIDER, NOT FOR THE PRICE. There is no geographic data anywhere in
+   * this system — the service areas carry a name, a key and a region, and no
+   * coordinates or boundaries — so nothing can price by a point, and the
+   * config says `pricing: false` on the wire so nobody wires one up by
+   * accident.
+   *
+   * ═══ SENT ONLY WHEN THE CONFIG OFFERS IT ═══
+   * `AddressesBody` is `.strict()` server-side. Until the column ships, this
+   * field is a 400 with no useful message — so `submittedAddress()` attaches
+   * it if and only if `config.location.offer` is true, and a server old enough
+   * to refuse the field is also old enough never to say so. Do not set this
+   * from anywhere else.
+   *
+   * OPTIONAL RATHER THAN NULLABLE, the same rule `district` follows on the
+   * event payload: every `checkout.completed` already in the outbox lacks the
+   * property, and a replayed payload must not become invalid for it.
+   */
+  location?: AddressLocation;
+}
+
+/** Decimal degrees on the wire; stored server-side as integer micro-degrees,
+ *  the same way money is stored in minor units. `accuracyM` is the browser's
+ *  own `coords.accuracy`, rounded to a whole metre. */
+export interface AddressLocation {
+  lat: number;
+  lng: number;
+  accuracyM: number;
+  /** `"device"` is the Geolocation API; `"pin"` is dropped on a map. */
+  source: "device" | "pin";
+  /** Epoch milliseconds. */
+  capturedAt: number;
 }
 
 export interface ShippingOption {

@@ -11,6 +11,24 @@ import { readShopSession } from "../data/auth-api";
 import { listSavedAddresses, type SavedAddress } from "../data/orders-api";
 import { listServiceAreas, type ServiceArea } from "../data/returns-api";
 import { BLANK_ADDRESS, NEW_ADDRESS, keyOfSaved, readSavedAddress } from "./saved-address";
+import {
+  DISTRICT_FALLBACK,
+  readDeliveryConfig,
+  type AddressMode,
+  type DeliveryConfig,
+  type DeliveryField,
+  type FieldKey,
+} from "../data/delivery-config";
+import {
+  districtChoicesFor,
+  effectiveDistrict as districtToSubmit,
+  fieldPatch,
+  fieldRows,
+  fieldValue,
+  submittedAddress,
+  wantsServiceAreas,
+} from "./address-fields";
+import { LocationCapture } from "./location-capture";
 import { saveReceiptSnapshot } from "./receipt-snapshot";
 import { getPointsBalance } from "../data/points-api";
 import type { PointsBalance } from "../data/points-api";
@@ -72,7 +90,12 @@ function StepHeader({ step }: { step: Step }) {
 
 /** The register from `empty-state.tsx`: what happened, and what to do about
  *  it. Never "Sorry", never vague. */
-function errorCopy(error: CheckoutError): { title: string; body: string } {
+function errorCopy(
+  error: CheckoutError,
+  /** The shop may not be asking for a district at all — see the
+   *  `outside_delivery_area` case. */
+  mode: AddressMode = "district",
+): { title: string; body: string } {
   switch (error.code) {
     case "empty_cart":
       return { title: "Your cart is empty", body: "Add something to the cart before checking out." };
@@ -84,10 +107,20 @@ function errorCopy(error: CheckoutError): { title: string; body: string } {
     case "no_shipping_address":
       return { title: "No delivery address on file", body: "Enter a delivery address before choosing a delivery option." };
     case "outside_delivery_area":
-      return {
-        title: "We don't deliver to that district yet",
-        body: "Pick a different district — or leave the district blank to use your state's standard delivery.",
-      };
+      /* THE HANDLER STAYS IN BOTH MODES (§6.4). The server can still refuse
+         under `simple` — `servedRegions` is the documented way — and this is
+         the only thing that tells the shopper why. Only the WORDING moves:
+         naming a district to a shopper who was never shown one is an
+         instruction they cannot follow. */
+      return mode === "district"
+        ? {
+            title: "We don't deliver to that district yet",
+            body: "Pick a different district — or leave the district blank to use your state's standard delivery.",
+          }
+        : {
+            title: "We don't deliver to that address yet",
+            body: "Check the state and town are right. If they are, we don't reach there yet — contact us and we'll see what we can do.",
+          };
     case "unresolved_lines":
       return { title: "An item in the cart is no longer available", body: "Go back to the cart and remove it, then try again." };
     case "currency_mismatch":
@@ -117,14 +150,16 @@ function errorCopy(error: CheckoutError): { title: string; body: string } {
 function ErrorBanner({
   error,
   action,
+  mode,
 }: {
   error: CheckoutError;
+  mode?: AddressMode;
   /** A control the customer can actually take, e.g. "gone" sending them back
    *  to the cart. Optional — most errors here are recoverable by trying the
    *  same step again, which the form's own submit already offers. */
   action?: React.ReactNode;
 }) {
-  const { title, body } = errorCopy(error);
+  const { title, body } = errorCopy(error, mode);
   return (
     /* `bg-destructive/10` stays on the BASE token — a tint is a fill, which is
        what that token is tuned for. Only the glyph moves: an icon owes 3:1 and
@@ -144,22 +179,56 @@ function ErrorBanner({
 /** Classed to match `Input` exactly — the same string `return-form.tsx` keeps
  *  for its native selects, for the same reason: the select sits among Inputs
  *  in one form and must read as family, not as a browser default beside them. */
+/**
+ * How long a delivery config is trusted before the address step re-reads it.
+ *
+ * MATCHES THE ENDPOINT'S OWN `s-maxage`. A shopper who reaches the delivery
+ * step and comes back inside a minute is holding what the CDN would hand back
+ * anyway, so the re-read is skipped; past it the mode may genuinely have
+ * moved and the form has to catch up (§6.5).
+ */
+const CONFIG_REREAD_MS = 60_000;
+
+/** One shared empty list, so "no areas" keeps a stable identity across
+ *  renders and does not re-run everything memoised on it. */
+const NO_AREAS: ServiceArea[] = [];
+
+/**
+ * The DOM ids this form has always used.
+ *
+ * A MAP RATHER THAN A TEMPLATE OVER THE KEY, because `postalCode` is
+ * `co-postal` — the ids are what a browser's saved autofill and anything
+ * already pointing at them keys on, and deriving them would silently rename
+ * one.
+ */
+const FIELD_IDS: Record<FieldKey, string> = {
+  name: "co-name",
+  phone: "co-phone",
+  line1: "co-line1",
+  line2: "co-line2",
+  city: "co-city",
+  region: "co-region",
+  district: "co-district",
+  postalCode: "co-postal",
+};
+
 const NATIVE_SELECT_CLASSES =
   "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm";
-
-/** Case- and space-insensitive: the State field is free text, and "lagos"
- *  must find the areas filed under "Lagos". */
-const normRegion = (value: string) => value.trim().toLowerCase();
 
 function Field({
   id,
   label,
   required,
+  help,
   children,
 }: {
   id: string;
   label: string;
   required?: boolean;
+  /** The config's own wording for what this field wants — "House number,
+   *  street, and the nearest landmark." Wired to the input by
+   *  `aria-describedby` rather than left as loose text near it. */
+  help?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -169,6 +238,11 @@ function Field({
         {required && <span aria-hidden="true"> *</span>}
       </Label>
       {children}
+      {help && (
+        <p id={`${id}-help`} className="text-xs text-muted-foreground">
+          {help}
+        </p>
+      )}
     </div>
   );
 }
@@ -184,26 +258,80 @@ export function CheckoutFlow() {
   const [address, setAddress] = React.useState<Address>(BLANK_ADDRESS);
 
   /**
-   * The served districts, for the OPTIONAL district picker under the State
-   * field. Districts are where per-district delivery pricing keys from: the
-   * picker submits `ServiceArea.key`, the API prices delivery by it, and a
-   * switched-off district is refused with `outside_delivery_area`.
+   * ═══ THE SHOP'S OWN DESCRIPTION OF THIS FORM ═══
+   * Whether the shop asks for a district at all is an admin setting, so the
+   * fields, their order, their labels and their limits all come from
+   * `GET /api/public/shop/delivery-config` rather than from JSX here.
    *
-   * PUBLIC AND COOKIELESS, fetched for guests and customers alike — and an
-   * empty list (fetch failed, or nothing served) renders NO picker rather
-   * than a dead control: a district is never required, so the form without
-   * one is simply the form as it was before districts existed.
+   * IT STARTS AT `DISTRICT_FALLBACK`, WHICH IS TODAY'S FORM. The first paint
+   * is therefore the form the shop has always had, and it stays that way if
+   * the config never arrives — failing toward the RICHER form is the safe
+   * direction, because the district form asks for a superset of what simple
+   * mode asks for. On `localhost` this is always what happens: the commerce
+   * API sends no CORS header for that origin.
    */
-  const [serviceAreas, setServiceAreas] = React.useState<ServiceArea[]>([]);
+  const [config, setConfig] = React.useState<DeliveryConfig>(DISTRICT_FALLBACK);
+  const configReadAt = React.useRef(0);
   React.useEffect(() => {
+    /* READ WHEN THE ADDRESS STEP MOUNTS, NOT ONCE AT BOOT — and read again if
+       the shopper comes back to it later, because the mode may have moved
+       while they were on the delivery step. The window matches the
+       endpoint's own `s-maxage`, so a re-entry inside it costs nothing. */
+    if (step !== "address") return;
+    if (configReadAt.current && Date.now() - configReadAt.current < CONFIG_REREAD_MS) return;
+
     let cancelled = false;
-    void listServiceAreas().then((areas) => {
-      if (!cancelled && areas) setServiceAreas(areas.filter((area) => area.key));
+    void readDeliveryConfig().then((next) => {
+      if (cancelled) return;
+      configReadAt.current = Date.now();
+      setConfig(next);
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [step]);
+
+  /**
+   * The served districts, for the district picker under the State field.
+   * Districts are where per-district delivery pricing keys from: the picker
+   * submits `ServiceArea.key`, the API prices delivery by it, and a
+   * switched-off district is refused with `outside_delivery_area`.
+   *
+   * NOT FETCHED AT ALL UNDER `simple` (§6.1) — there is no picker to fill, so
+   * the round trip buys nothing.
+   *
+   * PUBLIC AND COOKIELESS, fetched for guests and customers alike — and an
+   * empty list (fetch failed, or nothing served) renders NO picker rather
+   * than a dead control.
+   */
+  const [fetchedAreas, setFetchedAreas] = React.useState<ServiceArea[]>([]);
+  React.useEffect(() => {
+    if (!wantsServiceAreas(config)) return;
+    let cancelled = false;
+    void listServiceAreas().then((areas) => {
+      /* Filtered HERE, at the fetch, so `serviceAreas.length` stays a
+         trustworthy "have the areas loaded?" signal — which is what the stale
+         district guard reads. */
+      if (!cancelled && areas) setFetchedAreas(areas.filter((area) => area.key));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [config]);
+
+  /**
+   * Empty under `simple`, whatever was fetched before the flip.
+   *
+   * DERIVED DURING RENDER RATHER THAN CLEARED BY AN EFFECT — the same rule
+   * `effectiveDistrict` below follows, and for the same reason. An effect
+   * that cleared the list would leave a committed render in which the old
+   * areas were still live, which is a render where a district picker the mode
+   * no longer wants is still on screen and still pricing.
+   */
+  const serviceAreas = React.useMemo(
+    () => (wantsServiceAreas(config) ? fetchedAreas : NO_AREAS),
+    [config, fetchedAreas],
+  );
 
   const [shippingOptions, setShippingOptions] = React.useState<ShippingOption[]>([]);
   const [selectedShippingId, setSelectedShippingId] = React.useState<string | null>(null);
@@ -267,9 +395,15 @@ export function CheckoutFlow() {
    *  State field is free text, so this is a loose match; a state that matches
    *  nothing simply renders no picker, and the address prices at the zone. */
   const districtChoices = React.useMemo(
-    () =>
-      serviceAreas.filter((area) => normRegion(area.region) === normRegion(address.region ?? "")),
+    () => districtChoicesFor(serviceAreas, address.region),
     [serviceAreas, address.region],
+  );
+
+  /** The rows the form draws: the config's visible fields, in the config's
+   *  order, with City and State paired as they are on screen today. */
+  const rows = React.useMemo(
+    () => fieldRows(config, districtChoices),
+    [config, districtChoices],
   );
 
   /**
@@ -293,17 +427,12 @@ export function CheckoutFlow() {
    * mistyped State brings the district back rather than making the shopper
    * choose it again.
    */
-  const effectiveDistrict =
-    !address.district ||
-    serviceAreas.length === 0 ||
-    districtChoices.some((area) => area.key === address.district)
-      ? address.district
-      : null;
+  const effectiveDistrict = districtToSubmit(address, config, serviceAreas, districtChoices);
 
-  /** What the submit sends: the typed address carrying the district that is
-   *  actually on screen, never an orphaned key still sitting in state. */
-  const effectiveAddress: Address =
-    effectiveDistrict === address.district ? address : { ...address, district: effectiveDistrict };
+  /** What the submit sends: the fields this config actually asked for, with
+   *  the district that is actually on screen and never an orphaned key still
+   *  sitting in state. */
+  const effectiveAddress: Address = submittedAddress(address, config, serviceAreas);
 
   /** For the review step: the district's display name, never its key. */
   const districtName = effectiveDistrict
@@ -439,6 +568,83 @@ export function CheckoutFlow() {
   }, []);
 
   const email = customerEmail ?? guestEmail;
+
+  /**
+   * One configured field as a control.
+   *
+   * EVERY ATTRIBUTE COMES FROM THE CONFIG except the input's `type`, which is
+   * a property of the KEY rather than of the shop's policy — a phone field is
+   * `tel` wherever it appears.
+   *
+   * `maxLength` IS THE SERVER'S OWN LIMIT. It 400s past it, so the input stops
+   * the shopper there rather than letting them type into a refusal.
+   */
+  const renderField = (field: DeliveryField) => {
+    const id = FIELD_IDS[field.key];
+    const describedBy = field.help ? `${id}-help` : undefined;
+
+    if (field.key === "district") {
+      /* "a district" / "an area" — the label is the shop's word, so the
+         article has to agree with whatever that word turns out to be. */
+      const article = /^[aeiou]/i.test(field.label) ? "an" : "a";
+      const noun = field.label.toLowerCase();
+      return (
+        <Field
+          key={field.key}
+          id={id}
+          label={field.label}
+          required={field.required}
+          help={field.help}
+        >
+          {/* ONLY WHERE IT MEANS SOMETHING: `fieldRows` drops this field
+              entirely when the typed State has no served areas, whatever the
+              config says about `required` — a picker with no options reads as
+              a broken required field. Choosing one prices delivery for that
+              district; leaving it is the state's standard rate. */}
+          <select
+            id={id}
+            required={field.required}
+            aria-describedby={describedBy}
+            value={effectiveDistrict ?? ""}
+            onChange={(e) => editAddress(fieldPatch("district", e.target.value))}
+            className={NATIVE_SELECT_CLASSES}
+          >
+            <option value="">
+              {field.required
+                ? `Choose ${article} ${noun}`
+                : `Choose ${article} ${noun} (optional)`}
+            </option>
+            {districtChoices.map((area) => (
+              <option key={area.id} value={area.key}>
+                {area.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      );
+    }
+
+    return (
+      <Field
+        key={field.key}
+        id={id}
+        label={field.label}
+        required={field.required}
+        help={field.help}
+      >
+        <Input
+          id={id}
+          type={field.key === "phone" ? "tel" : "text"}
+          required={field.required}
+          maxLength={field.maxLength}
+          autoComplete={field.autocomplete}
+          aria-describedby={describedBy}
+          value={fieldValue(address, field.key, effectiveDistrict)}
+          onChange={(e) => editAddress(fieldPatch(field.key, e.target.value))}
+        />
+      </Field>
+    );
+  };
 
   async function submitAddress(e: React.FormEvent) {
     e.preventDefault();
@@ -591,15 +797,18 @@ export function CheckoutFlow() {
           bulkPercentBps: line.bulkPercentBps,
           lineTotal: line.total,
         })),
+        /* `effectiveAddress`, for the reason the review line above gives:
+           the receipt must record the address the shop was actually given,
+           not whatever is left in the form's state. */
         address: {
-          name: address.name,
-          line1: address.line1,
-          line2: address.line2 ?? null,
-          city: address.city,
-          region: address.region ?? null,
-          postalCode: address.postalCode ?? null,
-          countryCode: address.countryCode,
-          phone: address.phone ?? null,
+          name: effectiveAddress.name,
+          line1: effectiveAddress.line1,
+          line2: effectiveAddress.line2 ?? null,
+          city: effectiveAddress.city,
+          region: effectiveAddress.region ?? null,
+          postalCode: effectiveAddress.postalCode ?? null,
+          countryCode: effectiveAddress.countryCode,
+          phone: effectiveAddress.phone ?? null,
         },
         totals: {
           subtotal: totals?.subtotal.amount ?? 0,
@@ -696,6 +905,7 @@ export function CheckoutFlow() {
         {error && (
           <ErrorBanner
             error={error}
+            mode={config.mode}
             action={
               error.code === "gone" ? (
                 <Button
@@ -799,84 +1009,35 @@ export function CheckoutFlow() {
                 reading "14 Bourdillon Road" over fields saying something else.
                 Any edit means this is no longer that saved address, and the
                 selection has to say so. */}
-            <Field id="co-name" label="Full name" required>
-              <Input
-                id="co-name"
-                required
-                value={address.name}
-                onChange={(e) => editAddress({ name: e.target.value })}
-              />
-            </Field>
-            <Field id="co-phone" label="Phone">
-              <Input
-                id="co-phone"
-                type="tel"
-                value={address.phone ?? ""}
-                onChange={(e) => editAddress({ phone: e.target.value })}
-              />
-            </Field>
-            <Field id="co-line1" label="Address" required>
-              <Input
-                id="co-line1"
-                required
-                value={address.line1}
-                onChange={(e) => editAddress({ line1: e.target.value })}
-              />
-            </Field>
-            <Field id="co-line2" label="Apartment, suite, etc.">
-              <Input
-                id="co-line2"
-                value={address.line2 ?? ""}
-                onChange={(e) => editAddress({ line2: e.target.value })}
-              />
-            </Field>
-            <div className="grid grid-cols-2 gap-4">
-              <Field id="co-city" label="City" required>
-                <Input
-                  id="co-city"
-                  required
-                  value={address.city}
-                  onChange={(e) => editAddress({ city: e.target.value })}
-                />
-              </Field>
-              <Field id="co-region" label="State" required>
-                <Input
-                  id="co-region"
-                  required
-                  value={address.region ?? ""}
-                  onChange={(e) => editAddress({ region: e.target.value })}
-                />
-              </Field>
-            </div>
-            {districtChoices.length > 0 && (
-              <Field id="co-district" label="District">
-                {/* OPTIONAL, AND ONLY WHERE IT MEANS SOMETHING: rendered when
-                    the typed State matches a state with served districts, and
-                    absent otherwise — a picker with no options would read as a
-                    broken required field. Choosing one prices delivery for
-                    that district; leaving it is the state's standard rate. */}
-                <select
-                  id="co-district"
-                  value={effectiveDistrict ?? ""}
-                  onChange={(e) => editAddress({ district: e.target.value || null })}
-                  className={NATIVE_SELECT_CLASSES}
-                >
-                  <option value="">Choose a district (optional)</option>
-                  {districtChoices.map((area) => (
-                    <option key={area.id} value={area.key}>
-                      {area.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+            {/* ═══ THE FORM IS THE CONFIG'S, NOT THIS FILE'S ═══
+                Order, labels, which fields appear at all and what each one
+                will accept are the shop's setting, read from
+                `/api/public/shop/delivery-config`. With the switch off that
+                config is `DISTRICT_FALLBACK`, which is field-for-field the
+                form this block used to spell out.
+
+                `rows` carries the one thing a flat `fields[]` cannot say:
+                City and State share a line, as they do on screen today. */}
+            {rows.map((row) =>
+              row.length === 2 ? (
+                <div key={row[0].key} className="grid grid-cols-2 gap-4">
+                  {row.map(renderField)}
+                </div>
+              ) : (
+                renderField(row[0])
+              ),
             )}
-            <Field id="co-postal" label="Postal code">
-              <Input
-                id="co-postal"
-                value={address.postalCode ?? ""}
-                onChange={(e) => editAddress({ postalCode: e.target.value })}
+
+            {/* Only ever when the config offers it — which is also the gate on
+                sending the field at all, because `AddressesBody` is `.strict()`
+                and an older server 400s on it. */}
+            {config.location.offer && (
+              <LocationCapture
+                config={config}
+                value={address.location}
+                onChange={(location) => editAddress({ location })}
               />
-            </Field>
+            )}
 
             <Button
               type="submit"
@@ -1013,14 +1174,29 @@ export function CheckoutFlow() {
                       Change
                     </button>
                   </div>
+                  {/* ═══ WHAT WAS SENT, NOT WHAT IS IN THE FORM ═══
+                      `effectiveAddress` carries only the fields this config
+                      actually asked for. Reading raw form state here would
+                      print a postcode under `simple` — never on screen, never
+                      submitted, but still sitting in state from a saved
+                      address — and the review would describe an address the
+                      shop was not given. */}
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {address.name}, {address.line1}
-                    {address.line2 ? `, ${address.line2}` : ""}
-                    {/* The district is part of where the parcel goes AND why
-                        delivery costs what the line below says — its name (not
-                        its key) belongs in the address the customer confirms. */}
-                    {districtName ? `, ${districtName}` : ""}, {address.city}, {address.region}{" "}
-                    {address.postalCode}
+                    {[
+                      effectiveAddress.name,
+                      effectiveAddress.line1,
+                      effectiveAddress.line2,
+                      /* The district is part of where the parcel goes AND why
+                         delivery costs what the line below says — its name
+                         (not its key) belongs in the address the customer
+                         confirms. */
+                      districtName,
+                      effectiveAddress.city,
+                      effectiveAddress.region,
+                      effectiveAddress.postalCode,
+                    ]
+                      .filter(Boolean)
+                      .join(", ")}
                   </p>
                   <p className="mt-2 text-sm text-muted-foreground">{email}</p>
                 </div>
