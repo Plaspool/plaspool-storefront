@@ -143,13 +143,40 @@ export type CheckoutError =
   | { code: "bad_revision" }
   | { code: "field"; field: string; detail?: string }
   | { code: "network" }
-  | { code: "unknown"; status: number; detail?: string };
+  /**
+   * Too many attempts on this cart. `retryAfter` is SECONDS until the window
+   * reopens, straight from the API's own `Retry-After`; `null` when the 429
+   * came from somewhere that named no wait, because the copy still has to say
+   * something true in that case.
+   *
+   * THIS ONE EXISTS BECAUSE THE GENERIC ADVICE CAUSES IT. `/checkout/start`
+   * allows ten attempts per cart per fifteen minutes, and the fallback banner
+   * said "try again" — which is the shopper spending the rest of that budget
+   * on the instruction that failed them.
+   */
+  | { code: "rate_limited"; retryAfter: number | null }
+  /** Reached, and broken on the store's side. Split from `unknown` because it
+   *  is the one refusal where "try again shortly" is honest and the shopper
+   *  did nothing to cause it. */
+  | { code: "server"; status: number; requestId: string | null }
+  | { code: "unknown"; status: number; detail?: string; requestId: string | null };
 
 export type CheckoutResult<T> = { ok: true; data: T } | { ok: false; error: CheckoutError };
 
 function classify(status: number, body: Record<string, unknown> | null): CheckoutError {
   const errorCode = typeof body?.error === "string" ? body.error : null;
   const detail = typeof body?.detail === "string" ? body.detail : undefined;
+  /* EVERY error the admin produces carries this, and repeats it as
+     `x-request-id`. The detail it will not put in a response — the stack, the
+     SQLSTATE — is in its log beside this string, so it is the whole of what
+     makes a shopper's "it didn't work" findable. It used to be dropped here. */
+  const requestId = typeof body?.requestId === "string" ? body.requestId : null;
+  if (status === 429 || errorCode === "rate_limited") {
+    return {
+      code: "rate_limited",
+      retryAfter: typeof body?.retryAfter === "number" ? body.retryAfter : null,
+    };
+  }
   if (status === 410 || errorCode === "gone") return { code: "gone" };
   if (status === 400 && detail === "baseRevision") return { code: "bad_revision" };
   /* Two spellings of one refusal: the address step refuses at the door (400
@@ -169,13 +196,37 @@ function classify(status: number, body: Record<string, unknown> | null): Checkou
     return { code: "unresolved_lines", variantIds: (body?.variantIds as string[]) ?? [] };
   }
   if (errorCode === "currency_mismatch") return { code: "currency_mismatch" };
-  if (errorCode === "precondition_failed" && body?.operation === "no_shipping_address") {
-    return { code: "no_shipping_address" };
+  if (errorCode === "precondition_failed") {
+    /*
+     * ═══ `operation` CARRIES TWO DIFFERENT THINGS, AND THAT COST A BUG ═══
+     * Across the admin, `operation` names the OPERATION — `update_cart`,
+     * `remove_line`, `capture`, `parseWebhook`. But the freeze route passes
+     * its REASON through the same field, which is where `empty_cart` and
+     * `no_shipping_address` come from, and this client was written to read
+     * only that second sense.
+     *
+     * So `/checkout/start` refusing an empty cart — which it reports as
+     * `operation: 'checkout_start'`, obeying the first sense — fell past both
+     * branches to `unknown`, and a shopper at step 1 of 4 got "That didn't go
+     * through" for a cart the store could have named as empty. That is the
+     * screenful of copy already written, never reached.
+     *
+     * `reason` is read FIRST because it is the unambiguous field, and the
+     * admin now sends it alongside `operation` rather than overloading it.
+     * The two `operation` spellings stay accepted underneath: this client
+     * cannot assume which version of the API it is talking to, and a
+     * storefront that only works against the newest deploy of its own
+     * backend is a storefront that breaks on every rollback.
+     */
+    const reason =
+      typeof body?.reason === "string" ? body.reason : (body?.operation as string | undefined);
+    if (reason === "no_shipping_address") return { code: "no_shipping_address" };
+    /* `checkout_start` IS an empty cart: that route's only other refusal is
+       `insufficient_stock`, matched above. */
+    if (reason === "empty_cart" || reason === "checkout_start") return { code: "empty_cart" };
   }
-  if (errorCode === "precondition_failed" && body?.operation === "empty_cart") {
-    return { code: "empty_cart" };
-  }
-  return { code: "unknown", status, detail };
+  if (status >= 500) return { code: "server", status, requestId };
+  return { code: "unknown", status, detail, requestId };
 }
 
 async function request<T>(
