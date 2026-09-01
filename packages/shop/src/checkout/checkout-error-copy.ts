@@ -1,4 +1,5 @@
 import type { CheckoutError } from "../data/checkout-api";
+import type { AddressMode } from "../data/delivery-config";
 
 /**
  * Checkout's failure copy, lifted out of `checkout-flow.tsx`.
@@ -31,7 +32,13 @@ export function retryWaitLabel(retryAfter: number | null): string {
 
 /** The register from `empty-state.tsx`: what happened, and what to do about
  *  it. Never "Sorry", never vague. */
-export function errorCopy(error: CheckoutError): { title: string; body: string } {
+export function errorCopy(
+  error: CheckoutError,
+  /** The shop may not be asking for a district at all — see the
+   *  `outside_delivery_area` case. Defaults to `district`, so a call site that
+   *  does not know the mode gets the wording this function always had. */
+  mode: AddressMode = "district",
+): { title: string; body: string } {
   switch (error.code) {
     case "empty_cart":
       return { title: "Your cart is empty", body: "Add something to the cart before checking out." };
@@ -43,10 +50,20 @@ export function errorCopy(error: CheckoutError): { title: string; body: string }
     case "no_shipping_address":
       return { title: "No delivery address on file", body: "Enter a delivery address before choosing a delivery option." };
     case "outside_delivery_area":
-      return {
-        title: "We don't deliver to that district yet",
-        body: "Pick a different district — or leave the district blank to use your state's standard delivery.",
-      };
+      /* THE HANDLER STAYS IN BOTH MODES (§6.4). The server can still refuse
+         under `simple` — `servedRegions` is the documented way — and this is
+         the only thing that tells the shopper why. Only the WORDING moves:
+         naming a district to a shopper who was never shown one is an
+         instruction they cannot follow. */
+      return mode === "district"
+        ? {
+            title: "We don't deliver to that district yet",
+            body: "Pick a different district — or leave the district blank to use your state's standard delivery.",
+          }
+        : {
+            title: "We don't deliver to that address yet",
+            body: "Check the state and town are right. If they are, we don't reach there yet — contact us and we'll see what we can do.",
+          };
     case "unresolved_lines":
       return { title: "An item in the cart is no longer available", body: "Go back to the cart and remove it, then try again." };
     case "currency_mismatch":

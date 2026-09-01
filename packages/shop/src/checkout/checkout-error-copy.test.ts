@@ -109,3 +109,39 @@ describe("the copy that was already right, which must not drift", () => {
     });
   });
 });
+
+describe("a district we don't reach, in a shop that may not ask for districts", () => {
+  /*
+   * ═══ MERGED IN FROM THE SERVER-DESCRIBED ADDRESS FORM ═══
+   * The two changes landed on the same function from different branches: one
+   * moved it here and added rate_limited/server, the other gave it an
+   * AddressMode so this case could stop naming a control the shopper was never
+   * shown. Both are wanted, so `mode` came with it — and these two tests are
+   * what prove the merge did not quietly drop the second one.
+   *
+   * The handler stays in BOTH modes: the server can still refuse under
+   * `simple` (servedRegions is the documented way), and this is the only thing
+   * that tells the shopper why. Only the wording moves.
+   */
+  it("names the district picker when there is a district picker", () => {
+    expect(errorCopy({ code: "outside_delivery_area" }, "district")).toEqual({
+      title: "We don't deliver to that district yet",
+      body: "Pick a different district — or leave the district blank to use your state's standard delivery.",
+    });
+  });
+
+  it("never names a district to a shopper who was never shown one", () => {
+    const copy = errorCopy({ code: "outside_delivery_area" }, "simple");
+    expect(copy).toEqual({
+      title: "We don't deliver to that address yet",
+      body: "Check the state and town are right. If they are, we don't reach there yet — contact us and we'll see what we can do.",
+    });
+    expect(copy.body).not.toMatch(/district/i);
+  });
+
+  it("defaults to the district wording, so an un-passed mode cannot silently change copy", () => {
+    expect(errorCopy({ code: "outside_delivery_area" })).toEqual(
+      errorCopy({ code: "outside_delivery_area" }, "district"),
+    );
+  });
+});
