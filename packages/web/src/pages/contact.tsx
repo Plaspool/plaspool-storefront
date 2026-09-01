@@ -54,10 +54,8 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     message,
     phone // optionally include phone in message
   };
-  console.log("Payload to send:", payload);
 
   try {
-    console.log("Submitting form with payload:", payload);
     const res = await fetch("/api/sendmail", {
       method: "POST",
       headers: {
@@ -78,7 +76,7 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     }
   } catch (error) {
     console.error("Error submitting form:", error);
-    alert("Failed to send message. Please try again later.");
+    errorNotify("Failed to send message. Please try again later.");
     setSubmitting(false);
   }
 };
