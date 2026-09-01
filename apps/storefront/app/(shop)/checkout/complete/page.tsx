@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { CheckoutComplete } from "@plaspool/shop";
+import { CheckoutComplete, getLineImages } from "@plaspool/shop";
 
 /**
  * Where Paystack sends the customer back — see `checkout-complete.tsx` for
@@ -13,12 +13,26 @@ import { CheckoutComplete } from "@plaspool/shop";
  * built and ready; only the owner can update that production env var (and
  * redeploy the admin app afterward, since it bakes in at build time).
  */
-export default function CheckoutCompletePage() {
+export const dynamic = "force-dynamic";
+
+export default async function CheckoutCompletePage() {
+  /* AWAITED OUTSIDE THE BOUNDARY, not inside it — the same split
+     `/account/orders/[orderNumber]` makes, for the same reason. `Suspense`
+     here exists for `useSearchParams`, which resolves on the client;
+     suspending the same boundary on a server fetch as well would hold the
+     whole page behind a `null` fallback while the catalogue is read.
+
+     The receipt draws a picture per line, and a line carries only a
+     `variantId` — no image field — so the picture is resolved
+     `variantId` → catalogue. `getLineImages()` reads the ANONYMOUS product
+     list every visitor gets, on the cache window `/store` already shares, so
+     nothing keyed to this person is read on the server here. The receipt
+     itself never touches the network: it is read from `sessionStorage` in the
+     browser (see `checkout/receipt-snapshot.ts`). */
+  const lineImages = await getLineImages();
   return (
     <Suspense fallback={null}>
-      <CheckoutComplete />
+      <CheckoutComplete lineImages={lineImages} />
     </Suspense>
   );
 }
-
-/* No server fetch of its own — same reasoning as `/cart` and `/checkout`. */

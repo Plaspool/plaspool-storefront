@@ -213,3 +213,50 @@ html {
     display: none !important;
   }
 }
+
+/**
+ * PRINT.
+ *
+ * Added for the order confirmation's "Print receipt" button, which is the one
+ * place the shop asks somebody to put a page on paper — a receipt for an
+ * expense claim, or for a customer who wants the order in a folder.
+ *
+ * ═══ WHY THE CHROME IS MARKED RATHER THAN SELECTED ═══
+ * `header` and `footer` cannot be hidden by tag: `order-detail.tsx`,
+ * `order-status-page.tsx` and `sign-in.tsx` all use `<header>` for a section
+ * heading INSIDE the page, and hiding those would take the order's own title
+ * off the printout. `data-print-hide` sits on the three chrome roots in
+ * `shop-shell.tsx`'s tree — the announcement bar, the nav and the footer —
+ * and says what it means.
+ *
+ * NOT SCOPED TO THE RECEIPT. Printing any page of this shop with a sticky nav
+ * frozen across the top and a full site footer beneath is wrong everywhere,
+ * not just here; there is no page whose printout is improved by them.
+ *
+ * `print-color-adjust` is what keeps the brand tints — the tick's disc, the
+ * points note — from dropping to white, since browsers strip backgrounds when
+ * printing by default. Both spellings: WebKit still wants the prefix.
+ */
+@media print {
+  [data-print-hide] {
+    display: none !important;
+  }
+
+  /* No point reserving space for a sticky buy bar that is not printed. */
+  body {
+    background: #fff;
+  }
+
+  [data-receipt-page] {
+    max-width: none;
+    padding: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* A receipt that breaks a line item across two sheets is unreadable. */
+  [data-receipt-page] li,
+  [data-receipt-page] section {
+    break-inside: avoid;
+  }
+}
