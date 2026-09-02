@@ -320,9 +320,36 @@ describe("the submit button's pinning is the caller's choice, not this file's", 
     expect(html).not.toContain("sticky");
   });
 
-  it("pins the submit when the caller is a sheet", () => {
+  it("leaves no part of the pinned treatment behind when not asked", () => {
+    /* `sticky` alone was not enough to assert. The pinned classes were split
+       across two strings so the bleed could be commented separately, and only
+       the FIRST was guarded by the prop — so `/returns` rendered
+       `sm:-mx-6 sm:px-6` on a wrapper that must have no margins at all. It
+       cancelled out visually, which is exactly why nothing caught it until the
+       computed style was read off the live page. Assert the whole treatment is
+       absent, not just its most obvious word. */
+    const html = renderToStaticMarkup(<ReturnForm program={PROGRAM} areas={AREAS} />);
+    for (const cls of ["sticky", "-mx-4", "sm:-mx-6", "sm:px-6", "border-t", "sm:pt-4"]) {
+      expect(html).not.toContain(cls);
+    }
+  });
+
+  it("pins the submit when the caller asks", () => {
     const html = renderToStaticMarkup(<ReturnForm program={PROGRAM} areas={AREAS} pinSubmit />);
     expect(html).toContain("sticky");
+  });
+
+  it("pins at every width, because the dialog scrolls on a desktop too", () => {
+    /* The first version of this reset the pin at `sm`, on the reasoning that
+       the bottom sheet was a mobile treatment. Measurement said otherwise: the
+       centred dialog caps at `100dvh-2rem` and the form is taller than that,
+       so a desktop shopper scrolled past the fields to a submit they could not
+       see either. The bleed changes with the container padding (`-mx-4` for
+       the sheet's `px-4`, `-mx-6` for the dialog's `p-6`); the pinning
+       itself does not. */
+    const html = renderToStaticMarkup(<ReturnForm program={PROGRAM} areas={AREAS} pinSubmit />);
+    expect(html).not.toContain("sm:static");
+    expect(html).toContain("sm:-mx-6");
   });
 
   it("keeps the submit itself unchanged either way, pinning only its row", () => {
