@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { cn } from "@plaspool/ui";
 
 import { introDismissed } from "./intro-dismissed";
+import { progressDot } from "../components/progress-dot";
 
 /**
  * Where the shopper is in the return dialog, and the way back.
@@ -117,18 +118,14 @@ export function ReturnSteps({ step, onSelect }: ReturnStepsProps) {
               type="button"
               aria-current={current ? "step" : undefined}
               onClick={() => onSelect(s.id)}
-              className={cn(
-                /* The current step is a PILL, not a darker dot. Two dots
-                   differing only in fill ask the eye to compare two 8px
-                   circles for tone; a shape difference is legible at a
-                   glance and survives being looked at on a phone in
-                   daylight. `transition-all` because the width animates
-                   too now. */
-                "h-2 rounded-full transition-all motion-reduce:transition-none",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
-                "focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                current ? "w-5 bg-foreground" : "w-2 bg-brand-line hover:bg-muted-foreground",
-              )}
+              /* THE SAME DOT THE HERO CAROUSEL DRAWS — see `progress-dot.ts`.
+                 This file had its own spelling (`h-2`, a `w-5` pill,
+                 `bg-foreground`), which was three unmade decisions away from
+                 the carousel's and used a text colour where the ramp has a
+                 brand one. The paint is shared; the SEMANTICS are not, and
+                 must not be — see this file's header on why these are steps
+                 and those are slides. */
+              className={progressDot(current)}
             >
               <span className="sr-only">{`Step ${i + 1} of ${STEPS.length}: ${s.label}`}</span>
             </button>
