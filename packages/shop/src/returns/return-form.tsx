@@ -355,8 +355,14 @@ export interface ReturnFormProps {
    * form. Same class, same component, opposite result, decided entirely by
    * who rendered it. `return-form.test.tsx` pins this boundary.
    *
-   * Below `sm` only: the sheet is a mobile treatment, and the centred dialog
-   * on desktop keeps the submit where it has always been.
+   * ═══ AT EVERY WIDTH, NOT ONLY ON THE PHONE ═══
+   * This reset itself at `sm` at first, on the reasoning that the bottom
+   * sheet was a mobile treatment. Measurement said otherwise: `DialogContent`
+   * caps at `100dvh-2rem` — 768px in an 800px window — and this form renders
+   * taller than that, so a desktop shopper scrolled past every field to reach
+   * a submit they could not see either. It was the same defect, not a smaller
+   * one. Only the BLEED differs now, because only the container's padding
+   * differs (`px-4` on the sheet, `p-6` on the dialog).
    */
   pinSubmit?: boolean;
   className?: string;
@@ -804,15 +810,29 @@ export function ReturnForm({ program, areas, onDone, pinSubmit, className }: Ret
       {/* The wrapper is ALWAYS a `flex flex-col`, pinned or not. Without it the
           button stops being a direct flex child of the form and collapses to
           its content width — so an unstyled `<div>` here would silently break
-          the full-width submit on `/returns` too. The pinned variant bleeds
-          its background out to the sheet's edges (`-mx-4 px-4`) so fields
+          the full-width submit on `/returns` too.
+
+          THE PINNED CLASSES ARE ONE STRING BEHIND ONE GUARD, and that is a
+          fix rather than a formatting choice. They were split in two so the
+          `sm:` bleed could carry its own comment, and only the first half was
+          bound to `pinSubmit` — so `/returns`, which pins nothing, still
+          rendered `sm:-mx-6 sm:px-6` on a wrapper that must carry no margin at
+          all. The negative margin and the padding cancelled each other, so it
+          looked correct everywhere and was caught only by reading the computed
+          style off the live page. Keep them together.
+
+          The bleed is the one thing that differs between the two callers,
+          because their containers' padding does: `px-4` in the sheet, `p-6` in
+          the centred dialog. It pulls the bar out to both edges so fields
           scroll UNDER it rather than appearing to stop at it, and the hairline
-          is what separates the two. All of it resets at `sm`. */}
+          is what separates the two. The pinning itself is identical at every
+          width — see the prop's own note for why it no longer resets at
+          `sm`. */}
       <div
         className={cn(
           "flex flex-col",
           pinSubmit &&
-            "sticky bottom-0 -mx-4 border-t border-brand-line bg-background px-4 pb-1 pt-3 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0",
+            "sticky bottom-0 -mx-4 border-t border-brand-line bg-background px-4 pb-1 pt-3 sm:-mx-6 sm:px-6 sm:pt-4",
         )}
       >
         <Button type="submit" disabled={sending || noAreas} tone="primary" className="h-12 text-base">
