@@ -210,7 +210,10 @@ export function ReturnModal({ open, onOpenChange, program, areas }: ReturnModalP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      {/* A bottom sheet on a phone, the centred dialog everywhere else — one
+          mounted dialog either way, switched in CSS. See `SHEET_ON_MOBILE` in
+          `@plaspool/ui`'s `dialog.tsx` for why this is not a `Sheet`. */}
+      <DialogContent mobile="sheet">
         {/* Required by Radix for the dialog's accessible name. `program.name`,
             never a spelled noun — the same choice the page's `<h1>` makes.
             `sr-only` on the explanation step, where `ReturnIntro`'s slogan is
@@ -247,7 +250,15 @@ export function ReturnModal({ open, onOpenChange, program, areas }: ReturnModalP
           ) : (
             <>
               {session === "customer" && (
-                <ReturnForm program={program} areas={areas} onDone={() => onOpenChange(false)} />
+                <ReturnForm
+                  program={program}
+                  areas={areas}
+                  /* Only from here. `/returns` renders the same form with no
+                     scrolling ancestor to pin against — see the prop's own
+                     note for what that would do instead. */
+                  pinSubmit
+                  onDone={() => onOpenChange(false)}
+                />
               )}
               {session === "guest" && <GuestPrompt />}
               {session === "unknown" && <FormSkeleton />}

@@ -262,7 +262,7 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1 sm:gap-1.5">
       <Label htmlFor={id}>
         {label}
         {required && <span aria-hidden="true"> *</span>}
@@ -341,10 +341,28 @@ export interface ReturnFormProps {
    *  the file header. The page passes nothing, and its confirmation simply
    *  stays on screen. */
   onDone?: () => void;
+  /**
+   * Pins the submit to the bottom of the scrolling ancestor, so it stays on
+   * screen while the fields scroll under it.
+   *
+   * ═══ A PROP, BECAUSE CSS CANNOT TELL THE TWO CALLERS APART ═══
+   * `position: sticky` resolves against the nearest SCROLLING ancestor. In
+   * `ReturnModal` that is `DialogContent`, which already carries
+   * `overflow-y-auto`, so the button pins to the bottom of the sheet exactly
+   * as intended. On `/returns` there is no such ancestor — the page itself
+   * scrolls — and the identical class would glue the button to the bottom of
+   * the VIEWPORT, floating it over the footer and everything else below the
+   * form. Same class, same component, opposite result, decided entirely by
+   * who rendered it. `return-form.test.tsx` pins this boundary.
+   *
+   * Below `sm` only: the sheet is a mobile treatment, and the centred dialog
+   * on desktop keeps the submit where it has always been.
+   */
+  pinSubmit?: boolean;
   className?: string;
 }
 
-export function ReturnForm({ program, areas, onDone, className }: ReturnFormProps) {
+export function ReturnForm({ program, areas, onDone, pinSubmit, className }: ReturnFormProps) {
   const [qty, setQty] = React.useState(String(program.minUnitsPerReturn));
   const [name, setName] = React.useState("");
   const [phone, setPhone] = React.useState("");
@@ -566,7 +584,7 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate className={cn("flex flex-col gap-5", className)}>
+    <form onSubmit={onSubmit} noValidate className={cn("flex flex-col gap-3.5 sm:gap-5", className)}>
       {placement && "kind" in placement && placement.kind === "already-open" && (
         <div
           ref={blockAlertRef}
@@ -783,10 +801,25 @@ export function ReturnForm({ program, areas, onDone, className }: ReturnFormProp
         </p>
       )}
 
-      <Button type="submit" disabled={sending || noAreas} tone="primary" className="h-12 text-base">
-        {sending && <Loader2 aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" />}
-        Send return request
-      </Button>
+      {/* The wrapper is ALWAYS a `flex flex-col`, pinned or not. Without it the
+          button stops being a direct flex child of the form and collapses to
+          its content width — so an unstyled `<div>` here would silently break
+          the full-width submit on `/returns` too. The pinned variant bleeds
+          its background out to the sheet's edges (`-mx-4 px-4`) so fields
+          scroll UNDER it rather than appearing to stop at it, and the hairline
+          is what separates the two. All of it resets at `sm`. */}
+      <div
+        className={cn(
+          "flex flex-col",
+          pinSubmit &&
+            "sticky bottom-0 -mx-4 border-t border-brand-line bg-background px-4 pb-1 pt-3 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0",
+        )}
+      >
+        <Button type="submit" disabled={sending || noAreas} tone="primary" className="h-12 text-base">
+          {sending && <Loader2 aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" />}
+          Send return request
+        </Button>
+      </div>
     </form>
   );
 }

@@ -104,7 +104,7 @@ export function ReturnIntro({ program, dismissed, onDismissedChange, onNext }: R
     `${program.pointsLabelPlural} towards your next PlaSpool order.`;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4 sm:gap-5">
       {/* DECORATION, AND SO HIDDEN OUTRIGHT. The band says nothing the two
           paragraphs below do not say in words, and a screen reader announcing
           three spools and two arrows before reaching the offer is worse than
@@ -113,7 +113,7 @@ export function ReturnIntro({ program, dismissed, onDismissedChange, onNext }: R
           file for the seven unnamed images that taught it the difference. */}
       <div
         aria-hidden="true"
-        className="flex items-center justify-center gap-2 border-2 border-foreground bg-brand-soft px-4 py-6 sm:gap-4 sm:py-8"
+        className="flex items-center justify-center gap-2 border-2 border-foreground bg-brand-soft px-4 py-4 sm:gap-4 sm:py-8"
       >
         {BAND.map((spool, i) => (
           <React.Fragment key={spool.weightGrams}>
@@ -123,25 +123,28 @@ export function ReturnIntro({ program, dismissed, onDismissedChange, onNext }: R
               weightGrams={spool.weightGrams}
               empty={spool.empty}
               label=""
-              className="w-16 sm:w-20"
+              className="w-12 sm:w-20"
             />
           </React.Fragment>
         ))}
       </div>
 
-      <div className="flex flex-col gap-2">
-        <h2 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+      {/* `text-sm` holds at every width — 14px is the floor for body copy, and
+          a phone is where it is read most. The tightening is in the leading
+          and the gaps, never in the type size. */}
+      <div className="flex flex-col gap-1.5 sm:gap-2">
+        <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-2xl">
           {SLOGAN}
         </h2>
-        <p className="text-sm leading-6 text-muted-foreground">{opening}</p>
-        <p className="text-sm leading-6 text-muted-foreground">{offer}</p>
+        <p className="text-sm leading-5 text-muted-foreground sm:leading-6">{opening}</p>
+        <p className="text-sm leading-5 text-muted-foreground sm:leading-6">{offer}</p>
       </div>
 
       {/* The checkbox and the way forward, on one line where there is room for
           one. The checkbox comes FIRST in the DOM in both layouts: it is the
           decision that changes what happens next time, and a keyboard reaching
           the primary button before it would step past it. */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div className="flex items-center gap-2.5">
           <input
             id={checkboxId}
