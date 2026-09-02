@@ -43,7 +43,9 @@
      state the checkout opens in. Darkening the token fixes every such pair at
      once; patching each site would leave the next tinted surface to rediscover
      it. 40.8% clears 4.5:1 against the full tint, and 5.57:1 against white. */
-    --muted-foreground: 0 0% 40.8%;
+    /* Kept in step with apps/storefront/app/globals.css, which carries the
+       reasoning for this value. Not imported at runtime; see the file header. */
+    --muted-foreground: 0 0% 25%;
 
     --accent: 0 0% 96.1%;
     --accent-foreground: 0 0% 9%;

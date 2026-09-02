@@ -25,15 +25,34 @@
     --secondary-foreground: 0 0% 9%;
 
     --muted: 0 0% 96.1%;
-  /* 40.8%, NOT 45.1%. Secondary text lands on tinted surfaces as well as on
-     white — a preselected address card, an orders row on hover, the selected
-     size chip — and at 45.1% it cleared white by only 4.74:1, so ANY tint under
-     it dropped below AA: 4.38:1 on `brand-soft/40`, 3.88:1 on full `brand-soft`.
-     That is the text that distinguishes one saved address from another, in the
-     state the checkout opens in. Darkening the token fixes every such pair at
-     once; patching each site would leave the next tinted surface to rediscover
-     it. 40.8% clears 4.5:1 against the full tint, and 5.57:1 against white. */
-    --muted-foreground: 0 0% 40.8%;
+  /* ═══ 25%, AND THE HISTORY OF THIS NUMBER IS THE ARGUMENT FOR IT ═══
+     It was 45.1%, which cleared white by only 4.74:1, so ANY tint under it
+     dropped below AA: 4.38:1 on `brand-soft/40`, 3.88:1 on full `brand-soft`.
+     Secondary text lands on tinted surfaces as well as on white — a preselected
+     address card, an orders row on hover, the selected size chip — and that is
+     the text distinguishing one saved address from another, in the state the
+     checkout opens in. It went to 40.8%: 5.57:1 on white, 4.55:1 on the full
+     tint. Legal, and still visibly grey.
+
+     "LEGAL" WAS THE WRONG BAR. Passing AA is a floor, not a reading experience,
+     and 295 usages across 74 files means this token IS the shop's body copy —
+     product descriptions, order rows, help text, every label under every value.
+     Set at 40.8% the whole storefront read as grey-on-white with black reserved
+     for headings, which is a look nobody chose; it fell out of a contrast fix.
+
+     25% is 10.41:1 on white and 8.51:1 on full `brand-soft` — near-black to
+     read, and roughly double the contrast it had.
+
+     IT IS DELIBERATELY NOT `--foreground` (3.9%, 19.8:1). Collapsing the two
+     would erase the label/value distinction this shop leans on everywhere, in
+     one edit, with no site left to restore it from. The gap is now small enough
+     to read as emphasis rather than as a different colour of text, which is
+     what it should have been all along.
+
+     CHANGE IT HERE, NEVER AT A CALL SITE. Every previous fix to this colour was
+     applied to one screen and left failing in its siblings; that is the defect
+     `house-rules.test.ts` exists to catch. One token, one answer, everywhere. */
+    --muted-foreground: 0 0% 25%;
 
     --accent: 0 0% 96.1%;
     --accent-foreground: 0 0% 9%;
