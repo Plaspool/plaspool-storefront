@@ -136,9 +136,6 @@ export function ReturnModal({ open, onOpenChange, program, areas }: ReturnModalP
    *  same flag today, but "which screen do I open on" and "is the box ticked"
    *  are different questions, and only one of them is the shopper's to see. */
   const [dismissed, setDismissed] = React.useState(false);
-  /* Which way the last move went, so the entering step slides in from the side
-     it came from. Purely cosmetic, and `motion-reduce` drops it entirely. */
-  const [forward, setForward] = React.useState(true);
 
   /*
    * RESET DURING RENDER, NOT INSIDE THE EFFECT BELOW.
@@ -169,7 +166,6 @@ export function ReturnModal({ open, onOpenChange, program, areas }: ReturnModalP
          reading storage during render is safe at this one call site. */
       setStep(stepOnOpen());
       setDismissed(introDismissed());
-      setForward(true);
     }
   }
 
@@ -184,12 +180,18 @@ export function ReturnModal({ open, onOpenChange, program, areas }: ReturnModalP
    * this is genuinely not rendered state: nothing on screen depends on whether
    * the last step change came from a click or from opening the dialog.
    */
-  const stepRef = React.useRef<HTMLDivElement>(null);
+  /* One ref per panel, because both are mounted at all times now — see the
+     note above the two of them in the JSX. `panel()` answers whichever is
+     currently displayed; focusing a `hidden` one would silently do nothing. */
+  const introRef = React.useRef<HTMLDivElement>(null);
+  const formRef = React.useRef<HTMLDivElement>(null);
+  const panel = (which: ReturnStep) => (which === "intro" ? introRef : formRef).current;
+
   const moved = React.useRef(false);
   React.useEffect(() => {
     if (!moved.current) return;
     moved.current = false;
-    const region = stepRef.current;
+    const region = panel(step);
     if (!region) return;
 
     /*
@@ -214,7 +216,9 @@ export function ReturnModal({ open, onOpenChange, program, areas }: ReturnModalP
    *  `parentElement` so an extra wrapper between the two cannot silently
    *  break it. */
   function scroller(): Element | null {
-    return stepRef.current?.closest('[role="dialog"]') ?? null;
+    /* Either panel resolves to the same ancestor, and `closest` is a DOM walk
+       that a `hidden` element takes part in exactly like a shown one. */
+    return introRef.current?.closest('[role="dialog"]') ?? null;
   }
 
   /* The one step that ends in a pinned bar, and so supplies its own bottom
@@ -235,7 +239,6 @@ export function ReturnModal({ open, onOpenChange, program, areas }: ReturnModalP
        there is no frame to catch. */
     const el = scroller();
     if (el) el.scrollTop = 0;
-    setForward(next === "form");
     setStep(next);
   }
 
@@ -333,49 +336,79 @@ export function ReturnModal({ open, onOpenChange, program, areas }: ReturnModalP
           </DialogDescription>
         </div>
 
-        {/* `key={step}` restarts the entrance animation, which is what makes
-            the move legible as movement rather than as the dialog silently
-            becoming a different dialog — the same reasoning
-            `FeaturedCarousel` re-keys its slide on. `tabIndex={-1}` exists
-            only so the effect above has something to focus; it is never in
-            the tab order. */}
+        {/* ═══════════════════════════════════════════════════════════════
+            BOTH STEPS STAY MOUNTED. ONLY ONE IS DISPLAYED.
+
+            This was one `<div key={step}>` holding whichever step was
+            current, which remounted the body on every move. That restarted
+            the entrance animation, which was the intent — and it also
+            destroyed `ReturnForm`, which is where everything the shopper has
+            typed lives. Press Back to re-read the offer and then Next, and
+            the quantity, name, phone, address and district were all gone;
+            `return-form.tsx`'s own header promises the exact opposite ("THE
+            FORM NEVER EMPTIES ITSELF"). After a successful submit it was
+            worse: the confirmation card carrying the shopper's `requestId` —
+            the one screen it is ever shown on — was destroyed with it.
+
+            THE ANIMATION SURVIVES THE FIX FOR FREE. An element with
+            `display: none` has no principal box, so its CSS animations are
+            not running; giving it a box again starts them from the
+            beginning. Toggling `hidden` therefore replays `animate-in` on
+            whichever panel is being revealed, with no key, no remount and no
+            state to lose.
+
+            EACH PANEL ENTERS FROM ITS OWN SIDE, so the `forward` state this
+            used to need is gone: the explanation is only ever reached by
+            going back, and the form only by going forward. The direction is
+            a property of the panel, not of the journey.
+
+            `hidden` rather than a class, because it is the one spelling that
+            takes the panel out of the accessibility tree and the tab order
+            as well as out of the layout — a screen reader must not be able to
+            wander into the form while the explanation is on screen.
+            ═══════════════════════════════════════════════════════════════ */}
         <div
-          key={step}
-          ref={stepRef}
+          ref={introRef}
+          hidden={step !== "intro"}
           tabIndex={-1}
           className={cn(
-            "outline-none duration-200 animate-in fade-in-0 motion-reduce:animate-none",
-            forward ? "slide-in-from-right-4" : "slide-in-from-left-4",
-            /* Every step owns its own bottom inset now, EXCEPT the one whose
+            "outline-none duration-200 animate-in fade-in-0 slide-in-from-left-4 motion-reduce:animate-none",
+            STEP_BOTTOM_INSET,
+          )}
+        >
+          <ReturnIntro
+            program={program}
+            dismissed={dismissed}
+            onDismissedChange={onDismissedChange}
+            onNext={() => goTo("form")}
+          />
+        </div>
+
+        <div
+          ref={formRef}
+          hidden={step !== "form"}
+          tabIndex={-1}
+          className={cn(
+            "outline-none duration-200 animate-in fade-in-0 slide-in-from-right-4 motion-reduce:animate-none",
+            /* Every step owns its own bottom inset, EXCEPT the one whose
                pinned bar already carries it — putting it here as well would
                re-open the very gap the bar exists to close. */
             !barCarriesInset && STEP_BOTTOM_INSET,
           )}
         >
-          {step === "intro" ? (
-            <ReturnIntro
+          {session === "customer" && (
+            <ReturnForm
               program={program}
-              dismissed={dismissed}
-              onDismissedChange={onDismissedChange}
-              onNext={() => goTo("form")}
+              areas={areas}
+              /* Only from here. `/returns` renders the same form with no
+                 scrolling ancestor to pin against — see the prop's own
+                 note for what that would do instead. */
+              pinSubmit
+              onDone={() => onOpenChange(false)}
             />
-          ) : (
-            <>
-              {session === "customer" && (
-                <ReturnForm
-                  program={program}
-                  areas={areas}
-                  /* Only from here. `/returns` renders the same form with no
-                     scrolling ancestor to pin against — see the prop's own
-                     note for what that would do instead. */
-                  pinSubmit
-                  onDone={() => onOpenChange(false)}
-                />
-              )}
-              {session === "guest" && <GuestPrompt />}
-              {session === "unknown" && <FormSkeleton />}
-            </>
           )}
+          {session === "guest" && <GuestPrompt />}
+          {session === "unknown" && <FormSkeleton />}
         </div>
       </DialogContent>
     </Dialog>
