@@ -14,6 +14,10 @@ import {
 
 import { ReturnForm } from "./return-form";
 import { GuestPrompt } from "./guest-prompt";
+import { ReturnIntro } from "./return-intro";
+import { ReturnSteps, stepOnOpen } from "./return-steps";
+import type { ReturnStep } from "./return-steps";
+import { introDismissed, setIntroDismissed } from "./intro-dismissed";
 import { readShopSession } from "../data/auth-api";
 import type { ShopSession } from "../data/auth-api";
 import type { ServiceArea } from "../data/returns-api";
@@ -47,6 +51,33 @@ import type { RewardsProgram } from "../data/marketing";
  * doing that here would unmount the form in the same tick React would
  * otherwise paint the one screen `requestId` is ever shown on. Do not "fix"
  * this by closing on success.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * TWO STEPS: THE EXPLANATION, THEN THE FORM.
+ *
+ * `ReturnIntro` is what the programme IS; the three session states above are
+ * how you join it. Both live in this one dialog because they are one errand,
+ * and the shopper decides when to move between them — nothing here advances
+ * on its own.
+ *
+ * ═══ THE EXPLANATION IS SHOWN TO EVERYONE, INCLUDING A GUEST ═══
+ * The session branch moved DOWN a level: it now gates step two only. Step one
+ * is public marketing that needs no account, and gating it would reproduce
+ * exactly the defect `ReturnFormGate` was written to fix one file over — a
+ * shopper told to sign in before being told what for. A guest now reads the
+ * offer first and meets `GuestPrompt` only after choosing to act on it.
+ *
+ * ═══ WHICH STEP AN OPEN LANDS ON IS DECIDED DURING RENDER ═══
+ * In the same `open !== wasOpen` block as the session reset below, not in an
+ * effect. An effect would commit one frame of the explanation to a shopper who
+ * ticked "don't show this again" — the flash is small, and it is the exact
+ * thing they asked not to see. Reading `localStorage` during render is safe
+ * HERE specifically because this branch only runs when `open` FLIPS, which on
+ * the server never happens: `ReturnsCta` always mounts closed, so the initial
+ * `wasOpen` equals `open` and the branch is skipped. `introDismissed()`
+ * answers `false` where there is no storage anyway, so the server would render
+ * the explanation rather than crash even if that ever stopped being true.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 export interface ReturnModalProps {
   open: boolean;
@@ -72,8 +103,30 @@ export interface ReturnModalProps {
  */
 const RETURNS_DESCRIPTION = "Request a pickup for what you're sending back.";
 
+/**
+ * The explanation step's accessible description — the sentence a screen reader
+ * hears when the dialog opens, before it reaches the visible copy.
+ *
+ * Built from `program` like everything else: the same rule the whole package
+ * follows, and the reason this is a function rather than a constant. Step one's
+ * visible heading is `ReturnIntro`'s own slogan, so this and the title above it
+ * are `sr-only` there — Radix's documented pattern for a dialog whose visible
+ * heading is styled and placed differently from its accessible name.
+ */
+function introDescription(program: RewardsProgram): string {
+  return `How ${program.name} works, and what you get for sending back your ${program.unitLabelPlural}.`;
+}
+
 export function ReturnModal({ open, onOpenChange, program, areas }: ReturnModalProps) {
   const [session, setSession] = React.useState<ShopSession["kind"]>("unknown");
+  const [step, setStep] = React.useState<ReturnStep>("intro");
+  /** The checkbox's own state. Separate from `step` on purpose: they read the
+   *  same flag today, but "which screen do I open on" and "is the box ticked"
+   *  are different questions, and only one of them is the shopper's to see. */
+  const [dismissed, setDismissed] = React.useState(false);
+  /* Which way the last move went, so the entering step slides in from the side
+     it came from. Purely cosmetic, and `motion-reduce` drops it entirely. */
+  const [forward, setForward] = React.useState(true);
 
   /*
    * RESET DURING RENDER, NOT INSIDE THE EFFECT BELOW.
@@ -96,7 +149,50 @@ export function ReturnModal({ open, onOpenChange, program, areas }: ReturnModalP
   const [wasOpen, setWasOpen] = React.useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (open) setSession("unknown");
+    if (open) {
+      setSession("unknown");
+      /* Both asked fresh on every open, for the same reason the session is:
+         the box may have been ticked in this dialog's own previous open, or in
+         another tab, since this instance mounted. See the file header for why
+         reading storage during render is safe at this one call site. */
+      setStep(stepOnOpen());
+      setDismissed(introDismissed());
+      setForward(true);
+    }
+  }
+
+  /*
+   * Focus follows the step, but only when the SHOPPER moved it.
+   *
+   * The control that moves you is inside the step it leaves — "Earn <points>"
+   * unmounts the instant it is pressed — so without this, focus lands back on
+   * the dialog container and a keyboard user has to tab in from the top of a
+   * screen they have already read. A ref rather than state gates it because
+   * `react-hooks/set-state-in-effect` forbids the obvious version, and because
+   * this is genuinely not rendered state: nothing on screen depends on whether
+   * the last step change came from a click or from opening the dialog.
+   */
+  const stepRef = React.useRef<HTMLDivElement>(null);
+  const moved = React.useRef(false);
+  React.useEffect(() => {
+    if (!moved.current) return;
+    moved.current = false;
+    stepRef.current?.focus();
+  }, [step]);
+
+  function goTo(next: ReturnStep) {
+    if (next === step) return;
+    moved.current = true;
+    setForward(next === "form");
+    setStep(next);
+  }
+
+  /* Persisted the moment it is ticked, NOT on the way to the next step. A
+     shopper who ticks the box and then closes with × has still said what they
+     want, and a preference that only counts if you keep going is a trap. */
+  function onDismissedChange(next: boolean) {
+    setDismissed(next);
+    setIntroDismissed(next);
   }
 
   React.useEffect(() => {
@@ -116,15 +212,48 @@ export function ReturnModal({ open, onOpenChange, program, areas }: ReturnModalP
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         {/* Required by Radix for the dialog's accessible name. `program.name`,
-            never a spelled noun — the same choice the page's `<h1>` makes. */}
-        <DialogTitle>{program.name}</DialogTitle>
-        <DialogDescription>{RETURNS_DESCRIPTION}</DialogDescription>
+            never a spelled noun — the same choice the page's `<h1>` makes.
+            `sr-only` on the explanation step, where `ReturnIntro`'s slogan is
+            the visible heading and this would be a second one above it. */}
+        <DialogTitle className={cn(step === "intro" && "sr-only")}>{program.name}</DialogTitle>
+        <DialogDescription className={cn(step === "intro" && "sr-only")}>
+          {step === "intro" ? introDescription(program) : RETURNS_DESCRIPTION}
+        </DialogDescription>
 
-        {session === "customer" && (
-          <ReturnForm program={program} areas={areas} onDone={() => onOpenChange(false)} />
-        )}
-        {session === "guest" && <GuestPrompt />}
-        {session === "unknown" && <FormSkeleton />}
+        <ReturnSteps step={step} onSelect={goTo} />
+
+        {/* `key={step}` restarts the entrance animation, which is what makes
+            the move legible as movement rather than as the dialog silently
+            becoming a different dialog — the same reasoning
+            `FeaturedCarousel` re-keys its slide on. `tabIndex={-1}` exists
+            only so the effect above has something to focus; it is never in
+            the tab order. */}
+        <div
+          key={step}
+          ref={stepRef}
+          tabIndex={-1}
+          className={cn(
+            "outline-none duration-200 animate-in fade-in-0 motion-reduce:animate-none",
+            forward ? "slide-in-from-right-4" : "slide-in-from-left-4",
+          )}
+        >
+          {step === "intro" ? (
+            <ReturnIntro
+              program={program}
+              dismissed={dismissed}
+              onDismissedChange={onDismissedChange}
+              onNext={() => goTo("form")}
+            />
+          ) : (
+            <>
+              {session === "customer" && (
+                <ReturnForm program={program} areas={areas} onDone={() => onOpenChange(false)} />
+              )}
+              {session === "guest" && <GuestPrompt />}
+              {session === "unknown" && <FormSkeleton />}
+            </>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );
