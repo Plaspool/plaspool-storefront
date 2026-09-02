@@ -1,7 +1,15 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { ReturnForm, composePickupAddress, placeError, resolveReturnPrefill } from "./return-form";
+import {
+  DIALOG_BOTTOM_INSET,
+  ReturnForm,
+  composePickupAddress,
+  placeError,
+  resolveReturnPrefill,
+} from "./return-form";
 import { ReturnRequestError } from "../data/returns-api";
 import type { MyReturn } from "../data/returns-api";
 import type { Address } from "../data/checkout-api";
@@ -329,7 +337,19 @@ describe("the submit button's pinning is the caller's choice, not this file's", 
        computed style was read off the live page. Assert the whole treatment is
        absent, not just its most obvious word. */
     const html = renderToStaticMarkup(<ReturnForm program={PROGRAM} areas={AREAS} />);
-    for (const cls of ["sticky", "-mx-4", "sm:-mx-6", "sm:px-6", "border-t", "sm:pt-4"]) {
+    for (const cls of [
+      "sticky",
+      "-mx-4",
+      "sm:-mx-6",
+      "sm:px-6",
+      "border-t",
+      "sm:pt-4",
+      // The scrim half. Omitting these let the exact split-out-of-the-guard
+      // regression pass green — twice.
+      "before:absolute",
+      "before:bottom-full",
+      "before:from-background",
+    ]) {
       expect(html).not.toContain(cls);
     }
   });
@@ -362,4 +382,72 @@ describe("the submit button's pinning is the caller's choice, not this file's", 
     );
     expect(pinned).toBe(plain);
   });
+});
+
+describe("the pinned bar carries the bottom inset the scroller gave up", () => {
+  /*
+   * ═══ THE DEFECT THIS ENCODES ═══
+   * `DialogContent` is the scroll container and sets `pb-0`. It has to: a
+   * sticky footer is confined to its containing block — the `<form>` — whose
+   * content box stops where the scroller's bottom padding starts, so ANY
+   * padding there parks the bar that far above the true bottom edge and every
+   * field scrolls visibly through the strip underneath. That shipped once,
+   * with the District select showing below "Send return request".
+   *
+   * ═══ READ THE BAR'S OWN `class`, NOT THE WHOLE DOCUMENT ═══
+   * The first version of these asserted `html.toContain(cls)`, which matches
+   * anywhere. `bg-background` already appears six times in this form (every
+   * `Input`, every native select), so that assertion passed with the bar
+   * transparent; and `pb-4` moved onto the `<form>` instead of the bar also
+   * passed, which is precisely the arrangement that reopens the gap. Both
+   * assertions are now scoped to the wrapper element itself.
+   */
+  const barClass = (html: string) => {
+    const m = /<div class="([^"]*sticky[^"]*)"/.exec(html);
+    return m ? m[1]! : "";
+  };
+
+  it("pads its bottom by the same amount every other surface of the dialog does", () => {
+    const html = renderToStaticMarkup(<ReturnForm program={PROGRAM} areas={AREAS} pinSubmit />);
+    const cls = barClass(html);
+    expect(cls).not.toBe("");
+    for (const token of DIALOG_BOTTOM_INSET.split(" ")) {
+      expect(cls.split(" ")).toContain(token);
+    }
+  });
+
+  it("paints over what scrolls beneath it rather than sharing a layer with it", () => {
+    const cls = barClass(
+      renderToStaticMarkup(<ReturnForm program={PROGRAM} areas={AREAS} pinSubmit />),
+    ).split(" ");
+    expect(cls).toContain("z-10");
+    expect(cls).toContain("bg-background");
+  });
+
+  it("fades content into itself with a single-hue scrim", () => {
+    // `to-transparent` is transparent BLACK and hazes grey in Safari; the ramp
+    // must end on the same colour at zero alpha.
+    const cls = barClass(
+      renderToStaticMarkup(<ReturnForm program={PROGRAM} areas={AREAS} pinSubmit />),
+    ).split(" ");
+    expect(cls).toContain("before:from-background");
+    expect(cls).toContain("before:to-background/0");
+    expect(cls).not.toContain("before:to-transparent");
+  });
+
+  it("gives the confirmation the same inset, since it replaces the bar entirely", () => {
+    // A successful submit swaps the whole form — pinned bar included — for a
+    // status card, so the card becomes the thing drawing the dialog's bottom
+    // edge. Without its own inset it sat flush on the dialog's border, and on
+    // a phone under the home indicator.
+    //
+    // SCOPED TO THE CONFIRMATION'S OWN JSX. The first version grepped the
+    // whole file for the margin tokens, which the constant's declaration
+    // satisfies by itself — deleting the usage left this green.
+    const src = readFileSync(join(__dirname, "return-form.tsx"), "utf8");
+    const block = src.slice(src.indexOf("if (confirmation) {"), src.indexOf("<Check aria-hidden"));
+    expect(block).not.toBe("");
+    expect(block).toContain("CONFIRMATION_BOTTOM_INSET");
+  });
+
 });

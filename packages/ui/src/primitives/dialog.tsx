@@ -59,11 +59,22 @@ const SHEET_ON_MOBILE = [
      The two `translate-*-0`s are what undo the centring transform. */
   "max-sm:inset-x-0 max-sm:bottom-0 max-sm:left-0 max-sm:top-auto",
   "max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0",
-  /* Only the top edge is a border now — the other three sit off-screen. */
-  "max-sm:max-h-[92dvh] max-sm:rounded-t-2xl max-sm:border-x-0 max-sm:border-b-0",
+  /* Only the top edge is a border now — the other three sit off-screen.
+     `rounded-t-lg` is `--radius` exactly. It was `rounded-t-2xl`, which is
+     1rem and the ONLY `2xl` radius anywhere in this codebase: the scale in
+     use is `rounded-md`/`sm`/`lg` off the one token, and a sheet corner
+     twice every other corner in the app reads as imported from somewhere
+     else. */
+  /* The bottom corners have to be squared off explicitly now that the base
+     is `rounded-lg`, or the sheet curves away from the screen edge it is
+     flush against. */
+  "max-sm:max-h-[92dvh] max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0",
   /* Tighter than the desktop `p-6`/`gap-4`: on a narrow screen that padding
-     is width the content needs more than the margin does. */
-  "max-sm:gap-3 max-sm:px-4 max-sm:pb-4 max-sm:pt-3",
+     is width the content needs more than the margin does.
+
+     NO BOTTOM PADDING HERE — it is the caller's, deliberately. See the note on
+     `DialogContentProps["mobile"]` and `ReturnModal`'s `pb-0`. */
+  "max-sm:gap-3 max-sm:px-4 max-sm:pt-3",
   /* It rises from the edge it is attached to rather than fading in place.
      Composes with the base fade — different custom properties. */
   "max-sm:data-[state=open]:slide-in-from-bottom",
@@ -87,7 +98,16 @@ const DialogContent = React.forwardRef<
       ref={ref}
       className={cn(
         "fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4",
-        "max-h-[calc(100dvh-2rem)] overflow-y-auto border border-brand-line bg-background p-6 shadow-lg",
+        /* `rounded-lg` is `--radius` exactly. This carried NO radius at all,
+           which is not a square-corner idiom being honoured: the flat panels
+           that are legitimately square in this system are the
+           `border-2 border-foreground` ones (`guest-prompt.tsx`), whereas
+           this is `border border-brand-line … shadow-lg` — the elevated-card
+           treatment with its corner deleted. Everything inside it is on the
+           scale (`Card` `rounded-lg`, inputs and selects `rounded-md`, the
+           close button `rounded-sm`), so a hard-square frame around
+           `rounded-md` fields read as unfinished rather than as deliberate. */
+        "max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-lg border border-brand-line bg-background p-6 shadow-lg",
         "data-[state=open]:animate-in data-[state=closed]:animate-out",
         "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         mobile === "sheet" && SHEET_ON_MOBILE,
@@ -96,7 +116,12 @@ const DialogContent = React.forwardRef<
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
+      {/* `focus-visible:` and the BRAND ring. Stock shadcn ships `focus:` with
+          `--ring` (near-black), which made this the one control in the dialog
+          that ringed a different colour from every other — the step dots, the
+          Back button and the intro's checkbox all ring `--brand` — and ringed
+          it on a plain mouse click too. */}
+      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2">
         <X className="h-4 w-4" />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>
