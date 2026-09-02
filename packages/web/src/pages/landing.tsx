@@ -1,7 +1,7 @@
 
 "use client"
 import Image from "next/image"
-import { ArrowRight, Globe, Layers, Shield, Truck, Users, Zap } from "lucide-react"
+import { ArrowRight, Layers, Shield, Truck, Users, Zap } from "lucide-react"
 
 import {
   Badge,
@@ -36,9 +36,12 @@ export default function PlaspoolLanding() {
                   Premium 3D Printer
                   <span className="text-brand-ink"> Filaments</span>
                 </h1>
-                <p className="text-xl text-brand-ink leading-relaxed font-light">
-                  Engineered for excellence. Manufactured with precision. Delivered globally. PlaSpool provides
-                  high-quality PLA filaments for makers, professionals, and industrial users worldwide.
+                {/* NOT `font-light`. A 300 weight at this size was the thinnest
+                    text on the page sitting on the darkest ground on the page,
+                    which is the pairing this pass exists to stop. */}
+                <p className="text-xl text-brand-ink leading-relaxed">
+                  High-quality PLA filaments for makers, professionals and industrial users in Nigeria —
+                  engineered for excellence and manufactured with precision.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-4">
@@ -53,36 +56,17 @@ export default function PlaspoolLanding() {
                     SC 1.4.11's 3:1 for a control boundary outright. The white
                     key is 15.5:1 here and is unmistakably the page's one call
                     to action. The ROLE is still primary; the TONE that renders
-                    it correctly on an inverted band is `default`. */}
+                    it correctly on an inverted band is `default`.
+
+                    IT IS ALSO NOW THE ONLY BUTTON HERE. "View Specifications"
+                    stood beside it and pointed at the `#specs` table, and both
+                    were removed together — that button was the section's only
+                    inbound link, so neither outlives the other. */}
                 <Button asChild size="lg" tone="default" className="font-mono">
                   <Link href="/store" prefetch={false}>
                     Shop Filaments <ArrowRight className="ml-2 w-4 h-4" />
                   </Link>
                 </Button>
-                <a href="#specs">
-                <Button
-                  size="lg"
-                  variant="outline"
-                  /* OUTLINE, NOT A SECOND SOLID BRAND BUTTON. This sits beside
-                     "Shop Filaments" on the dark hero and was a muted secondary
-                     (`bg-slate-800` against the primary's `bg-blue-800`). Mapping
-                     both fills onto `bg-brand` made two identical CTAs with no
-                     hierarchy between them, so the fill comes off and the border
-                     carries it — which is what `variant="outline"` meant here.
-
-                     `tone="none"` — THE ONE PLACE THE TREATMENT DOES NOT REACH.
-                     A second white machined key here would erase the hierarchy
-                     the comment above exists to protect, and the machined table
-                     has no inverted row to be quiet in: it is light-ground by
-                     construction, its top highlight assumes light falling onto
-                     a light page. So this stays a hand-drawn outline on the
-                     dark band. It is NOT excused from the flag — there is no
-                     flag position in which a bevel belongs here. */
-                  tone="none"
-                  className="border-brand-line bg-transparent text-brand-ink hover:bg-brand-hover hover:text-brand-ink font-mono"
-                >
-                  View Specifications
-                </Button></a>
               </div>
               
             </div>
@@ -180,7 +164,7 @@ export default function PlaspoolLanding() {
                 <div className="w-16 h-16 bg-brand-soft rounded-full flex items-center justify-center mx-auto mb-4">
                   <Layers className="w-8 h-8 text-brand" />
                 </div>
-                <CardTitle className="text-xl text-muted-foreground tracking-tight">PLA Filaments</CardTitle>
+                <CardTitle className="text-xl text-foreground tracking-tight">PLA Filaments</CardTitle>
                 <CardDescription>Easy-to-print, biodegradable, perfect for beginners and pros alike</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -207,7 +191,7 @@ export default function PlaspoolLanding() {
                 <div className="w-16 h-16 bg-brand-soft rounded-full flex items-center justify-center mx-auto mb-4">
                   <Users className="w-8 h-8 text-brand" />
                 </div>
-                <CardTitle className="text-xl tracking-tight text-muted-foreground">For Everyone</CardTitle>
+                <CardTitle className="text-xl tracking-tight text-foreground">For Everyone</CardTitle>
                 <CardDescription>From individual makers to businesses in need of bulk supply</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -222,10 +206,13 @@ export default function PlaspoolLanding() {
 
             <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow bg-white">
               <CardHeader className="text-center pb-4">
-                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Shield className="w-8 h-8 text-muted-foreground" />
+                {/* `bg-brand-soft`/`text-brand`, matching the two cards beside
+                    it. The muted pair here made the third card read as disabled
+                    — a state, not the emphasis it was reaching for. */}
+                <div className="w-16 h-16 bg-brand-soft rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Shield className="w-8 h-8 text-brand" />
                 </div>
-                <CardTitle className="text-xl tracking-tight text-muted-foreground">Quality Control</CardTitle>
+                <CardTitle className="text-xl tracking-tight text-foreground">Quality Control</CardTitle>
                 <CardDescription>Strict quality controls ensure consistent performance</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -237,68 +224,6 @@ export default function PlaspoolLanding() {
           
               </CardContent>
             </Card>
-          </div>
-        </div>
-      </section>
-
-        <section id="specs" className="py-16 bg-muted">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center space-y-4 mb-12">
-            <Badge variant="outline" className="text-brand border-brand-line font-mono text-xs tracking-wider">
-              Technical Data
-            </Badge>
-            <h2 className="text-3xl font-bold text-foreground tracking-tight">Engineering Specifications</h2>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-brand-line">
-                <thead className="bg-muted">
-                  <tr>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider font-mono"
-                    >
-                      Property
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider font-mono"
-                    >
-                      Value
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider font-mono"
-                    >
-                      Test Method
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-brand-line font-mono text-sm">
-                  <tr>
-                    <td className="px-6 py-4 whitespace-nowrap text-foreground">Diameter Tolerance</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-muted-foreground">±0.02mm</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-muted-foreground">Laser Micrometer</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 whitespace-nowrap text-foreground">Roundness</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-muted-foreground">≥ 95%</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-muted-foreground">Optical Measurement</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 whitespace-nowrap text-foreground">Tensile Strength</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-muted-foreground">50 MPa</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-muted-foreground">ASTM D638</td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 whitespace-nowrap text-foreground">Print Temperature</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-muted-foreground">190-220°C</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-muted-foreground">Thermal Analysis</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
           </div>
         </div>
       </section>
@@ -319,42 +244,11 @@ export default function PlaspoolLanding() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-16">
-            <div className="text-center space-y-4">
-              <div className="w-16 h-16 bg-brand-soft rounded-full flex items-center justify-center mx-auto">
-                <Globe className="w-8 h-8 text-brand" />
-              </div>
-              <h3 className="font-semibold text-foreground tracking-wide">Africa</h3>
-              <p className="text-sm text-muted-foreground">Serving the growing African maker community</p>
-            </div>
-            <div className="text-center space-y-4">
-              <div className="w-16 h-16 bg-brand-soft rounded-full flex items-center justify-center mx-auto">
-                <Globe className="w-8 h-8 text-brand" />
-              </div>
-              <h3 className="font-semibold text-foreground tracking-wide">Europe</h3>
-              <p className="text-sm text-muted-foreground">Reliable supply to European markets</p>
-            </div>
-            <div className="text-center space-y-4">
-              <div className="w-16 h-16 bg-brand-soft rounded-full flex items-center justify-center mx-auto">
-                <Globe className="w-8 h-8 text-brand" />
-              </div>
-              <h3 className="font-semibold text-foreground tracking-wide">North America</h3>
-              <p className="text-sm text-muted-foreground">Fast delivery across the Americas</p>
-            </div>
-            <div className="text-center space-y-4">
-              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto">
-                <Globe className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <h3 className="font-semibold text-foreground tracking-wide">Asia & Beyond</h3>
-              <p className="text-sm text-muted-foreground">Expanding reach to global markets</p>
-            </div>
-          </div>
-
           <div className="bg-muted rounded-2xl p-8" id="partnerships">
             <div className="grid md:grid-cols-2 gap-8 items-center">
               <div className="space-y-6">
                 <h3 className="text-2xl font-bold text-foreground tracking-tight">Partnership Opportunities</h3>
-                <p className="text-muted-foreground">
+                <p className="text-lg text-muted-foreground">
                   We support partnerships with resellers, distributors, and educators worldwide. Join our global network
                   and bring premium filaments to your local market.
                 </p>
@@ -471,19 +365,32 @@ export default function PlaspoolLanding() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-24 bg-gradient-to-r from-brand to-brand-hover text-white">
+      {/* ═══ WHITE, AND THE FOOTER UNDERNEATH IT IS THE WHOLE REASON ═══
+          This band was `from-brand to-brand-hover` sitting directly on the
+          footer's flat `bg-brand`: two different purples meeting with no seam
+          between them, which reads as a rendering fault rather than as two
+          sections. Painting this one white gives the footer an edge to begin
+          at, and lets the page end on ONE deliberate block of brand colour
+          instead of two accidental ones.
+
+          IT ALSO FLIPS THE BUTTON'S TONE, and that is not cosmetic. `default`
+          is the machined table's WHITE key, chosen for this band precisely
+          because the band used to be painted; left here it would be a white
+          key on white. `primary` is the #303030 row the table is built for on
+          a light ground — the hero CTA states the same rule from the other
+          side, and the two comments should be read together. */}
+      <section className="py-24 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-8">
-          <h2 className="text-3xl lg:text-4xl font-bold tracking-tight">Ready to Experience PlaSpool Quality?</h2>
-          <p className="text-xl text-brand-ink">
+          <h2 className="text-3xl lg:text-4xl font-bold tracking-tight text-foreground">
+            Ready to Experience PlaSpool Quality?
+          </h2>
+          <p className="text-lg text-muted-foreground">
             Whether you are printing prototypes, functional parts, or artistic models, PlaSpool delivers reliable
             filament that performs consistently.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             {/* One anchor styled as a button — see the hero CTA above. */}
-            {/* `default` for the same reason as the hero CTA above: this band
-                is brand-painted, and the white key is the readable one on it.
-                The button was already white — it just says so as a role now. */}
-            <Button asChild size="lg" tone="default" className="w-full font-mono">
+            <Button asChild size="lg" tone="primary" className="w-full font-mono">
               <Link href="/store" prefetch={false}>
                 Shop Now <ArrowRight className="ml-2 w-4 h-4" />
               </Link>
