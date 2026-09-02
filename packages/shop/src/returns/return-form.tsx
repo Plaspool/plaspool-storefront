@@ -124,6 +124,52 @@ import { readSavedAddress } from "../checkout/saved-address";
  * file to branch on that the reads do not already collapse for it.
  */
 
+/**
+ * The breathing room at the bottom of whatever a dialog step ends with.
+ *
+ * ═══ IT LIVES HERE BECAUSE `DialogContent` GAVE IT UP ═══
+ * That element is the scroll container and sets `pb-0`. It has to: a sticky
+ * footer is confined to its containing block — the `<form>` — whose content
+ * box stops where the scroller's bottom padding starts, so ANY padding there
+ * parks the pinned bar that far above the true bottom edge and every field
+ * scrolls visibly through the strip underneath. That shipped once, with the
+ * District select showing below "Send return request".
+ *
+ * So the inset has to sit INSIDE whatever draws the bottom of a step, or it is
+ * just a gap for content to show through again. THREE things need it and must
+ * agree, or the dialog's bottom edge changes depth depending on what you are
+ * looking at: the pinned bar, the confirmation that REPLACES the whole form
+ * once a request is sent, and every non-form step (`ReturnModal`'s
+ * `STEP_BOTTOM_INSET`, which re-exports this).
+ *
+ * Exported from this file rather than from `return-modal.tsx` purely for
+ * import direction: the modal already imports the form, so the reverse would
+ * be a cycle.
+ */
+export const DIALOG_BOTTOM_INSET =
+  "pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-6";
+
+/**
+ * The same inset as a MARGIN, for the confirmation card — the tint stops at
+ * the card's edge that way, instead of the card growing a lopsided bottom.
+ *
+ * Spelled out rather than derived from `DIALOG_BOTTOM_INSET` at runtime.
+ * Tailwind's scanner is a regex over source text: a `.replace()` would produce
+ * `mb-4 sm:mb-6` at render time, those literals would appear nowhere in any
+ * file, and no such CSS would ever be generated. The two constants must stay
+ * numerically in step; `return-form.test.tsx` asserts it.
+ *
+ * ═══ `env(safe-area-inset-bottom)` UNDER `sm`, LIKE THE OTHER BOTTOM BAR ═══
+ * The sheet is seated flush at `max-sm:bottom-0`, so a flat 16px put the
+ * `h-12` primary inside an iPhone's ~34pt home-indicator strip, with the
+ * system swipe-up gesture over the tap target. `sticky-buy-bar.tsx:73` and
+ * `shop-shell.tsx:89` already reserve this inset and note that it resolves to
+ * 0px everywhere else, so it costs nothing to apply unconditionally. The `sm`
+ * side needs none: the centred dialog is not against a screen edge.
+ */
+const CONFIRMATION_BOTTOM_INSET =
+  "mb-[calc(1rem+env(safe-area-inset-bottom))] sm:mb-6";
+
 /** The API's own floor for one request, mirrored so a quantity below it is
  *  reported beside the field before a request is ever made. The API still
  *  gets the last word — see `placeError`'s `below-minimum` case — because the
@@ -410,12 +456,37 @@ export function ReturnForm({ program, areas, onDone, pinSubmit, className }: Ret
      empties itself, and `review-form.tsx` for the same silence being the
      pre-existing house shape there. */
   const blockAlertRef = React.useRef<HTMLDivElement>(null);
+  /* The whole-form message that renders just above the submit. See the effect
+     below for why a PINNED submit forced this to stop being silent. */
+  const formAlertRef = React.useRef<HTMLParagraphElement>(null);
 
   React.useEffect(() => {
     if (placement && "kind" in placement) {
       blockAlertRef.current?.focus();
+      return;
     }
-  }, [placement]);
+    /*
+     * ═══ A PINNED SUBMIT BROKE THE ARGUMENT FOR LEAVING THIS SILENT ═══
+     * The note above says field-level errors and this whole-form message are
+     * deliberately unchanged, on the grounds that they were the pre-existing
+     * house shape. That reasoning had an unstated premise: the submit used to
+     * sit at the BOTTOM of the scroll, so pressing it meant you were already
+     * looking at the place a message would land.
+     *
+     * `pinSubmit` removes that premise. The button is now reachable at ANY
+     * offset, and this message renders as the last flow child before the bar
+     * — so submitting from the top of a form taller than the dialog put the
+     * only feedback below the scrollport, behind the bar and its scrim. The
+     * spinner ran, stopped, and nothing visible changed: a rate limit, a
+     * paused programme or a dropped connection all read as a dead button.
+     *
+     * Only when pinned. On `/returns` the original geometry still holds and
+     * the house shape is left exactly as it was.
+     */
+    if (pinSubmit && placement && "field" in placement && placement.field === null) {
+      formAlertRef.current?.scrollIntoView({ block: "nearest" });
+    }
+  }, [placement, pinSubmit]);
 
   /* SET SYNCHRONOUSLY, INSIDE EVERY PREFILLABLE FIELD'S OWN `onChange` —
      not `useState`, because a `useState` guard reads whatever the closure
@@ -509,11 +580,49 @@ export function ReturnForm({ program, areas, onDone, pinSubmit, className }: Ret
 
   const pointsForQty = Number.isFinite(qtyNumber) && qtyNumber > 0 ? qtyNumber * program.pointsPerUnit : 0;
 
+  /** The first field, in visual order, that is currently a problem. Ordered
+   *  by the DOM rather than by `Object.keys`, so "first" means the one nearest
+   *  the top of the form and not whichever key happens to be declared first. */
+  function firstProblemFieldId(): string | null {
+    const order: (keyof typeof problems)[] = [
+      "qtyDeclared",
+      "phone",
+      "pickupAddress",
+      "serviceAreaId",
+    ];
+    const key = order.find((k) => problems[k] !== null);
+    if (!key) return null;
+    return { qtyDeclared: id("qty"), phone: id("phone"), pickupAddress: id("address"), serviceAreaId: id("area") }[key];
+  }
+
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     setAttempted(true);
     setPlacement(null);
-    if (!valid || sending) return;
+    if (!valid || sending) {
+      /*
+       * ═══ A REJECTED SUBMIT HAS TO SHOW SOMETHING, AND IT DID NOT ═══
+       * This returned silently. `placement` stays null on a client-side
+       * failure, so the effect above does nothing; the form is `noValidate`
+       * and carries no native `required`, so the browser scrolls nothing
+       * either; the field messages have no `role="alert"`. With the submit at
+       * the END of the scroll that was survivable — you were looking at the
+       * fields. `pinSubmit` made the button reachable from ANY offset, so a
+       * shopper prefilled from a saved address (which deliberately leaves the
+       * district blank) could press it from the top of the form and get
+       * nothing at all: no spinner, no message in view, no focus move.
+       *
+       * Focusing is what fixes both audiences at once — it scrolls the field
+       * into view for a sighted shopper and moves the screen reader to the
+       * control with its `aria-describedby` error. `DialogContent`'s
+       * `scroll-pb-24` is what keeps that landing above the pinned bar.
+       */
+      if (!valid) {
+        const target = firstProblemFieldId();
+        if (target) document.getElementById(target)?.focus();
+      }
+      return;
+    }
 
     setSending(true);
     try {
@@ -544,6 +653,14 @@ export function ReturnForm({ program, areas, onDone, pinSubmit, className }: Ret
         role="status"
         className={cn(
           "flex items-start gap-3 rounded-lg border border-brand-line bg-brand-soft p-4",
+          /* THE CONFIRMATION REPLACES THE WHOLE FORM, pinned bar included, so
+             it is the last thing in a scroller that no longer supplies a
+             bottom inset — see `DIALOG_BOTTOM_INSET`. Without this the card's
+             border sat flush on the dialog's own bottom border, and on a
+             phone the sheet is anchored to the screen edge, putting "Done"
+             under the home indicator. `mb-*` rather than `pb-*` so the inset
+             stays OUTSIDE the tinted card instead of padding it unevenly. */
+          pinSubmit && CONFIRMATION_BOTTOM_INSET,
           className,
         )}
       >
@@ -802,7 +919,7 @@ export function ReturnForm({ program, areas, onDone, pinSubmit, className }: Ret
       </Field>
 
       {placement && "field" in placement && placement.field === null && (
-        <p role="alert" className="text-sm text-destructive-strong">
+        <p ref={formAlertRef} role="alert" className="text-sm text-destructive-strong">
           {placement.message}
         </p>
       )}
@@ -832,7 +949,28 @@ export function ReturnForm({ program, areas, onDone, pinSubmit, className }: Ret
         className={cn(
           "flex flex-col",
           pinSubmit &&
-            "sticky bottom-0 -mx-4 border-t border-brand-line bg-background px-4 pb-1 pt-3 sm:-mx-6 sm:px-6 sm:pt-4",
+            /* ONE STRING. The scrim below was briefly a second `cn()`
+               argument so it could carry its own comment, which put it
+               OUTSIDE this guard and leaked it onto `/returns` — the second
+               time that exact mistake was made in this exact place. The
+               comments live above the string now; the classes do not leave
+               it.
+
+               THE SCRIM: a short fade standing on the bar's own top edge, so
+               a field passing underneath dissolves instead of being
+               guillotined by the hairline. `bottom-full` puts it in the
+               scrolling content's space without taking layout room, and it is
+               `pointer-events-none` because it must never eat a click aimed
+               at the last field.
+
+               `to-background/0`, NEVER `to-transparent`: Tailwind's
+               `transparent` is `rgba(0,0,0,0)` — transparent BLACK — and a
+               white-to-transparent-black ramp is the classic grey-haze fade,
+               which Safari interpolates through grey rather than staying on
+               the hue. Fading to the same colour at zero alpha keeps one hue
+               in every engine. `from-background` also keeps it on the token
+               ramp, which `house-rules.test.ts` requires of a gradient stop. */
+            `sticky bottom-0 z-10 -mx-4 border-t border-brand-line bg-background px-4 pt-3 ${DIALOG_BOTTOM_INSET} sm:-mx-6 sm:px-6 sm:pt-4 before:pointer-events-none before:absolute before:inset-x-0 before:bottom-full before:h-4 before:bg-gradient-to-t before:from-background before:to-background/0`,
         )}
       >
         <Button type="submit" disabled={sending || noAreas} tone="primary" className="h-12 text-base">

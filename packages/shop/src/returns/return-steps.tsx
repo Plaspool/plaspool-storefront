@@ -81,7 +81,13 @@ export function ReturnSteps({ step, onSelect }: ReturnStepsProps) {
        top-4`, which is exactly where a `justify-between` row would have put
        them. Centring also means the indicator does not shift when "Back"
        appears beside it on the second step. */
-    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+    /* `min-h-7` = 28px, the height of the Back button (`text-sm` + `py-1`).
+       Without it this row is 8px tall on the first step — just the dots — and
+       28px on the second, so the indicator dropped 10px the moment Back
+       appeared beside it. Reserving the taller of the two heights on both
+       steps is what actually makes the dots hold still; being row one only
+       fixed the larger jump above them. */
+    <div className="grid min-h-7 grid-cols-[1fr_auto_1fr] items-center gap-4">
       {/* Renders nothing on the first step. The column holds the row's left
           edge regardless, so the dots do not move when "Back" appears. */}
       {index > 0 ? (
@@ -112,10 +118,16 @@ export function ReturnSteps({ step, onSelect }: ReturnStepsProps) {
               aria-current={current ? "step" : undefined}
               onClick={() => onSelect(s.id)}
               className={cn(
-                "h-2 w-2 rounded-full transition-colors motion-reduce:transition-none",
+                /* The current step is a PILL, not a darker dot. Two dots
+                   differing only in fill ask the eye to compare two 8px
+                   circles for tone; a shape difference is legible at a
+                   glance and survives being looked at on a phone in
+                   daylight. `transition-all` because the width animates
+                   too now. */
+                "h-2 rounded-full transition-all motion-reduce:transition-none",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
                 "focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                current ? "bg-foreground" : "bg-brand-line hover:bg-muted-foreground",
+                current ? "w-5 bg-foreground" : "w-2 bg-brand-line hover:bg-muted-foreground",
               )}
             >
               <span className="sr-only">{`Step ${i + 1} of ${STEPS.length}: ${s.label}`}</span>

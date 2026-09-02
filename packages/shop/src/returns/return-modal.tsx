@@ -12,7 +12,7 @@ import {
   cn,
 } from "@plaspool/ui";
 
-import { ReturnForm } from "./return-form";
+import { DIALOG_BOTTOM_INSET, ReturnForm } from "./return-form";
 import { GuestPrompt } from "./guest-prompt";
 import { ReturnIntro } from "./return-intro";
 import { ReturnSteps, stepOnOpen } from "./return-steps";
@@ -104,6 +104,18 @@ export interface ReturnModalProps {
 const RETURNS_DESCRIPTION = "Request a pickup for what you're sending back.";
 
 /**
+ * The breathing room at the bottom of a step, which `DialogContent` no longer
+ * provides — see the `pb-0` note at the call site for why it cannot.
+ *
+ * Re-exported from `ReturnForm` rather than declared here so the pinned bar,
+ * the confirmation card and every non-form step are provably the same number:
+ * they all draw the bottom of this one dialog, and a disagreement between them
+ * shows up as the dialog's bottom edge changing depth depending on which state
+ * you happen to be looking at.
+ */
+export const STEP_BOTTOM_INSET = DIALOG_BOTTOM_INSET;
+
+/**
  * The explanation step's accessible description — the sentence a screen reader
  * hears when the dialog opens, before it reaches the visible copy.
  *
@@ -124,9 +136,6 @@ export function ReturnModal({ open, onOpenChange, program, areas }: ReturnModalP
    *  same flag today, but "which screen do I open on" and "is the box ticked"
    *  are different questions, and only one of them is the shopper's to see. */
   const [dismissed, setDismissed] = React.useState(false);
-  /* Which way the last move went, so the entering step slides in from the side
-     it came from. Purely cosmetic, and `motion-reduce` drops it entirely. */
-  const [forward, setForward] = React.useState(true);
 
   /*
    * RESET DURING RENDER, NOT INSIDE THE EFFECT BELOW.
@@ -157,7 +166,6 @@ export function ReturnModal({ open, onOpenChange, program, areas }: ReturnModalP
          reading storage during render is safe at this one call site. */
       setStep(stepOnOpen());
       setDismissed(introDismissed());
-      setForward(true);
     }
   }
 
@@ -172,18 +180,65 @@ export function ReturnModal({ open, onOpenChange, program, areas }: ReturnModalP
    * this is genuinely not rendered state: nothing on screen depends on whether
    * the last step change came from a click or from opening the dialog.
    */
-  const stepRef = React.useRef<HTMLDivElement>(null);
+  /* One ref per panel, because both are mounted at all times now — see the
+     note above the two of them in the JSX. `panel()` answers whichever is
+     currently displayed; focusing a `hidden` one would silently do nothing. */
+  const introRef = React.useRef<HTMLDivElement>(null);
+  const formRef = React.useRef<HTMLDivElement>(null);
+  const panel = (which: ReturnStep) => (which === "intro" ? introRef : formRef).current;
+
   const moved = React.useRef(false);
   React.useEffect(() => {
     if (!moved.current) return;
     moved.current = false;
-    stepRef.current?.focus();
+    const region = panel(step);
+    if (!region) return;
+
+    /*
+     * ═══ `preventScroll`, AND THEN THE SCROLL BY HAND ═══
+     * A plain `.focus()` here dumped the shopper at the BOTTOM of the form.
+     * Focusing scrolls the element into view, and the browser does that by
+     * moving the minimum distance needed — for a region TALLER than the
+     * scrollport, "the minimum" is to align its bottom edge, so pressing
+     * "Next" landed on the submit with every field scrolled off above it.
+     *
+     * The two halves are both needed. `preventScroll` stops the browser
+     * choosing, and the explicit reset is what actually puts the shopper at
+     * the top of the step they just asked for — the dialog keeps whatever
+     * scroll offset the PREVIOUS step left behind otherwise, since it is one
+     * scroll container reused across both.
+     */
+    region.focus({ preventScroll: true });
   }, [step]);
+
+  /** The dialog's scroll container — `DialogContent` itself, which Radix
+   *  renders with `role="dialog"`. Found by role rather than by
+   *  `parentElement` so an extra wrapper between the two cannot silently
+   *  break it. */
+  function scroller(): Element | null {
+    /* Either panel resolves to the same ancestor, and `closest` is a DOM walk
+       that a `hidden` element takes part in exactly like a shown one. */
+    return introRef.current?.closest('[role="dialog"]') ?? null;
+  }
+
+  /* The one step that ends in a pinned bar, and so supplies its own bottom
+     inset. Every other step — the explanation, the sign-in prompt, the
+     loading skeleton — ends in ordinary flowed content and needs the dialog's
+     old padding back. */
+  const barCarriesInset = step === "form" && session === "customer";
 
   function goTo(next: ReturnStep) {
     if (next === step) return;
     moved.current = true;
-    setForward(next === "form");
+    /* SYNCHRONOUSLY, HERE — not in the effect above. Both steps share one
+       scroll container, so the incoming step inherits whatever offset the
+       outgoing one left. Resetting in an effect is allowed to run after
+       paint, which lets the new step render one frame at the old offset and
+       then snap, mid-way through its own entrance animation. Doing it in the
+       handler means the scroll is already 0 before React re-renders, and
+       there is no frame to catch. */
+    const el = scroller();
+    if (el) el.scrollTop = 0;
     setStep(next);
   }
 
@@ -212,58 +267,148 @@ export function ReturnModal({ open, onOpenChange, program, areas }: ReturnModalP
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/* A bottom sheet on a phone, the centred dialog everywhere else — one
           mounted dialog either way, switched in CSS. See `SHEET_ON_MOBILE` in
-          `@plaspool/ui`'s `dialog.tsx` for why this is not a `Sheet`. */}
-      <DialogContent mobile="sheet">
+          `@plaspool/ui`'s `dialog.tsx` for why this is not a `Sheet`.
+
+          ═══ `pb-0`, AND IT IS LOAD-BEARING ═══
+          This is the scroll container. A sticky footer inside it is confined
+          to its containing block — the `<form>` — whose content box STOPS
+          where this element's bottom padding starts. With any padding here,
+          `bottom-0` parks the pinned bar that far above the true bottom edge
+          and every field scrolls visibly through the strip underneath it,
+          which is precisely the defect this fixes: the District select was
+          showing below the "Send return request" bar.
+
+          So the bottom inset belongs to whatever sits at the end of a step,
+          never to the scroller: the pinned bar carries it for the form, and
+          `STEP_BOTTOM_INSET` below carries it for every other step. */}
+      {/* `scroll-pb-24` = 96px of scroll padding at the bottom, which is what
+          makes `scrollIntoView` inside this scroller aim ABOVE the pinned bar
+          rather than underneath it. The bar measures 89px in the centred
+          dialog and 77px on the sheet (hairline + `pt` + `h-12` + inset), so
+          without this, `block: "nearest"` parks an error message in exactly
+          the band the bar covers — the message is placed, the scroll happens,
+          and the shopper still sees nothing. Set on the scroller so every
+          scroll-into-view in the form inherits it, rather than each call site
+          remembering a magic number. */}
+      <DialogContent mobile="sheet" className="pb-0 scroll-pb-24">
         {/* Required by Radix for the dialog's accessible name. `program.name`,
             never a spelled noun — the same choice the page's `<h1>` makes.
             `sr-only` on the explanation step, where `ReturnIntro`'s slogan is
             the visible heading and this would be a second one above it. */}
-        <DialogTitle className={cn(step === "intro" && "sr-only")}>{program.name}</DialogTitle>
-        <DialogDescription className={cn(step === "intro" && "sr-only")}>
-          {step === "intro" ? introDescription(program) : RETURNS_DESCRIPTION}
-        </DialogDescription>
-
+        {/* ═══ THE STEP BAR IS ROW ONE, ON BOTH STEPS, AND THAT IS THE POINT ═══
+            It used to sit below the title/description group, which is
+            `sr-only` on the explanation step — and `sr-only` is
+            `position:absolute`, so that group occupies no grid row there at
+            all. The indicator was therefore row 1 on one step and row 2 on
+            the other, and jumped ~68px between them with no transition, while
+            the content beside it slid a decorative 16px. The one element whose
+            whole job is to hold still was the one that moved furthest.
+            Putting it first makes its position independent of whether
+            anything above it is rendered. */}
         <ReturnSteps step={step} onSelect={goTo} />
 
-        {/* `key={step}` restarts the entrance animation, which is what makes
-            the move legible as movement rather than as the dialog silently
-            becoming a different dialog — the same reasoning
-            `FeaturedCarousel` re-keys its slide on. `tabIndex={-1}` exists
-            only so the effect above has something to focus; it is never in
-            the tab order. */}
+        {/* TITLE AND DESCRIPTION ARE ONE GROUP, not two rows of the dialog's
+            grid. As siblings they inherited its `gap-4`, so a heading sat 16px
+            off its own subtitle — the same distance as from there to the form,
+            which flattens the hierarchy into evenly spaced things instead of a
+            header followed by content. `gap-1` binds the pair.
+
+            THE HAIRLINE DOES THE SEPARATING, not more space. The dialog's own
+            `gap-4`/`gap-3` between groups is SMALLER than the `gap-5`/`gap-3.5`
+            between fields inside the form, so spacing alone said the header
+            was part of the form. Winning that with a bigger gap would mean an
+            arms race against the form's own rhythm; a rule is what both
+            overlay comparators in this package already use — see
+            `filter-drawer.tsx`'s header `border-b` and `cart-drawer.tsx`'s
+            footer `border-t`.
+
+            The wrapper goes `sr-only` as a unit on the explanation step, where
+            `ReturnIntro` owns every visible word — see its header. */}
         <div
-          key={step}
-          ref={stepRef}
-          tabIndex={-1}
           className={cn(
-            "outline-none duration-200 animate-in fade-in-0 motion-reduce:animate-none",
-            forward ? "slide-in-from-right-4" : "slide-in-from-left-4",
+            "flex flex-col gap-1",
+            step === "intro" ? "sr-only" : "border-b border-brand-line pb-4",
           )}
         >
-          {step === "intro" ? (
-            <ReturnIntro
-              program={program}
-              dismissed={dismissed}
-              onDismissedChange={onDismissedChange}
-              onNext={() => goTo("form")}
-            />
-          ) : (
-            <>
-              {session === "customer" && (
-                <ReturnForm
-                  program={program}
-                  areas={areas}
-                  /* Only from here. `/returns` renders the same form with no
-                     scrolling ancestor to pin against — see the prop's own
-                     note for what that would do instead. */
-                  pinSubmit
-                  onDone={() => onOpenChange(false)}
-                />
-              )}
-              {session === "guest" && <GuestPrompt />}
-              {session === "unknown" && <FormSkeleton />}
-            </>
+          <DialogTitle>{program.name}</DialogTitle>
+          <DialogDescription>
+            {step === "intro" ? introDescription(program) : RETURNS_DESCRIPTION}
+          </DialogDescription>
+        </div>
+
+        {/* ═══════════════════════════════════════════════════════════════
+            BOTH STEPS STAY MOUNTED. ONLY ONE IS DISPLAYED.
+
+            This was one `<div key={step}>` holding whichever step was
+            current, which remounted the body on every move. That restarted
+            the entrance animation, which was the intent — and it also
+            destroyed `ReturnForm`, which is where everything the shopper has
+            typed lives. Press Back to re-read the offer and then Next, and
+            the quantity, name, phone, address and district were all gone;
+            `return-form.tsx`'s own header promises the exact opposite ("THE
+            FORM NEVER EMPTIES ITSELF"). After a successful submit it was
+            worse: the confirmation card carrying the shopper's `requestId` —
+            the one screen it is ever shown on — was destroyed with it.
+
+            THE ANIMATION SURVIVES THE FIX FOR FREE. An element with
+            `display: none` has no principal box, so its CSS animations are
+            not running; giving it a box again starts them from the
+            beginning. Toggling `hidden` therefore replays `animate-in` on
+            whichever panel is being revealed, with no key, no remount and no
+            state to lose.
+
+            EACH PANEL ENTERS FROM ITS OWN SIDE, so the `forward` state this
+            used to need is gone: the explanation is only ever reached by
+            going back, and the form only by going forward. The direction is
+            a property of the panel, not of the journey.
+
+            `hidden` rather than a class, because it is the one spelling that
+            takes the panel out of the accessibility tree and the tab order
+            as well as out of the layout — a screen reader must not be able to
+            wander into the form while the explanation is on screen.
+            ═══════════════════════════════════════════════════════════════ */}
+        <div
+          ref={introRef}
+          hidden={step !== "intro"}
+          tabIndex={-1}
+          className={cn(
+            "outline-none duration-200 animate-in fade-in-0 slide-in-from-left-4 motion-reduce:animate-none",
+            STEP_BOTTOM_INSET,
           )}
+        >
+          <ReturnIntro
+            program={program}
+            dismissed={dismissed}
+            onDismissedChange={onDismissedChange}
+            onNext={() => goTo("form")}
+          />
+        </div>
+
+        <div
+          ref={formRef}
+          hidden={step !== "form"}
+          tabIndex={-1}
+          className={cn(
+            "outline-none duration-200 animate-in fade-in-0 slide-in-from-right-4 motion-reduce:animate-none",
+            /* Every step owns its own bottom inset, EXCEPT the one whose
+               pinned bar already carries it — putting it here as well would
+               re-open the very gap the bar exists to close. */
+            !barCarriesInset && STEP_BOTTOM_INSET,
+          )}
+        >
+          {session === "customer" && (
+            <ReturnForm
+              program={program}
+              areas={areas}
+              /* Only from here. `/returns` renders the same form with no
+                 scrolling ancestor to pin against — see the prop's own
+                 note for what that would do instead. */
+              pinSubmit
+              onDone={() => onOpenChange(false)}
+            />
+          )}
+          {session === "guest" && <GuestPrompt />}
+          {session === "unknown" && <FormSkeleton />}
         </div>
       </DialogContent>
     </Dialog>

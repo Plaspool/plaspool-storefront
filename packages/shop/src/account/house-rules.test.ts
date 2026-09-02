@@ -318,3 +318,34 @@ describe("colour comes from the ramp, never from Tailwind's palette", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe("a wizard step is hidden, never re-keyed", () => {
+  /*
+   * ═══ RE-KEYING A STEP DESTROYS WHAT THE SHOPPER TYPED INTO IT ═══
+   * `return-modal.tsx` held one `<div key={step}>` around whichever step was
+   * current. The key restarted the entrance animation, which was the intent —
+   * and it also remounted `ReturnForm` on every move, so pressing Back to
+   * re-read the offer and then Next wiped the quantity, name, phone, address
+   * and district. `return-form.tsx`'s own header promises the opposite ("THE
+   * FORM NEVER EMPTIES ITSELF"), and after a successful submit the same key
+   * destroyed the confirmation card carrying the `requestId` — the only screen
+   * it is ever shown on.
+   *
+   * The animation did not need it. An element with `display: none` has no
+   * principal box, so its CSS animations are not running; giving it a box
+   * again starts them from the beginning. Toggling `hidden` replays
+   * `animate-in` with no remount and nothing to lose.
+   *
+   * TYPES AND LINT BOTH PASS EITHER WAY — a key is valid React and the data
+   * loss only shows up by typing, navigating and looking. Hence a grep.
+   */
+  it("never keys a container on the current step", () => {
+    const offenders: string[] = [];
+    for (const { path, text } of sourcesIn(SHOP)) {
+      text.split("\n").forEach((line, i) => {
+        if (/\bkey=\{\s*step\s*\}/.test(line)) offenders.push(`${path}:${i + 1}  ${line.trim()}`);
+      });
+    }
+    expect(offenders).toEqual([]);
+  });
+});

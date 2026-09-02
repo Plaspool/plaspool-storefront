@@ -113,7 +113,36 @@ export function ReturnIntro({ program, dismissed, onDismissedChange, onNext }: R
           file for the seven unnamed images that taught it the difference. */}
       <div
         aria-hidden="true"
-        className="flex items-center justify-center gap-2 border-2 border-foreground bg-brand-soft px-4 py-4 sm:gap-4 sm:py-8"
+        /* ═══ `bg-background`, NEVER A TINT — THIS IS A SYSTEM RULE ═══
+           It was `bg-brand-soft`, which is unusable here: `SpoolImage` fills
+           its own well with `hsl(var(--brand-soft))` and paints the near
+           flange opaque `--background` before tinting it navy at 7%. On a
+           `brand-soft` ground the well became invisible (identical colour)
+           and the flange measured ~1.07:1 against it, rescued only by a
+           0.5px hairline. Three spools at three fill levels rendered as
+           three shrinking navy discs — the one thing the band exists to
+           show was the thing it destroyed.
+
+           `description-tab.tsx`, `category-tiles.tsx`, `line-thumb.tsx` and
+           `bulk-promo.tsx` each state this rule; every other spool in the
+           shop sits on `bg-background`.
+
+           ═══ AND THE FRAME IS THE SETTLED ONE, NOT A NEW ONE ═══
+           This briefly kept its `border-2 border-foreground` and added
+           `rounded-lg ring-4 ring-brand-soft` to compensate for losing the
+           tint. That invented a third idiom: all thirteen other
+           `border-2 border-foreground` panels in this package are SQUARE
+           (`guest-prompt.tsx`, `checkout-flow.tsx`, and two more on this
+           dialog's own second step), and `ring-*` as decoration appears at no
+           other call site in either package. A shopper pressing "Earn …"
+           would have gone from a rounded, halo'd 2px panel to a square 2px
+           one in the same slot, one screen apart.
+
+           `rounded-lg border border-brand-line bg-background` is what the
+           package already uses for a spool on a light ground —
+           `category-tiles.tsx:40`, `gallery.tsx`, `description-tab.tsx`. A
+           1px hairline, on the radius token. */
+        className="flex items-center justify-center gap-2 rounded-lg border border-brand-line bg-background px-4 py-4 sm:gap-4 sm:py-8"
       >
         {BAND.map((spool, i) => (
           <React.Fragment key={spool.weightGrams}>
