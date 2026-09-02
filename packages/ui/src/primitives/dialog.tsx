@@ -29,10 +29,58 @@ const DialogOverlay = React.forwardRef<
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
+/**
+ * The same dialog, re-seated on the bottom edge of a phone.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * WRITTEN ENTIRELY AS `max-sm:` OVERRIDES, AND THAT IS THE WHOLE DESIGN.
+ *
+ * Every class below is scoped to widths under the `sm` breakpoint, so the
+ * desktop dialog's own classes are not edited, re-ordered or reset — there is
+ * no `sm:` restoration list to keep in sync with them, and no way for this
+ * variant to change what a wide screen renders. Opt-in via `mobile="sheet"`,
+ * so the cart drawer and every other consumer are untouched by default.
+ *
+ * A `Sheet` was the obvious alternative and is the wrong tool: it is the same
+ * Radix dialog underneath, so using both would mean either mounting two of
+ * them — two focus traps, two scroll locks, two Escape handlers — or picking
+ * between them with `matchMedia`, which cannot answer during the server
+ * render and so flashes the wrong one on first paint. CSS knows the viewport
+ * already.
+ *
+ * `92dvh` rather than `100dvh` leaves the underlying page visible above the
+ * sheet, which is what tells a shopper it is a layer over something rather
+ * than a new screen. `dvh` and not `vh` because mobile browser chrome
+ * collapses on scroll, and `vh` would leave the pinned submit under it.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+const SHEET_ON_MOBILE = [
+  /* Anchored to the bottom edge, full width, instead of centred on both axes.
+     The two `translate-*-0`s are what undo the centring transform. */
+  "max-sm:inset-x-0 max-sm:bottom-0 max-sm:left-0 max-sm:top-auto",
+  "max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0",
+  /* Only the top edge is a border now — the other three sit off-screen. */
+  "max-sm:max-h-[92dvh] max-sm:rounded-t-2xl max-sm:border-x-0 max-sm:border-b-0",
+  /* Tighter than the desktop `p-6`/`gap-4`: on a narrow screen that padding
+     is width the content needs more than the margin does. */
+  "max-sm:gap-3 max-sm:px-4 max-sm:pb-4 max-sm:pt-3",
+  /* It rises from the edge it is attached to rather than fading in place.
+     Composes with the base fade — different custom properties. */
+  "max-sm:data-[state=open]:slide-in-from-bottom",
+  "max-sm:data-[state=closed]:slide-out-to-bottom",
+].join(" ");
+
+interface DialogContentProps
+  extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
+  /** `"sheet"` re-seats the dialog as a bottom sheet below `sm` and changes
+   *  nothing at or above it. See `SHEET_ON_MOBILE`. */
+  mobile?: "sheet"
+}
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  DialogContentProps
+>(({ className, children, mobile, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
@@ -42,6 +90,7 @@ const DialogContent = React.forwardRef<
         "max-h-[calc(100dvh-2rem)] overflow-y-auto border border-brand-line bg-background p-6 shadow-lg",
         "data-[state=open]:animate-in data-[state=closed]:animate-out",
         "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+        mobile === "sheet" && SHEET_ON_MOBILE,
         className,
       )}
       {...props}

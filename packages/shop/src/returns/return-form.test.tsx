@@ -295,3 +295,44 @@ describe("resolveReturnPrefill — the two-source precedence, the load-bearing p
     expect(result).not.toHaveProperty("qtyDeclared");
   });
 });
+
+describe("the submit button's pinning is the caller's choice, not this file's", () => {
+  /*
+   * ═══ WHY THIS IS A PROP AND NOT JUST A `sm:` CLASS ═══
+   * `position: sticky` resolves against the nearest scrolling ancestor. In the
+   * dialog that is `DialogContent`, which already carries `overflow-y-auto`,
+   * so the button pins to the bottom of the sheet exactly as intended. On
+   * `/returns` there is no such ancestor: the page itself scrolls, and the
+   * same class would glue the button to the bottom of the VIEWPORT, floating
+   * it over the footer and everything else below the form.
+   *
+   * The two callers cannot be told apart from CSS, so they are told apart by a
+   * prop — and this is the test that stops the day someone "simplifies" it
+   * back into an unconditional class.
+   */
+  const submitTag = (html: string) => {
+    const at = html.lastIndexOf("<button");
+    return html.slice(at, html.indexOf(">", at) + 1);
+  };
+
+  it("pins nothing unless asked", () => {
+    const html = renderToStaticMarkup(<ReturnForm program={PROGRAM} areas={AREAS} />);
+    expect(html).not.toContain("sticky");
+  });
+
+  it("pins the submit when the caller is a sheet", () => {
+    const html = renderToStaticMarkup(<ReturnForm program={PROGRAM} areas={AREAS} pinSubmit />);
+    expect(html).toContain("sticky");
+  });
+
+  it("keeps the submit itself unchanged either way, pinning only its row", () => {
+    // The pinned version wraps the button; it must not restyle it. A submit
+    // that changed height or weight between the two callers would be two
+    // buttons pretending to be one.
+    const plain = submitTag(renderToStaticMarkup(<ReturnForm program={PROGRAM} areas={AREAS} />));
+    const pinned = submitTag(
+      renderToStaticMarkup(<ReturnForm program={PROGRAM} areas={AREAS} pinSubmit />),
+    );
+    expect(pinned).toBe(plain);
+  });
+});
