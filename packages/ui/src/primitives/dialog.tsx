@@ -20,7 +20,10 @@ const DialogOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Overlay
     className={cn(
-      "fixed inset-0 z-50 bg-black/80  data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      /* The scrim is a fade at every width — it never slides — so it keeps the
+         fade timing rather than the sheet's, and settles while the panel is
+         still arriving. Spelled out for the same reason the content's is. */
+      "fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=open]:duration-200 data-[state=closed]:duration-150",
       className
     )}
     {...props}
@@ -79,6 +82,13 @@ const SHEET_ON_MOBILE = [
      Composes with the base fade — different custom properties. */
   "max-sm:data-[state=open]:slide-in-from-bottom",
   "max-sm:data-[state=closed]:slide-out-to-bottom",
+  /* AND IT TAKES `sheet.tsx`'s TIMING, because below `sm` this IS that
+     motion: a full-width panel travelling in from a screen edge. Those are
+     the durations the cart drawer and the filter drawer already move at, so
+     matching them means the shop has one speed for "a panel arrives from an
+     edge" rather than two. The base pair above stays for the centred dialog,
+     which is a fade in place and would read as sluggish at 500ms. */
+  "max-sm:data-[state=open]:duration-500 max-sm:data-[state=closed]:duration-300",
 ].join(" ");
 
 interface DialogContentProps
@@ -110,6 +120,18 @@ const DialogContent = React.forwardRef<
         "max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-lg border border-brand-line bg-background p-6 shadow-lg",
         "data-[state=open]:animate-in data-[state=closed]:animate-out",
         "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+        /* SPELLED OUT, because the default was nobody's decision.
+           `tailwindcss-animate` falls back to 150ms, so this dialog opened at
+           one speed, `sheet.tsx` — the same package's other overlay — at
+           500/300, and the step change inside this very dialog at 200. Three
+           timings for adjacent motions, none of them chosen.
+
+           The scale now: a panel arriving from a screen edge takes
+           `sheet.tsx`'s 500/300 (applied under `sm`, where this becomes
+           exactly that motion — see `SHEET_ON_MOBILE`); a fade in place takes
+           200/150; and content changing INSIDE an open dialog is faster still
+           at 200, so the container always settles before its contents move. */
+        "data-[state=open]:duration-200 data-[state=closed]:duration-150",
         mobile === "sheet" && SHEET_ON_MOBILE,
         className,
       )}

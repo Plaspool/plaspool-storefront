@@ -7,6 +7,7 @@ import { cn, controlSurface } from "@plaspool/ui";
 import { HERO_COLOURS as COLOURS } from "../data/catalog";
 import type { CategoryLink } from "../data/catalog";
 import { SpoolImage } from "../components/spool-image";
+import { progressDot } from "../components/progress-dot";
 
 /**
  * The shop home's first screen. Two slides, each a two-column split: copy on
@@ -44,9 +45,6 @@ const SLIDES: Slide[] = [
     colourName: COLOURS["signal-red"].name,
   },
 ];
-
-const BUTTON_FOCUS =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 export function HeroCarousel({ primary }: { primary: CategoryLink }) {
   const [index, setIndex] = React.useState(0);
@@ -156,11 +154,11 @@ export function HeroCarousel({ primary }: { primary: CategoryLink }) {
               aria-label={`Show slide ${dot + 1}`}
               aria-current={dot === index ? "true" : undefined}
               onClick={() => setIndex(dot)}
-              className={cn(
-                "h-2.5 rounded-full transition-all duration-200 motion-reduce:transition-none",
-                BUTTON_FOCUS,
-                dot === index ? "w-8 bg-brand" : "w-2.5 bg-brand-line hover:bg-brand/40",
-              )}
+              /* Shared with the return dialog's step indicator, which had
+                 drifted to a different height, travel and hue — see
+                 `progress-dot.ts`. These values are the ones that moved
+                 there; nothing here changes. */
+              className={progressDot(dot === index)}
             />
           ))}
         </div>
