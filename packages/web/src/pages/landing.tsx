@@ -12,13 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@plaspool/ui"
-import {
-  onePointLabel,
-  pointValue,
-  programOffer,
-  programOpening,
-  type RewardsProgram,
-} from "@plaspool/shop"
+import { programOffer, programOpening, type RewardsProgram } from "@plaspool/shop"
 import Link from "next/link"
 
 export interface PlaspoolLandingProps {
@@ -203,21 +197,19 @@ export default function PlaspoolLanding({ program = null }: PlaspoolLandingProps
                 : "grid gap-8 mb-16 md:grid-cols-3"
             }
           >
-            {/* ═══ `flex flex-col justify-center`, AND ONLY THIS CARD HAS IT ═══
-                Its three siblings fill their height with a list or a figure;
-                this one is a title and a line of description since the spec
-                table came out. A grid stretches every card to the tallest, so
-                top-aligned it read as a card whose content had failed to load
-                — 300-odd pixels of white below the description, on the first
-                card in the row.
+            {/* ═══ TOP-ALIGNED, LIKE ALL FOUR — THIS WAS BRIEFLY CENTRED AND
+                IT WAS WRONG ═══
+                Losing the spec table left this card shorter than its
+                siblings, and `flex flex-col justify-center` was an attempt to
+                make the leftover space read as deliberate. Seen in the row it
+                did the opposite: three medallions on one line and a fourth
+                150px below them, which is a misalignment the eye catches
+                before it reads a single word.
 
-                Centred, the same emptiness reads as space around a short card
-                rather than missing content beneath it. `pb-4` goes with it:
-                that override exists to tighten the gap between a header and
-                the content under it, and there is no content under this one —
-                left in, it would push the block 8px above true centre. */}
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow bg-white flex flex-col justify-center">
-              <CardHeader className="text-center">
+                Empty space at the BOTTOM of a short card is what every card
+                grid looks like. A row of icons that do not line up is not. */}
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow bg-white">
+              <CardHeader className="text-center pb-4">
                 <div className="w-16 h-16 bg-brand-soft rounded-full flex items-center justify-center mx-auto mb-4">
                   <Layers className="w-8 h-8 text-brand" />
                 </div>
@@ -248,7 +240,13 @@ export default function PlaspoolLanding({ program = null }: PlaspoolLandingProps
                 <CardDescription>From individual makers to businesses in need of bulk supply</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <ul className="space-y-2 text-sm text-muted-foreground font-mono">
+                {/* `text-center`, MATCHING THE HEADER ABOVE IT. Every card in
+                    this row centres its medallion, title and description and
+                    then dropped to a left-aligned body — one card, two
+                    alignments, and a ragged left edge starting halfway down.
+                    All four bodies are centred now; the row reads as one
+                    column of text per card instead of two. */}
+                <ul className="space-y-2 text-sm text-muted-foreground font-mono text-center">
                   <li>Individual makers & hobbyists</li>
                   <li>Educational institutions</li>
                   <li>Professional and Industrial prototyping</li>
@@ -269,7 +267,8 @@ export default function PlaspoolLanding({ program = null }: PlaspoolLandingProps
                 <CardDescription>Strict quality controls ensure consistent performance</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <ul className="space-y-2 text-sm text-muted-foreground font-mono">
+                {/* Centred, for the reason on the card before this one. */}
+                <ul className="space-y-2 text-sm text-muted-foreground font-mono text-center">
                   <li>Uniform diameter control</li>
                   <li>Batch quality tracking</li>
                   <li>Performance validation</li>
@@ -307,26 +306,22 @@ export default function PlaspoolLanding({ program = null }: PlaspoolLandingProps
                   </CardTitle>
                   <CardDescription>{programOpening(program)}</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-muted-foreground font-mono leading-relaxed">
+                {/* ═══ NO VALUE PILL HERE. IT LIVES IN THE RETURN DIALOG ═══
+                    A bordered, tinted, `text-xl` row was the only filled block
+                    anywhere in this grid, and it sat at the bottom of the last
+                    card — so the row ended on a weight nothing else carried
+                    and the four cards stopped reading as a set. The dialog's
+                    first step is where a shopper is actually deciding whether
+                    to send spools back, and the figure earns its emphasis
+                    there; here it was a fifth thing competing with three
+                    quiet cards.
+
+                    `POINT_VALUE_NAIRA` still exists and the dialog still shows
+                    it — this card just does not repeat it. */}
+                <CardContent>
+                  <p className="text-sm text-muted-foreground font-mono leading-relaxed text-center">
                     {programOffer(program)}
                   </p>
-
-                  {/* The exchange rate, set as an equation — the same row the
-                      return dialog closes its first step with, down to the
-                      `sr-only` phrase standing in for the `=`. Punctuation
-                      settings decide whether a screen reader voices "equals",
-                      so the glyph is decoration and the words carry it. */}
-                  <div className="flex items-center justify-center gap-3 rounded-lg border border-brand-line bg-brand-soft px-4 py-3">
-                    <span className="text-sm text-muted-foreground">{onePointLabel(program)}</span>
-                    <span aria-hidden="true" className="text-sm text-muted-foreground">
-                      =
-                    </span>
-                    <span className="sr-only">is worth</span>
-                    <span className="text-xl font-semibold tabular-nums text-brand">
-                      {pointValue()}
-                    </span>
-                  </div>
                 </CardContent>
               </Card>
             )}
