@@ -6,7 +6,7 @@ import { Button, Label, cn } from "@plaspool/ui";
 
 import { SpoolImage } from "../components/spool-image";
 import { HERO_COLOURS } from "../data/policy";
-import { pointsLabel } from "../data/marketing";
+import { onePointLabel, pointValue, programOffer, programOpening } from "../data/marketing";
 import type { RewardsProgram } from "../data/marketing";
 
 /**
@@ -38,10 +38,20 @@ import type { RewardsProgram } from "../data/marketing";
  * have read "1 Spool Points" in production on day one.
  *
  * ═══ NO FIGURE IS SPELLED EITHER, AND THAT IS THE SAME RULE ═══
- * The copy this was written from said "₦100". `pointsPerUnit` is what the API
- * actually pays, and `ReturnForm`'s own arithmetic line renders the same
- * number one step later — a hardcoded one here would be a promise the very
- * next screen contradicts.
+ * `pointsPerUnit` is what the API actually pays, and `ReturnForm`'s own
+ * arithmetic line renders the same number one step later — a hardcoded one
+ * here would be a promise the very next screen contradicts.
+ *
+ * The ONE exception is what a point is worth in naira, which the rewards
+ * endpoint does not send at all. It is `POINT_VALUE_NAIRA` in
+ * `data/marketing.ts`, spelled once for the whole storefront; see that
+ * constant's own note for what happens when the admin grows the field.
+ *
+ * ═══ THE TWO SENTENCES ARE NOT WRITTEN HERE ANY MORE ═══
+ * `programOpening()` and `programOffer()` build them, because the landing
+ * page's rewards card now makes the same offer and the two must not be able to
+ * drift apart. They still arrive as whole strings, which is the property the
+ * suite below depends on.
  *
  * ═══ THE HEADINGS ARE PLAIN HTML, NOT `DialogTitle` ═══
  * Radix's title and description must sit inside a `Dialog` context, which
@@ -92,16 +102,10 @@ export function ReturnIntro({ program, dismissed, onDismissedChange, onNext }: R
      label of one toggles the other. */
   const checkboxId = React.useId();
 
-  const earned = `${program.pointsPerUnit} ${pointsLabel(program.pointsPerUnit, program)}`;
-
-  /* Built as whole strings rather than JSX fragments so each sentence is one
-     text node — a sentence assembled from interpolated children is one the
-     suite can only assert on in pieces. */
-  const opening = `Your ${program.unitLabelSingular} doesn't have to become waste when the filament runs out.`;
-  const offer =
-    `Return your empty filament ${program.unitLabelPlural} to PlaSpool and earn ${earned} ` +
-    `for every eligible ${program.unitLabelSingular}. Save them up and use your ` +
-    `${program.pointsLabelPlural} towards your next PlaSpool order.`;
+  /* Both whole strings, and both built in `data/marketing.ts` — see this
+     file's header for why they are no longer written here. */
+  const opening = programOpening(program);
+  const offer = programOffer(program);
 
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
@@ -167,6 +171,37 @@ export function ReturnIntro({ program, dismissed, onDismissedChange, onNext }: R
         </h2>
         <p className="text-sm leading-5 text-muted-foreground sm:leading-6">{opening}</p>
         <p className="text-sm leading-5 text-muted-foreground sm:leading-6">{offer}</p>
+      </div>
+
+      {/* ═══ THE ONE THING THE PARAGRAPHS ABOVE NEVER SAY ═══
+          "Save them up and use your points towards your next order" is a
+          promise with no price on it: a shopper reading it cannot tell whether
+          fifty returns are worth a spool or a sticker. This row is the
+          exchange rate, and it is set as an EQUATION rather than a sentence
+          because that is what it is — the same reason every quantity in this
+          package is mono and tabular and no measurement is ever set in the
+          body face.
+
+          `bg-brand-soft` INSIDE the panel, where the spool band above may not
+          have it: the band is defeated by a tint because `SpoolImage` fills
+          its own well with that exact colour (see the long note on the band).
+          Nothing is drawn here, so the tint is free — and it is what separates
+          the figure from two paragraphs of grey without raising a second
+          control against `Earn …`.
+
+          THE `=` IS DECORATION AND THE WORDS ARE NOT. Punctuation-level
+          settings decide whether a screen reader voices "equals" at all, so
+          the glyph is hidden and an `sr-only` phrase carries the meaning —
+          "1 Spool Point is worth ₦100" reads as a sentence either way. */}
+      <div className="flex items-center justify-center gap-3 rounded-lg border border-brand-line bg-brand-soft px-4 py-2.5 sm:gap-4 sm:py-3">
+        <span className="text-sm text-muted-foreground">{onePointLabel(program)}</span>
+        <span aria-hidden="true" className="text-sm text-muted-foreground">
+          =
+        </span>
+        <span className="sr-only">is worth</span>
+        <span className="font-mono text-lg font-semibold tabular-nums text-brand sm:text-xl">
+          {pointValue()}
+        </span>
       </div>
 
       {/* The checkbox and the way forward, on one line where there is room for

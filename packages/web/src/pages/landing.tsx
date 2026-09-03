@@ -1,7 +1,7 @@
 
 "use client"
 import Image from "next/image"
-import { ArrowRight, Layers, Shield, Truck, Users, Zap } from "lucide-react"
+import { ArrowRight, Layers, Recycle, Shield, Truck, Users, Zap } from "lucide-react"
 
 import {
   Badge,
@@ -12,9 +12,36 @@ import {
   CardHeader,
   CardTitle,
 } from "@plaspool/ui"
+import {
+  onePointLabel,
+  pointValue,
+  programOffer,
+  programOpening,
+  type RewardsProgram,
+} from "@plaspool/shop"
 import Link from "next/link"
 
-export default function PlaspoolLanding() {
+export interface PlaspoolLandingProps {
+  /**
+   * The live rewards programme, or null when none is configured.
+   *
+   * ═══ A PROP, BECAUSE THIS FILE IS `"use client"` AND THE PROGRAMME IS A
+   * SERVER READ ═══
+   * `getRewardsProgram()` is an `async` fetch with a `next: { revalidate }`
+   * entry; it cannot run here. The host route (`app/(site)/page.tsx`) is a
+   * server component, so it awaits the programme and hands the plain object
+   * down — the same shape `RewardsBand` reads directly on `/store`.
+   *
+   * NULLABLE ON PURPOSE, AND THE CARD DISAPPEARS WITH IT. `getRewardsProgram`
+   * answers null rather than throwing when the marketing API is unreachable,
+   * and the rule the whole storefront follows is that a section explaining a
+   * scheme that does not exist is worse than a shorter page. A marketing
+   * outage costs this one card and nothing else on the landing page.
+   */
+  program?: RewardsProgram | null
+}
+
+export default function PlaspoolLanding({ program = null }: PlaspoolLandingProps) {
   return (
     <div className="min-h-screen bg-muted font-mono">
 
@@ -158,32 +185,58 @@ export default function PlaspoolLanding() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 mb-16">
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow bg-white">
-              <CardHeader className="text-center pb-4">
+          {/* ═══ THE COLUMN COUNT FOLLOWS THE CARD COUNT ═══
+              Three cards on a three-column grid; four when the rewards card is
+              there. Both class strings are written out in full rather than
+              interpolated — Tailwind's scanner reads source text, and a class
+              assembled at runtime is one it never sees and never generates.
+
+              FOUR ACROSS ONLY AT `xl`. At `lg` the container is 960px wide, so
+              a quarter of it is a 216px card — narrower than any card on the
+              site and too narrow for the paragraph the rewards card carries.
+              2×2 from `md` to `xl` gives 344–576px, and 4-up at `xl` gives
+              280px, which is the width these cards were drawn at. */}
+          <div
+            className={
+              program
+                ? "grid gap-8 mb-16 md:grid-cols-2 xl:grid-cols-4"
+                : "grid gap-8 mb-16 md:grid-cols-3"
+            }
+          >
+            {/* ═══ `flex flex-col justify-center`, AND ONLY THIS CARD HAS IT ═══
+                Its three siblings fill their height with a list or a figure;
+                this one is a title and a line of description since the spec
+                table came out. A grid stretches every card to the tallest, so
+                top-aligned it read as a card whose content had failed to load
+                — 300-odd pixels of white below the description, on the first
+                card in the row.
+
+                Centred, the same emptiness reads as space around a short card
+                rather than missing content beneath it. `pb-4` goes with it:
+                that override exists to tighten the gap between a header and
+                the content under it, and there is no content under this one —
+                left in, it would push the block 8px above true centre. */}
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow bg-white flex flex-col justify-center">
+              <CardHeader className="text-center">
                 <div className="w-16 h-16 bg-brand-soft rounded-full flex items-center justify-center mx-auto mb-4">
                   <Layers className="w-8 h-8 text-brand" />
                 </div>
                 <CardTitle className="text-xl text-foreground tracking-tight">PLA Filaments</CardTitle>
                 <CardDescription>Easy-to-print, biodegradable, perfect for beginners and pros alike</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2 font-mono">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Diameter Tolerance</span>
-                    <span className="text-foreground font-medium">±0.02mm</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Print Temperature</span>
-                    <span className="text-foreground font-medium">190-220°C</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Bed Temperature</span>
-                    <span className="text-foreground font-medium">50-60°C</span>
-                  </div>
-                </div>
-                
-              </CardContent>
+              {/* NO `CardContent`. This card carried a three-row spec table —
+                  diameter tolerance, print temperature, bed temperature — and
+                  those figures belong to a PRODUCT, not to the range: they are
+                  on every listing and on the product page's parameters tab,
+                  where they move with the item. Quoted on the landing page
+                  they were a claim about whatever PlaSpool happens to sell
+                  next, maintained nowhere.
+
+                  The empty `<CardContent className="space-y-4">` they lived in
+                  went with them rather than being left behind as 24px of
+                  padding around nothing. The grid stretches its cards to a
+                  common height, so this one is shorter in content and the same
+                  size on the page. */}
             </Card>
 
             <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow bg-white">
@@ -221,9 +274,62 @@ export default function PlaspoolLanding() {
                   <li>Batch quality tracking</li>
                   <li>Performance validation</li>
                 </ul>
-          
+
               </CardContent>
             </Card>
+
+            {/* ═══ THE REWARDS CARD, AND NOT ONE WORD OF IT IS WRITTEN HERE ═══
+                The programme's name, what a point is called and what a unit is
+                called all come from `GET /api/public/marketing/rewards`, and
+                both sentences are built by `programOpening`/`programOffer` in
+                `@plaspool/shop` — the same two the return dialog's first step
+                shows. An operator renaming "Spool Points" renames this card
+                with it, and a rewrite of the offer lands on both surfaces at
+                once. `data/marketing.ts` sets the rule out at length.
+
+                RENDERS NOTHING WHEN THERE IS NO PROGRAMME — see the note on
+                the `program` prop above.
+
+                SHAPED EXACTLY LIKE ITS THREE NEIGHBOURS: same white card, same
+                `bg-brand-soft` medallion, same `text-xl` title. The row is one
+                set of things PlaSpool does, and a card that announced itself
+                with a different fill would read as an ad dropped into it. What
+                distinguishes this one is the figure at the bottom, which is
+                the only number on the page a shopper can put in their pocket. */}
+            {program && (
+              <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow bg-white">
+                <CardHeader className="text-center pb-4">
+                  <div className="w-16 h-16 bg-brand-soft rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Recycle className="w-8 h-8 text-brand" />
+                  </div>
+                  <CardTitle className="text-xl tracking-tight text-foreground">
+                    {program.pointsLabelPlural}
+                  </CardTitle>
+                  <CardDescription>{programOpening(program)}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground font-mono leading-relaxed">
+                    {programOffer(program)}
+                  </p>
+
+                  {/* The exchange rate, set as an equation — the same row the
+                      return dialog closes its first step with, down to the
+                      `sr-only` phrase standing in for the `=`. Punctuation
+                      settings decide whether a screen reader voices "equals",
+                      so the glyph is decoration and the words carry it. */}
+                  <div className="flex items-center justify-center gap-3 rounded-lg border border-brand-line bg-brand-soft px-4 py-3">
+                    <span className="text-sm text-muted-foreground">{onePointLabel(program)}</span>
+                    <span aria-hidden="true" className="text-sm text-muted-foreground">
+                      =
+                    </span>
+                    <span className="sr-only">is worth</span>
+                    <span className="text-xl font-semibold tabular-nums text-brand">
+                      {pointValue()}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </section>

@@ -172,6 +172,20 @@ export type { MyReturn } from "./data/returns-api";
    has a title before the customer's own calls resolve. */
 export { getRewardsProgram, listBanners } from "./data/marketing";
 export type { RewardsProgram, PublicBanner, BannerPlacement } from "./data/marketing";
+/* The programme's copy and its exchange rate, published because the LANDING
+   PAGE — `packages/web`, outside this package entirely — now carries the same
+   rewards card the return dialog opens with, and the two must be built from
+   one set of strings rather than two. `pointsLabel` is renamed on the way out
+   for the collision reason above; the rest keep their names because nothing
+   else in this file exports them. */
+export {
+  POINT_VALUE_NAIRA,
+  onePointLabel,
+  pointValue,
+  programOffer,
+  programOpening,
+  pointsLabel as programPointsLabel,
+} from "./data/marketing";
 
 /* `/returns` — the real, linkable page behind Task 10's dialog. Named rather
    than `export *` because those are the two exports the route needs;

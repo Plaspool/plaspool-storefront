@@ -1,4 +1,5 @@
 import { COMMERCE_API_BASE, MARKETING_REVALIDATE } from "./config";
+import { formatNaira } from "./money";
 
 /**
  * The marketing client — banners and the rewards programme.
@@ -116,4 +117,71 @@ export function pointsLabel(count: number, program: RewardsProgram): string {
 
 export function unitLabel(count: number, program: RewardsProgram): string {
   return count === 1 ? program.unitLabelSingular : program.unitLabelPlural;
+}
+
+/**
+ * What ONE point is worth against an order, in whole naira.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE ONE FIGURE IN THIS MODULE THAT IS SPELLED RATHER THAN READ, AND IT IS
+ * NOT A LAPSE.
+ *
+ * `GET /api/public/marketing/rewards` sends the programme's nouns, its
+ * `pointsPerUnit` and its `minUnitsPerReturn` — and nothing at all about what
+ * a point redeems for. There is no field to read, so the number lives here
+ * ONCE rather than in each screen that quotes it. Two surfaces quote it today
+ * (the return dialog's first step and the landing page's card); a second
+ * spelling is how they end up disagreeing about the price of a point.
+ *
+ * WHEN THE ADMIN GROWS THE FIELD, DELETE THIS. It becomes `pointValueNaira` on
+ * `RewardsProgram` and every call site below changes with it — the rule the
+ * rest of this file already keeps.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export const POINT_VALUE_NAIRA = 100;
+
+/** `"₦100"` — one point's worth, in the shop's own money format. */
+export function pointValue(): string {
+  return formatNaira(POINT_VALUE_NAIRA);
+}
+
+/**
+ * `"1 Spool Point"` — the left-hand side of the value equation both surfaces
+ * draw. Singular by construction: the equation is always priced per point.
+ */
+export function onePointLabel(program: RewardsProgram): string {
+  return `1 ${program.pointsLabelSingular}`;
+}
+
+/**
+ * The programme's own announcement, in two sentences.
+ *
+ * ═══ HERE, NOT IN A COMPONENT, BECAUSE TWO COMPONENTS SAY IT ═══
+ * It was written for the return dialog and lived in `return-intro.tsx`. The
+ * landing page's card now makes the same offer, and a marketing sentence typed
+ * out twice is the exact shape of defect `house-rules.test.ts` exists to catch:
+ * the instance edited, the sibling left behind, the two screens promising
+ * different things about one programme.
+ *
+ * Each sentence is returned as ONE whole string rather than as JSX fragments,
+ * which is the property `return-intro.test.tsx` depends on — a sentence
+ * assembled from interpolated children is one a suite can only assert on in
+ * pieces.
+ *
+ * NOT ONE PROGRAMME NOUN IS SPELLED IN EITHER, and `pointsLabel()` is what
+ * keeps the count agreeing with its noun: the live programme pays ONE point
+ * per unit, so a plural-only sentence would read "1 Spool Points" in
+ * production.
+ */
+export function programOpening(program: RewardsProgram): string {
+  return `Your ${program.unitLabelSingular} doesn't have to become waste when the filament runs out.`;
+}
+
+export function programOffer(program: RewardsProgram): string {
+  const earned = `${program.pointsPerUnit} ${pointsLabel(program.pointsPerUnit, program)}`;
+  return (
+    `Return your empty filament ${program.unitLabelPlural} to PlaSpool and earn ${earned} ` +
+    `for every eligible ${program.unitLabelSingular}. Save them up and use your ` +
+    `${program.pointsLabelPlural} towards your next PlaSpool order.`
+  );
 }

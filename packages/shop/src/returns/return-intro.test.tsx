@@ -2,6 +2,7 @@ import { expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { ReturnIntro } from "./return-intro";
+import { POINT_VALUE_NAIRA } from "../data/marketing";
 import type { RewardsProgram } from "../data/marketing";
 
 /**
@@ -52,6 +53,21 @@ it("agrees a count with its noun, so one point is not `1 Bottle Caps`", () => {
   const html = render({ ...PROGRAM, pointsPerUnit: 1 });
   expect(html).toContain("1 Bottle Cap ");
   expect(html).not.toContain("1 Bottle Caps");
+});
+
+it("prices a point, which the offer sentence never does", () => {
+  // "Use your points towards your next order" is a promise with no number on
+  // it. The row is the exchange rate — the singular noun on the left, because
+  // the rate is always quoted per point, whatever `pointsPerUnit` pays.
+  const html = render(PROGRAM);
+  expect(html).toContain("1 Bottle Cap");
+  expect(html).toContain(`₦${POINT_VALUE_NAIRA}`);
+});
+
+it("spells the equation out for a screen reader rather than leaning on `=`", () => {
+  // Punctuation-level settings decide whether "=" is voiced at all, so the
+  // glyph is `aria-hidden` and the words carry the meaning.
+  expect(render(PROGRAM)).toContain("is worth");
 });
 
 it("labels the forward control with the programme's own points noun", () => {
