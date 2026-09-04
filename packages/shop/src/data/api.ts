@@ -10,6 +10,7 @@ import type {
   Product,
   RatingSummary,
   SizeOption,
+  VariantStock,
 } from "./types";
 
 /**
@@ -611,6 +612,49 @@ export function variantKey(colourId: string, sizeId: string): string {
   return `${colourId}:${sizeId}`;
 }
 
+/**
+ * `"<colourId>:<sizeId>"` → the shelf, for the variants that are for sale.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE NUMBER THE STOREFRONT USED TO THROW AWAY.
+ *
+ * `coloursFrom` above reduces `variant.available` to a per-COLOUR boolean, and
+ * that boolean is all the buy box ever saw. It is doubly lossy: the count is
+ * gone, and the answer is rolled up across sizes, so a black spool with four
+ * 1kg and none of the 3kg reads as "black: in stock" either way. The stepper
+ * therefore offered 99 of a thing there were four of, and the only gate left
+ * was `POST /checkout/freeze` — after the address, after the delivery choice.
+ *
+ * That boolean is still exactly right for what it drives, which is whether a
+ * SWATCH can be clicked. This map is the second question — how many — and it is
+ * kept separate rather than folded into `Colour` because stock belongs to the
+ * variant, and a colour spanning three weights has three different answers.
+ *
+ * DELIBERATELY THE SAME FILTER AS `variantIdsFrom`: priced variants only, first
+ * wins on a duplicate key, same `idOf`/`sizeIdOf` derivation. The two maps are
+ * read together — one to name the variant, one to bound it — and a pair present
+ * in one but not the other is a buy box that can add a line it cannot cap, or
+ * cap a line it cannot add.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function variantStockFrom(variants: ApiVariant[]): Record<string, VariantStock> {
+  const out: Record<string, VariantStock> = {};
+  for (const variant of variants) {
+    if (!variant.price) continue;
+    const colour = option(variant, COLOUR_KEYS);
+    if (!colour) continue;
+    const key = `${idOf(colour)}:${sizeIdOf(variant)}`;
+    if (key in out) continue;
+    /* CARRIED THROUGH UNTOUCHED, INCLUDING THE NULL AND THE NEGATIVE. `?? 0`
+       here would turn "nothing tracks this" into "none left" and cap an
+       untracked product at one unit; `Math.max(0, …)` would erase the record of
+       an oversold backorder. Both are decisions for `maxQtyFor`, which has the
+       `backorderable` flag in hand to make them with. */
+    out[key] = { available: variant.available, backorderable: variant.backorderable };
+  }
+  return out;
+}
+
 // -------------------------------------------------------------- order lines
 
 /**
@@ -937,6 +981,7 @@ export function toProduct(api: ApiProduct, ctx: AdaptContext): Product | null {
        made. */
     featured: false,
     variantIds: variantIdsFrom(variants),
+    variantStock: variantStockFrom(variants),
   };
 }
 

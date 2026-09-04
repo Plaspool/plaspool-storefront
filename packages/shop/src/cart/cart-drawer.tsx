@@ -13,6 +13,9 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
+  Skeleton,
+  SkeletonRegion,
+  TextSkeleton,
 } from "@plaspool/ui";
 
 import { EmptyState } from "../components/empty-state";
@@ -22,6 +25,7 @@ import { ProductPhoto } from "../components/product-photo";
 import { formatNaira } from "../data/money";
 import { BulkLinePrice } from "./bulk-line-price";
 import { useCart } from "./cart-context";
+import { stockWarning } from "./stock";
 import { UnsellableNotice } from "./unsellable-notice";
 import type { CartLineKey, ResolvedLine } from "./types";
 import { lineDescriptor, variantDescriptor } from "./line-descriptor";
@@ -53,6 +57,10 @@ function CartLineRow({
   const { product, colour, size, qty, unitPrice, effectiveUnitPrice, bulkPercentBps, bulkQty, total } =
     line;
   const descriptor = lineDescriptor(product.name, colour.name, size.label);
+  /* Null unless the shopper has actually reached a SHELF limit — never at the
+     stepper's own sanity ceiling, which is not an inventory claim. See
+     `stockWarning`. */
+  const left = stockWarning(qty, line.maxQty);
 
   return (
     <li className="flex gap-3 py-4">
@@ -100,7 +108,10 @@ function CartLineRow({
         </div>
 
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2">
-          <QuantityStepper value={qty} onChange={onQtyChange} label={descriptor} />
+          {/* `max` IS THE WHOLE FIX ON THIS SURFACE. Without it the stepper
+              offered 99 of a variant the shop had four of, and the refusal
+              arrived at the checkout freeze — after the address. */}
+          <QuantityStepper value={qty} onChange={onQtyChange} max={line.maxQty} label={descriptor} />
           <BulkLinePrice
             unitPrice={unitPrice}
             effectiveUnitPrice={effectiveUnitPrice}
@@ -109,6 +120,16 @@ function CartLineRow({
             lineQty={qty}
           />
         </div>
+
+        {/* WHY THE PLUS BUTTON STOPPED. A disabled control with no explanation
+            reads as a broken one; the number is what makes it an answer. Not
+            `role="alert"` — nothing has gone wrong, and the shopper caused this
+            by pressing the button they are looking at. */}
+        {left !== null && (
+          <p className="font-mono text-xs font-medium text-muted-foreground">
+            {`Only ${left} left`}
+          </p>
+        )}
 
         <Button
           type="button"
@@ -123,6 +144,79 @@ function CartLineRow({
         </Button>
       </div>
     </li>
+  );
+}
+
+/**
+ * The basket's shape, while the basket is still on its way.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE DRAWER USED TO OPEN ONTO NOTHING AT ALL.
+ *
+ * Every block below `hydrated` is gated on it, so until the client's first read
+ * lands the sheet was a title and dead space — and that wait is a real network
+ * round trip to the commerce API, on a cookie, at the moment the shopper has
+ * just clicked. The empty state could not fill it either: "Your cart is empty"
+ * is a CLAIM, and it is the one thing we do not yet know. Showing it and then
+ * replacing it with three rows is worse than showing nothing.
+ *
+ * So: the layout, drawn as itself. Per `CLAUDE.md` ("Loading states") — once a
+ * section's shape is known, the loading state renders that shape.
+ *
+ * ═══ IT MIRRORS `CartLineRow`'S BOX, CLASS FOR CLASS ═══
+ * Same `flex gap-3 py-4` row, same `w-16` square photograph, same two-line
+ * head, same stepper-height block. A skeleton that reflows when the data lands
+ * moves the text under the shopper's eye exactly as they start reading it,
+ * which is the failure this is supposed to prevent rather than cause.
+ *
+ * THREE ROWS because a basket the shopper is opening has at least one thing in
+ * it and a median cart is small; three is enough to read as a list without
+ * promising a fuller basket than arrives.
+ *
+ * EXPORTED SO A TEST CAN SEE IT. The drawer itself is unreachable from this
+ * suite twice over — `useCart` needs a provider that does not run under
+ * `react-dom/server`, and the sheet renders behind a Radix portal. `CLAUDE.md`
+ * names the way out and `returns/return-intro.tsx` is its worked example: pull
+ * the presentational half into its own component and assert THAT. This one is
+ * pure markup with no props, no hooks and no context, so it costs nothing.
+ */
+export function CartSkeleton() {
+  return (
+    <SkeletonRegion label="Loading your cart" className="min-h-0 flex-1">
+      <ul className="divide-y divide-brand-line px-6">
+        {[0, 1, 2].map((row) => (
+          <li key={row} className="flex gap-3 py-4">
+            {/* `self-start` IS LOAD-BEARING, and measurement is the only way to
+                see it. A flex child defaults to `align-self: stretch`, which
+                hands this a definite height — the row's — and a definite height
+                beats `aspect-ratio`. Measured at 375px it rendered 64×106: a
+                filled grey PORTRAIT block standing in for what reads on screen
+                as a square thumbnail, because the real `ProductPhoto` is an
+                `object-contain` image that letterboxes inside the same tall box
+                and so LOOKS 64×64. Opting out of the stretch makes the
+                placeholder the size the photograph appears to be.
+
+                It cannot change the row's height: the column beside it is
+                106px of content and is what drives the row either way. */}
+            <Skeleton className="aspect-square w-16 shrink-0 self-start rounded-md" />
+            <div className="flex min-w-0 flex-1 flex-col gap-2">
+              <div className="flex min-w-0 items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <TextSkeleton className="w-3/5 text-sm font-semibold" />
+                  <TextSkeleton className="mt-0.5 w-2/5 font-mono text-xs" />
+                </div>
+                <TextSkeleton className="w-16 shrink-0 text-sm" />
+              </div>
+              {/* The stepper is a fixed 36px control (`h-9`), so this is a
+                  height rather than a line box — the one place in this row
+                  where a `TextSkeleton` would be the wrong tool. */}
+              <Skeleton className="h-9 w-28 rounded-lg" />
+              <TextSkeleton className="w-20 text-xs" />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </SkeletonRegion>
   );
 }
 
@@ -169,6 +263,12 @@ export function CartDrawer() {
         {/* Anything derived from the cart renders nothing until hydrated —
             otherwise this would flash an empty cart before the real one
             loads from the server. See cart-context.tsx. */}
+
+        {/* `!cart.problem` FOR THE SAME REASON THE EMPTY STATE CARRIES IT. A
+            read that failed is not a read still running, and a basket shape
+            drawn over "We couldn't load your cart" promises rows that are
+            never coming. The notice is the whole answer in that case. */}
+        {!cart.hydrated && !cart.problem && <CartSkeleton />}
 
         {/* `!cart.problem`: an empty basket and an unreadable one are different
             claims, and only one of them is ours to make. Without this the

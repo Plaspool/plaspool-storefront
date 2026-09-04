@@ -19,6 +19,7 @@ import { NextTierHint } from "./next-tier-hint";
 import { AddToCartButton } from "../cart/add-to-cart";
 import type { CartLineKey } from "../cart/types";
 import { useCart } from "../cart/cart-context";
+import { stockWarning } from "../cart/stock";
 
 /**
  * Everything you need to decide with, in the order the spec fixes: name,
@@ -97,6 +98,15 @@ export interface BuyBoxProps {
   onColourChange: (id: string) => void;
   onSizeChange: (id: string) => void;
   onQuantityChange: (n: number) => void;
+  /**
+   * The stepper's ceiling for the CHOSEN variant, decided by `ProductBuySection`.
+   *
+   * Passed in rather than derived here because the section owns the quantity
+   * and already clamps it against this number — two readings of the rule is two
+   * places for them to disagree, and the disagreement would be a stepper whose
+   * `max` and whose value came from different variants.
+   */
+  maxQty: number;
   className?: string;
 }
 
@@ -109,6 +119,7 @@ export function BuyBox({
   onColourChange,
   onSizeChange,
   onQuantityChange,
+  maxQty,
   className,
 }: BuyBoxProps) {
   /* Real reviews only. This read the invented fixtures behind a feature flag
@@ -242,9 +253,18 @@ export function BuyBox({
         <QuantityStepper
           value={quantity}
           onChange={onQuantityChange}
+          max={maxQty}
           label={product.name}
           className="mt-2"
         />
+        {/* WHY THE PLUS BUTTON STOPPED, in the number that lets them decide
+            what to do about it. Silent above the sanity ceiling, which is not
+            an inventory claim — see `stockWarning`. */}
+        {stockWarning(quantity, maxQty) !== null && (
+          <p className="mt-2 font-mono text-xs font-medium text-muted-foreground">
+            {`Only ${maxQty} left`}
+          </p>
+        )}
         {/* Computed from `bulkTiers` alone — no request per key press. Renders
             nothing without a ladder or on the top rung. */}
         <NextTierHint tiers={product.bulkTiers} quantity={quantity} className="mt-2" />

@@ -41,6 +41,15 @@ export interface StickyBuyBarProps {
   size: SizeOption;
   quantity: number;
   onQuantityChange: (n: number) => void;
+  /**
+   * The stepper's ceiling for the CHOSEN variant, decided by `ProductBuySection`.
+   *
+   * Passed in rather than derived here because the section owns the quantity
+   * and already clamps it against this number — two readings of the rule is two
+   * places for them to disagree, and the disagreement would be a stepper whose
+   * `max` and whose value came from different variants.
+   */
+  maxQty: number;
   className?: string;
 }
 
@@ -50,6 +59,7 @@ export function StickyBuyBar({
   size,
   quantity,
   onQuantityChange,
+  maxQty,
   className,
 }: StickyBuyBarProps) {
   const unit = unitPriceFor(size.priceMinor, product.bulkTiers, quantity);
@@ -108,6 +118,7 @@ export function StickyBuyBar({
         <QuantityStepper
           value={quantity}
           onChange={onQuantityChange}
+          max={maxQty}
           label={product.name}
           className="hidden shrink-0 sm:inline-flex"
         />

@@ -230,3 +230,75 @@ describe("an address outside the region the shop serves at all", () => {
     );
   });
 });
+
+describe("being refused for stock, in the numbers the refusal carried", () => {
+  /*
+   * ═══════════════════════════════════════════════════════════════════════════
+   * `Shortfall` has always carried `requested` and `available`, and the admin's
+   * route is explicit that it sends them so the shopper can act:
+   *
+   *     // "Out of stock" is not actionable; "only 3 left" lets the shopper
+   *     // reduce the quantity without leaving the page.
+   *
+   * This copy read `shortfalls.length` and printed neither number. The
+   * assertions below are verbatim for the reason the header of this file gives:
+   * the numbers ARE the change, and a test that checked the sentence was
+   * non-empty would have passed before it.
+   * ═══════════════════════════════════════════════════════════════════════════
+   */
+
+  it("names both numbers when one line is short", () => {
+    expect(
+      errorCopy({
+        code: "insufficient_stock",
+        shortfalls: [{ variantId: "var_a", requested: 10, available: 4 }],
+      }).body,
+    ).toBe(
+      "You asked for 10 of an item and only 4 are left. Go back to the cart and lower the quantity to continue.",
+    );
+  });
+
+  it("agrees with itself about a single unit", () => {
+    expect(
+      errorCopy({
+        code: "insufficient_stock",
+        shortfalls: [{ variantId: "var_a", requested: 3, available: 1 }],
+      }).body,
+    ).toContain("only 1 is left");
+  });
+
+  /* ZERO IS A DIFFERENT INSTRUCTION, NOT A SMALLER NUMBER. The stock went
+     while they were checking out, so "lower the quantity" is advice that
+     cannot be followed — there is no quantity that works. */
+  it("tells them to remove it rather than printing 'only 0 left'", () => {
+    const body = errorCopy({
+      code: "insufficient_stock",
+      shortfalls: [{ variantId: "var_a", requested: 2, available: 0 }],
+    }).body;
+    expect(body).not.toContain("0 left");
+    expect(body).toContain("remove it");
+  });
+
+  /* Several lines cannot be spelled out in one sentence without becoming a
+     paragraph nobody reads, so this points at the cart — where every row now
+     carries its own count off the line's live `inStock`. */
+  it("points at the cart's own per-row counts when several are short", () => {
+    const body = errorCopy({
+      code: "insufficient_stock",
+      shortfalls: [
+        { variantId: "var_a", requested: 10, available: 4 },
+        { variantId: "var_b", requested: 2, available: 1 },
+      ],
+    }).body;
+    expect(body).toContain("2 items");
+    expect(body).toContain("how many are left");
+  });
+
+  /* The API always sends at least one. A response shape that changed must
+     still not render "0 items in your cart". */
+  it("degrades to the instruction rather than claiming zero items", () => {
+    const body = errorCopy({ code: "insufficient_stock", shortfalls: [] }).body;
+    expect(body).not.toContain("0");
+    expect(body).toContain("adjust the quantity");
+  });
+});

@@ -71,6 +71,20 @@ export interface ResolvedLine {
    */
   total: number;
   tier: BulkTier | null;
+  /**
+   * The most this row may be ordered in — the stepper's `max`, already decided.
+   *
+   * ═══ COMPUTED HERE SO EVERY BASKET SURFACE GETS THE SAME ANSWER ═══
+   * The drawer and `/cart` each render their own stepper, and the rule needs
+   * two inputs from two places: the LINE's live `inStock` and the CATALOGUE's
+   * `backorderable`. Left to the call sites, that is the same decision written
+   * twice — which is precisely how `resolved` and `itemCount` drifted apart and
+   * produced a badge counting rows the drawer could not draw (see `sellable.ts`).
+   *
+   * Always a number. "No ceiling" is `MAX_LINE_QTY`, never null — see
+   * `maxQtyFor`.
+   */
+  maxQty: number;
 }
 
 /** The cart's whole public surface. `hydrated` gates anything derived from

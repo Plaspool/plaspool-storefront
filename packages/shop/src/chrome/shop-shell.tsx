@@ -76,6 +76,12 @@ export async function ShopShell({ children }: ShopShellProps) {
        an API line is one variant id. Without this the drawer could render a
        basket it had no way to modify. */
     variantIds: product.variantIds,
+    /* WHAT THE CART NEEDS OFF THIS IS `backorderable`, NOT THE COUNT. A cart
+       line quotes its own `inStock` live on every read; this catalogue is ISR
+       cached for up to an hour, so its number is the staler of the two and
+       `maxQtyForLine` deliberately ignores it. The FLAG is the half a cart line
+       does not carry at all, and it is the half that almost never changes. */
+    variantStock: product.variantStock,
   }));
 
   return (

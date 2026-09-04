@@ -39,6 +39,7 @@ const ENTRY: CartCatalogEntry = {
   sizes: [SIZE],
   bulkTiers: [],
   variantIds: { "black:1kg": "var_live" },
+  variantStock: { "black:1kg": { available: 10, backorderable: false } },
   coverImageUrl: null,
 };
 
