@@ -6,6 +6,7 @@ import {
   productTag,
 } from "./config";
 import { lineImagesFrom, toCategory, toProduct } from "./api";
+import type { CurrencyCode } from "./currency-config";
 import { listReviewAggregates } from "./reviews";
 import { HERO_COLOURS, STANDARD_TIERS } from "./policy";
 import type { AdaptContext, ApiCategory, ApiProduct, LineImageIndex } from "./api";
@@ -82,6 +83,37 @@ import type { Category, Product } from "./types";
  * carrying both, so this is a branch and not an extra option.
  * ═══════════════════════════════════════════════════════════════════════════
  */
+/**
+ * `?currency=USD`, or nothing at all.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE DEFAULT CURRENCY MUST SEND NO PARAMETER, AND THAT IS A CACHING RULE AS
+ * MUCH AS AN API ONE.
+ *
+ * `getJson` keys Next's fetch cache by URL, so `/api/shop/products` and
+ * `/api/shop/products?currency=NGN` are TWO cache entries holding identical
+ * bytes — every naira page would miss the entry the shop has been filling
+ * since it launched, and each one costs a KV write to refill. The account has
+ * already had deploys fail against the free tier's 1,000-write day
+ * (`CLAUDE.md`), so doubling the catalogue's entries for no change in the
+ * response is not a cosmetic waste.
+ *
+ * It is also what the API asks for: "Omit the parameter for naira."
+ *
+ * A currency that is not enabled is a 400, which `getJson` maps to null — so a
+ * stale switcher asking for a currency the admin has since turned off costs
+ * that page's products rather than an exception, and the currency config's own
+ * fail-closed rule is what stops it being asked for in the first place.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+/* Exported for its test: the "omit for the default" rule is a CACHING
+   invariant, not a formatting detail, and it is worth a failing assertion
+   rather than a code review. The same reason `returns-cta` exports
+   `isOwnEntry`. */
+export function currencyQuery(currency: CurrencyCode | undefined, defaultCurrency: CurrencyCode = "NGN"): string {
+  return !currency || currency === defaultCurrency ? "" : `?currency=${currency}`;
+}
+
 async function getJson<T>(
   path: string,
   revalidate: number,
@@ -188,11 +220,17 @@ async function context(fresh = false): Promise<AdaptContext> {
  * and then a detail response per product was `1 + N` subrequests against a
  * 50-subrequest cap, i.e. a catalogue-size ceiling rather than a slow path.
  */
-export async function listProducts(fresh = false): Promise<Product[]> {
+export async function listProducts(fresh = false, currency?: CurrencyCode): Promise<Product[]> {
   const [list, ctx] = await Promise.all([
     getJson<{ items: ApiProduct[] }>(
-      "/api/shop/products",
+      `/api/shop/products${currencyQuery(currency)}`,
       CATALOG_LIST_REVALIDATE,
+      /* ═══ THE SAME TAG FOR EVERY CURRENCY, DELIBERATELY ═══
+         One product edit changes the naira listing and the dollar listing
+         alike — they are the same catalogue quoted twice — so a purge that
+         reached only the currency the editor happened to be looking at would
+         leave the other serving a price nobody sells at. `CATALOG_TAG` spans
+         both, and `POST /api/revalidate` keeps working unchanged. */
       [CATALOG_TAG],
       fresh,
     ),
@@ -221,9 +259,13 @@ export async function listProducts(fresh = false): Promise<Product[]> {
     .filter((p): p is Product => p !== null);
 }
 
-async function fetchProduct(slug: string, fresh = false): Promise<ApiProduct | null> {
+async function fetchProduct(
+  slug: string,
+  fresh = false,
+  currency?: CurrencyCode,
+): Promise<ApiProduct | null> {
   const body = await getJson<{ product: ApiProduct }>(
-    `/api/shop/products/${encodeURIComponent(slug)}`,
+    `/api/shop/products/${encodeURIComponent(slug)}${currencyQuery(currency)}`,
     CATALOG_DETAIL_REVALIDATE,
     /* BOTH TAGS, NOT JUST ITS OWN. `CATALOG_TAG` so a "the catalogue moved"
        purge reaches every product page without the caller having to enumerate
@@ -235,18 +277,26 @@ async function fetchProduct(slug: string, fresh = false): Promise<ApiProduct | n
   return body?.product ?? null;
 }
 
-export async function getProduct(slug: string, fresh = false): Promise<Product | null> {
+export async function getProduct(
+  slug: string,
+  fresh = false,
+  currency?: CurrencyCode,
+): Promise<Product | null> {
   /* No ratings fetched here. The product PAGE renders the full review list and
      its own aggregate beside this call (`product-page.tsx`), so asking for a
      star summary as well would be the same numbers twice. `toProduct` leaves
      `rating` at zero, which the page never reads. */
-  const [detail, ctx] = await Promise.all([fetchProduct(slug, fresh), context(fresh)]);
+  const [detail, ctx] = await Promise.all([fetchProduct(slug, fresh, currency), context(fresh)]);
   if (!detail) return null;
   return toProduct(detail, ctx);
 }
 
-export async function listProductsByCategory(slug: string, fresh = false): Promise<Product[]> {
-  return (await listProducts(fresh)).filter((p) => p.categorySlug === slug);
+export async function listProductsByCategory(
+  slug: string,
+  fresh = false,
+  currency?: CurrencyCode,
+): Promise<Product[]> {
+  return (await listProducts(fresh, currency)).filter((p) => p.categorySlug === slug);
 }
 
 /**
@@ -262,8 +312,12 @@ export async function listProductsByCategory(slug: string, fresh = false): Promi
  * The list endpoint returns newest-first, and `listProducts` preserves that
  * order, so this is a slice rather than a sort.
  */
-export async function listFeaturedProducts(limit = 4, fresh = false): Promise<Product[]> {
-  return (await listProducts(fresh)).slice(0, limit);
+export async function listFeaturedProducts(
+  limit = 4,
+  fresh = false,
+  currency?: CurrencyCode,
+): Promise<Product[]> {
+  return (await listProducts(fresh, currency)).slice(0, limit);
 }
 
 export async function productPaths(): Promise<{ slug: string }[]> {

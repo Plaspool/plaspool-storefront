@@ -25,13 +25,13 @@ const text = (props: Parameters<typeof Price>[0]) => html(props).replace(/<[^>]*
 
 describe("Price", () => {
   it("shows one figure when there is nothing to compare", () => {
-    const out = html({ amount: 23_500 });
+    const out = html({ currency: "NGN", amount: 2_350_000 });
     expect(out).toContain("₦23,500");
     expect(out).not.toContain("<s ");
   });
 
   it("strikes a reference price that beats the amount", () => {
-    const out = html({ amount: 20_000, compareAt: 24_000 });
+    const out = html({ currency: "NGN", amount: 2_000_000, compareAt: 2_400_000 });
     expect(out).toContain("<s ");
     expect(out).toContain("₦24,000");
     expect(out).toContain("₦20,000");
@@ -40,20 +40,20 @@ describe("Price", () => {
   /* A reference at or below the price is carried honestly and never shown —
      pre-existing behaviour, asserted so the bulk work did not disturb it. */
   it("ignores a reference price that does not beat the amount", () => {
-    expect(html({ amount: 20_000, compareAt: 20_000 })).not.toContain("<s ");
-    expect(html({ amount: 20_000, compareAt: 19_000 })).not.toContain("<s ");
+    expect(html({ currency: "NGN", amount: 2_000_000, compareAt: 2_000_000 })).not.toContain("<s ");
+    expect(html({ currency: "NGN", amount: 2_000_000, compareAt: 1_900_000 })).not.toContain("<s ");
   });
 
   /* ═══ THE THREE-NUMBER CASE ═══ */
   it("keeps the sale price visible when a bulk rung also applies", () => {
-    const out = text({ amount: 20_000, compareAt: 24_000, bulkAmount: 18_000, bulkQty: 5 });
+    const out = text({ currency: "NGN", amount: 2_000_000, compareAt: 2_400_000, bulkAmount: 1_800_000, bulkQty: 5 });
     expect(out).toContain("₦24,000");
     expect(out).toContain("₦20,000");
     expect(out).toContain("₦18,000");
   });
 
   it("says what quantity earns the bulk price", () => {
-    const out = text({ amount: 20_000, bulkAmount: 18_000, bulkQty: 5 });
+    const out = text({ currency: "NGN", amount: 2_000_000, bulkAmount: 1_800_000, bulkQty: 5 });
     expect(out).toMatch(/5/);
     expect(out).toMatch(/each/i);
   });
@@ -62,7 +62,7 @@ describe("Price", () => {
      price against the bulk figure is the conflation this whole test exists
      for, so the struck element must still hold `compareAt`. */
   it("strikes the reference price and never the bulk price", () => {
-    const out = html({ amount: 20_000, compareAt: 24_000, bulkAmount: 18_000, bulkQty: 5 });
+    const out = html({ currency: "NGN", amount: 2_000_000, compareAt: 2_400_000, bulkAmount: 1_800_000, bulkQty: 5 });
     const struck = /<s [^>]*>(.*?)<\/s>/s.exec(out)?.[1] ?? "";
     expect(struck).toContain("₦24,000");
     expect(struck).not.toContain("₦18,000");
@@ -70,12 +70,12 @@ describe("Price", () => {
 
   /* No rung reached is the ordinary case and must render exactly as before. */
   it("shows no bulk figure when no rung applies", () => {
-    const out = text({ amount: 20_000, compareAt: 24_000 });
+    const out = text({ currency: "NGN", amount: 2_000_000, compareAt: 2_400_000 });
     expect(out).not.toMatch(/each/i);
   });
 
   /* A bulk price that saves nothing is not worth a line of its own. */
   it("shows no bulk figure when the rung does not beat the price", () => {
-    expect(text({ amount: 20_000, bulkAmount: 20_000, bulkQty: 5 })).not.toMatch(/each/i);
+    expect(text({ currency: "NGN", amount: 2_000_000, bulkAmount: 2_000_000, bulkQty: 5 })).not.toMatch(/each/i);
   });
 });

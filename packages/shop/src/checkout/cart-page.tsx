@@ -181,7 +181,20 @@ export function CartPage() {
                       {variantDescriptor(line.colour.name, line.size.label)}
                     </p>
                   </div>
-                  <Price amount={line.total} size="sm" className="shrink-0" />
+                  {/* ═══ ×100 BECAUSE THE PROVIDER IS IN WHOLE UNITS AND `Price` IS IN MINOR ═══
+              `cart-context` runs every figure through `majorUnits()`, so `total` is
+              whole naira; `Price` takes minor units so it can render a currency
+              with sub-units at all. Converting HERE, explicitly, rather than
+              letting `Price` guess: the moment a cart can be USD this whole
+              provider has to move to minor units, and this multiplication is
+              the marker for where that starts. Lossless for NGN, which is the
+              only currency a cart can be today. */}
+                  <Price
+                    amount={line.total * 100}
+                    currency={line.size.currency}
+                    size="sm"
+                    className="shrink-0"
+                  />
                 </div>
                 {/* The per-unit price and, when a bulk rung applied, the
                     struck-through list price and the quantity that earned it.

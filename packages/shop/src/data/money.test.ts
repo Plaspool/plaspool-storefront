@@ -108,8 +108,8 @@ function product(over: Partial<Product> = {}): Product {
       { id: "red", name: "Red", hex: "#ff0000", inStock: true, imageUrl: null },
     ],
     sizes: [
-      { id: "1kg", label: "1 kg", weightGrams: 1000, priceNaira: 18500, compareAtNaira: null },
-      { id: "250g", label: "250 g", weightGrams: 250, priceNaira: 6500, compareAtNaira: null },
+      { id: "1kg", label: "1 kg", weightGrams: 1000, priceMinor: 1850000, compareAtMinor: null, currency: "NGN" as const },
+      { id: "250g", label: "250 g", weightGrams: 250, priceMinor: 650000, compareAtMinor: null, currency: "NGN" as const },
     ],
     ...over,
   } as Product;
@@ -121,8 +121,10 @@ describe("priceFrom / cheapestSize", () => {
      silent — nothing throws, the number is just wrong. */
   it("quote and add agree on the same size", () => {
     const p = product();
-    expect(priceFrom(p)).toBe(6500);
-    expect(cheapestSize(p).priceNaira).toBe(priceFrom(p));
+    /* MINOR UNITS now — `priceFrom` stopped rounding to whole naira when a
+       size started carrying its own currency. */
+    expect(priceFrom(p)).toBe(650000);
+    expect(cheapestSize(p).priceMinor).toBe(priceFrom(p));
     expect(cheapestSize(p).id).toBe("250g");
   });
 });

@@ -2,6 +2,8 @@
 
 import * as React from "react";
 
+import { isSwitchable, type CurrencyCode, type CurrencyConfig } from "../data/currency-config";
+import { resolveCurrency, storedCurrency } from "../data/currency-preference";
 import {
   addLine,
   bulkOf,
@@ -78,15 +80,50 @@ export interface CartCatalogEntry {
 export interface CartProviderProps {
   children: React.ReactNode;
   catalog: CartCatalogEntry[];
+  /**
+   * What the shop may charge in, from `ShopShell`.
+   *
+   * ═══ THE PROVIDER NEEDS IT BECAUSE IT IS WHAT MINTS THE CART ═══
+   * `POST /cart` writes the currency at CREATION and nothing updates it
+   * afterwards — order totals freeze against it. The cart is minted lazily on
+   * the first add, so this is the only moment the choice can be applied, and a
+   * provider that did not know it would silently create every basket in the
+   * shop's default no matter what the shopper had selected.
+   *
+   * OPTIONAL, so the package dev harnesses and any caller predating this can
+   * mount the provider unchanged; an absent config means `createCart` sends no
+   * currency and the server decides, which is exactly today's behaviour.
+   */
+  currencyConfig?: CurrencyConfig;
 }
 
-export function CartProvider({ children, catalog }: CartProviderProps) {
+export function CartProvider({ children, catalog, currencyConfig }: CartProviderProps) {
   const [view, setView] = React.useState<ApiCartView>(EMPTY);
   const [hydrated, setHydrated] = React.useState(false);
   const [isOpen, setIsOpen] = React.useState(false);
   /** A write is in flight. The drawer disables its steppers rather than letting
    *  two edits race and land in the order the network chose. */
   const [pending, setPending] = React.useState(false);
+
+  /**
+   * The currency any cart minted here is created in.
+   *
+   * READ FRESH AT EACH CREATE, not captured once: a shopper can switch in the
+   * header and then add an item without the provider remounting. `undefined`
+   * when there is no config or only one currency — `createCart` then sends no
+   * body at all and the server's default decides, which is the behaviour this
+   * provider had before currencies existed.
+   *
+   * NEVER `replace`. Emptying a basket to change its currency is a question,
+   * and it is asked by `CurrencySwitcher` — the only place that may answer it.
+   * A create from here that hits `currency_locked` simply leaves the existing
+   * cart alone, which is correct: the shopper is adding an item, not
+   * relitigating the currency.
+   */
+  const cartCurrency = React.useCallback((): CurrencyCode | undefined => {
+    if (!currencyConfig || !isSwitchable(currencyConfig)) return undefined;
+    return resolveCurrency(storedCurrency(), currencyConfig);
+  }, [currencyConfig]);
 
   /** What the last write ran into, in the shopper's words. Null when the cart
    *  and the server agree. */
@@ -304,7 +341,7 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
            visitor would set a cookie on people who never touch the shop. A
            second create on an existing cookie is a 200 returning the same
            basket, so this is safe to call whenever there is no cart yet. */
-        if (!view.cart) await createCart();
+        if (!view.cart) await createCart(cartCurrency());
         const added = await addLine(variantId, amount);
         /* ONE RETRY, AND ONLY FOR `gone`. The API retires the cookie naming a
            cart that has become an order, so the first add after a checkout finds
@@ -313,13 +350,13 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
            about a cart they were not thinking about. `createCart` mints one
            because the cookie is already cleared, so this cannot loop. */
         if (!added.ok && added.reason === "gone") {
-          const created = await createCart();
+          const created = await createCart(cartCurrency());
           if (created.ok) return addLine(variantId, amount);
         }
         return added;
       });
     },
-    [variantFor, open, mutate, view.cart],
+    [variantFor, open, mutate, view.cart, cartCurrency],
   );
 
   /**
@@ -351,7 +388,7 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
       let added = 0;
       let failed = 0;
       await mutate(async () => {
-        if (!view.cart) await createCart();
+        if (!view.cart) await createCart(cartCurrency());
         let last: CartResult = { ok: false, reason: "gone" };
         for (const item of known) {
           let next = await addLine(item.variantId, Math.trunc(item.qty));
@@ -359,7 +396,7 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
              thing to do right after checking out, which is exactly when the
              previous cart has just been retired. */
           if (!next.ok && next.reason === "gone") {
-            const created = await createCart();
+            const created = await createCart(cartCurrency());
             if (created.ok) next = await addLine(item.variantId, Math.trunc(item.qty));
           }
           /* THE RESULT, NOT THE INTENTION. A cart write that never landed used
@@ -376,7 +413,7 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
       });
       return { added, failed, skippedVariantIds };
     },
-    [byVariant, open, mutate, view.cart],
+    [byVariant, open, mutate, view.cart, cartCurrency],
   );
 
   const setQty = React.useCallback(
@@ -468,7 +505,7 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
        applied in `partitionLines`; a second `continue` here is how the two
        projections drifted apart the first time. */
     return split.sellable.map(({ line, entry, colour, size }) => {
-        /* THE SERVER'S PRICE, not `size.priceNaira`. The two agree today, and
+        /* THE SERVER'S PRICE, not `size.priceMinor`. The two agree today, and
            when they stop agreeing the server is the one that takes the money. */
         const unitPrice = majorUnits(line.unit);
         const frozen = totals.get(line.variantId);
@@ -528,7 +565,22 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
     /* List price minus what is actually charged. Zero today, because nothing
        discounts server-side — and it appears on its own the day something does,
        rather than needing this file to learn about it. */
-    const list = resolved.reduce((sum, r) => sum + r.size.priceNaira * r.qty, 0);
+    /* ═══ DIVIDED, BECAUSE `subtotal` ABOVE IS WHOLE UNITS ═══
+       `size.priceMinor` is minor units now (it was `priceNaira`, whole units,
+       when this line was written). `subtotal` comes through `majorUnits()`.
+       Subtracting one from the other without this division is a 100x error
+       that renders as a perfectly plausible saving — the confusion
+       `money-units.test.ts` exists to pin. Rounded per unit before
+       multiplying, exactly as `priceNaira` did, so the figure does not move.
+
+       THIS PROVIDER IS STILL NAIRA-SHAPED, knowingly: it works in whole units
+       via `majorUnits()`, which rounds cents away. Correct while a cart can
+       only be NGN, and the first thing to migrate when it cannot — the cart's
+       own currency is already on `view.cart.currency`. */
+    const list = resolved.reduce(
+      (sum, r) => sum + Math.round(r.size.priceMinor / 100) * r.qty,
+      0,
+    );
     return {
       lines,
       resolved,

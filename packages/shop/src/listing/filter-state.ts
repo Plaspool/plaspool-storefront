@@ -2,6 +2,22 @@ import type { Product } from "../data/types";
 import { priceFrom } from "../data/money";
 
 /**
+ * `priceFrom` is MINOR UNITS; `min` and `max` in the URL are WHOLE ones.
+ *
+ * ═══ THE URL IS HUMAN-FACING, AND ITS UNIT MUST NOT MOVE ═══
+ * `?min=15000&max=30000` means ₦15,000–₦30,000, it is in shared and
+ * bookmarked links, and it is typed straight into the filter rail's two
+ * boxes. When `SizeOption.priceNaira` became `priceMinor` this comparison
+ * silently became 100x wrong — `min=15000` filtered against ₦150 — which is
+ * not an error, just a listing that quietly shows the wrong products. The
+ * conversion happens HERE, at the boundary between the API's units and the
+ * query string's, and nowhere else.
+ */
+function majorOf(product: Parameters<typeof priceFrom>[0]): number {
+  return Math.round(priceFrom(product) / 100);
+}
+
+/**
  * The listing's URL contract, and the only place it is defined.
  *
  *   ?material=PLA,PETG&colour=obsidian-black&diameter=1.75&weight=1000
@@ -136,7 +152,7 @@ export function applyFilters(products: Product[], f: Filters): Product[] {
       return false;
     if (f.weights.length && !p.sizes.some((s) => f.weights.includes(s.weightGrams))) return false;
 
-    const price = priceFrom(p);
+    const price = majorOf(p);
     if (f.minPrice !== null && price < f.minPrice) return false;
     if (f.maxPrice !== null && price > f.maxPrice) return false;
 
@@ -223,7 +239,9 @@ export function facetsFor(products: Product[]): Facets {
     }
   }
 
-  const prices = products.map(priceFrom);
+  /* Whole units, because these bounds are rendered beside the two inputs and
+     are the same scale the shopper types into them. */
+  const prices = products.map(majorOf);
 
   return {
     materials: [...materials.entries()]

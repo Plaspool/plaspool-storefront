@@ -176,6 +176,99 @@ const FIELD_IDS: Record<FieldKey, string> = {
 const NATIVE_SELECT_CLASSES =
   "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm";
 
+/**
+ * The delivery country.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A CONTROL ONLY WHEN THE SERVER UNLOCKS ONE, AND THE LIST IS ALWAYS THE
+ * SERVER'S.
+ *
+ * `country.locked` is true today, which is the shop as it is: it ships from
+ * and within Nigeria, so the country is a fact rather than a question, and it
+ * renders as fixed text. That is what the form has always shown — the field
+ * did not exist as a control and this does not add one.
+ *
+ * When international selling is switched on the admin sets `locked: false` and
+ * fills `country.allowed`. THE STOREFRONT NEVER SPELLS THAT LIST. A hardcoded
+ * set of countries is a second, stale answer to a question the delivery config
+ * already answers, and the first thing it does when it drifts is offer to ship
+ * somewhere the shop has no zone for — which prices at the catch-all and
+ * quotes a delivery fee nobody can honour.
+ *
+ * ═══ CHANGING IT CAN HIDE THE DISTRICT PICKER, AND THAT IS THE POINT ═══
+ * Districts are Nigerian. `fieldRows` reads the address, so selecting anywhere
+ * else removes the picker in the same render, and `submittedAddress` omits the
+ * key from the body rather than sending an empty one. See `districtsApply`.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+function CountryField({
+  config,
+  value,
+  onChange,
+}: {
+  config: DeliveryConfig;
+  value: string;
+  onChange: (countryCode: string) => void;
+}) {
+  const id = "checkout-country";
+  const current = (value || config.country.default).toUpperCase();
+
+  /* LOCKED IS NOT A DISABLED SELECT. A greyed-out control invites a shopper to
+     try to change something they cannot, and a disabled form field is skipped
+     by keyboard navigation while still taking up a tab stop's worth of
+     attention. One country is a statement, so it is written as one. */
+  if (config.country.locked || config.country.allowed.length < 2) {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={id}>Country</Label>
+        <p id={id} className="text-sm text-muted-foreground">
+          {countryName(current)}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <Field id={id} label="Country" required>
+      <select
+        id={id}
+        required
+        value={current}
+        onChange={(e) => onChange(e.target.value)}
+        className={NATIVE_SELECT_CLASSES}
+      >
+        {config.country.allowed.map((code) => (
+          <option key={code} value={code}>
+            {countryName(code)}
+          </option>
+        ))}
+      </select>
+    </Field>
+  );
+}
+
+/**
+ * An ISO-3166-1 alpha-2 code as a name.
+ *
+ * `Intl.DisplayNames` where the runtime has it, the CODE ITSELF where it does
+ * not — never a hand-written table. A table would be one more list to drift
+ * from `country.allowed`, and it would be wrong in a different way from the
+ * server rather than merely terse. A bare "GB" beside a country selector is
+ * understandable; "United Kingdom" spelled by a storefront that also thinks
+ * "NG" is "Nigeria (FCT)" is not.
+ *
+ * WRAPPED, because `Intl.DisplayNames` is absent on some small-ICU builds and
+ * throws for an unknown code on others. This runs in the browser, but the
+ * component renders on the server first.
+ */
+function countryName(code: string): string {
+  try {
+    return new Intl.DisplayNames(["en"], { type: "region" }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
 function Field({
   id,
   label,
@@ -408,8 +501,10 @@ export function CheckoutFlow() {
   /** The rows the form draws: the config's visible fields, in the config's
    *  order, with City and State paired as they are on screen today. */
   const rows = React.useMemo(
-    () => fieldRows(config, districtChoices),
-    [config, districtChoices],
+    /* `address` so the district row disappears the moment a shopper selects a
+       country districts do not apply to — see `districtsApply`. */
+    () => fieldRows(config, districtChoices, address),
+    [config, districtChoices, address],
   );
 
   /**
@@ -1187,6 +1282,24 @@ export function CheckoutFlow() {
 
                 `rows` carries the one thing a flat `fields[]` cannot say:
                 City and State share a line, as they do on screen today. */}
+            {/* ═══ THE COUNTRY, WHICH IS A CONTROL ONLY WHEN THE SERVER SAYS
+                SO ═══
+                `country.locked` is true today, so this renders as fixed text —
+                which is exactly what the form has always shown, since the
+                shop only ships from and within Nigeria. When international
+                selling is switched on the admin sets it false and sends the
+                list in `country.allowed`, and this becomes a real selector.
+
+                THE LIST IS NEVER SPELLED HERE. A hardcoded set of countries
+                would be a second, stale answer to a question the delivery
+                config already answers, and the shop would offer to ship
+                somewhere it has no zone for. */}
+            <CountryField
+              config={config}
+              value={address.countryCode}
+              onChange={(countryCode) => editAddress({ countryCode })}
+            />
+
             {rows.map((row) =>
               row.length === 2 ? (
                 <div key={row[0].key} className="grid grid-cols-2 gap-4">

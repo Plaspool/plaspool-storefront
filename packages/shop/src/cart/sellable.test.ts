@@ -30,7 +30,7 @@ import type { CartCatalogEntry } from "./cart-context";
  */
 
 const COLOUR = { id: "black", name: "Black", hex: "#000000", inStock: true, imageUrl: null };
-const SIZE = { id: "1kg", label: "1kg", weightGrams: 1000, priceNaira: 23500, compareAtNaira: null };
+const SIZE = { id: "1kg", label: "1kg", weightGrams: 1000, priceMinor: 2350000, compareAtMinor: null, currency: "NGN" as const };
 
 const ENTRY: CartCatalogEntry = {
   slug: "pla-basic",

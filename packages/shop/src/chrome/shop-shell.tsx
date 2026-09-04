@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { listCategories, listProducts } from "../data/catalog";
+import { readCurrencyConfig } from "../data/currency-config";
 import { CartProvider } from "../cart/cart-context";
 import { CartDrawer } from "../cart/cart-drawer";
 import { AnnouncementBar } from "./announcement-bar";
@@ -50,7 +51,17 @@ export interface ShopShellProps {
 }
 
 export async function ShopShell({ children }: ShopShellProps) {
-  const [categories, products] = await Promise.all([listCategories(), listProducts()]);
+  /* THE CURRENCY CONFIG JOINS THE SAME `Promise.all` for the same reason the
+     other two are here: `ShopNav` is a client component and cannot await it,
+     and fetching it in the browser would put the header behind a round trip
+     the server had already made. It never throws and answers naira-only for
+     every failure, so the switcher simply does not render — which is also what
+     it does today, because the endpoint is not deployed. */
+  const [categories, products, currencyConfig] = await Promise.all([
+    listCategories(),
+    listProducts(),
+    readCurrencyConfig(),
+  ]);
   const catalog = products.map((product) => ({
     slug: product.slug,
     name: product.name,
@@ -68,7 +79,10 @@ export async function ShopShell({ children }: ShopShellProps) {
   }));
 
   return (
-    <CartProvider catalog={catalog}>
+    /* The cart needs the currency because `POST /cart` writes it at CREATION
+       and never again — see `createCart`. The provider mints the cart on the
+       first add, so that is the moment the choice has to be in hand. */
+    <CartProvider catalog={catalog} currencyConfig={currencyConfig}>
       {/*
         `has-[[data-cta-bar]]` reserves room for the product page's sticky buy
         bar — and only on the routes that render one.
@@ -88,7 +102,7 @@ export async function ShopShell({ children }: ShopShellProps) {
       */}
       <div className="flex min-h-screen flex-col has-[[data-cta-bar]]:pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
         <AnnouncementBar />
-        <ShopNav categories={categories} />
+        <ShopNav categories={categories} currencyConfig={currencyConfig} />
         {/* id/tabIndex: the root layout's skip link jumps here. Each route
             group owns its own <main>, so the shop supplies this one. */}
         <main id="content" tabIndex={-1} className="flex-1 focus:outline-none">

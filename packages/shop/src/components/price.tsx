@@ -1,6 +1,7 @@
 import { cn } from "@plaspool/ui";
 
-import { formatNaira } from "../data/money";
+import type { CurrencyCode } from "../data/currency-config";
+import { formatMinor } from "../data/format-money";
 
 /**
  * Every price in the store. Monospace and tabular per the type thesis, so a
@@ -23,9 +24,30 @@ const SECONDARY: Record<NonNullable<PriceProps["size"]>, string> = {
 };
 
 export interface PriceProps {
-  /** Whole Naira. */
+  /**
+   * MINOR UNITS, in `currency` — not whole naira.
+   *
+   * ═══ THIS PROP USED TO BE WHOLE NAIRA, AND THE SIGN WAS HARDCODED ═══
+   * `formatNaira` always printed `₦`, so this component could not render a
+   * dollar price at all: $49.99 came through as the number 50 and drew as
+   * `₦50` — the cents gone and the currency wrong, with nothing to indicate
+   * either. The comparisons below (`compareAt > amount`, `bulkAmount <
+   * amount`) now happen on the RAW minor figures, which are directly
+   * comparable because they share `currency`, so no rounding happens before
+   * the decision about what to draw.
+   */
   amount: number;
-  /** The struck reference price. Rendered only when it beats `amount`. */
+  /**
+   * What every figure here is denominated in.
+   *
+   * REQUIRED, AND DELIBERATELY WITHOUT A DEFAULT. The default that suggests
+   * itself is naira, because that is what the shop charged for its whole life
+   * — and that is exactly the silent mispricing this change exists to remove.
+   * A caller that does not know the currency does not know the price.
+   */
+  currency: CurrencyCode;
+  /** The struck reference price, minor units. Rendered only when it beats
+   *  `amount`. */
   compareAt?: number | null;
   /**
    * What a unit costs once a BULK RUNG applies, and the quantity that earns it.
@@ -67,6 +89,7 @@ export interface PriceProps {
 
 export function Price({
   amount,
+  currency,
   compareAt = null,
   bulkAmount = null,
   bulkQty = null,
@@ -94,12 +117,12 @@ export function Price({
           amountClassName,
         )}
       >
-        {formatNaira(amount)}
+        {formatMinor(amount, currency)}
       </span>
       {showCompare && (
         <s className={cn("font-mono tabular-nums text-muted-foreground", SECONDARY[size])}>
           <span className="sr-only">Was </span>
-          {formatNaira(compareAt)}
+          {formatMinor(compareAt, currency)}
         </s>
       )}
       {showBulk && (
@@ -109,7 +132,7 @@ export function Price({
           buy{" "}
           <span className="font-mono tabular-nums">{bulkQty}</span> for{" "}
           <span className="font-mono font-semibold tabular-nums text-brand">
-            {formatNaira(bulkAmount)}
+            {formatMinor(bulkAmount, currency)}
           </span>{" "}
           each
         </span>

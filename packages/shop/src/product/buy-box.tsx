@@ -126,7 +126,7 @@ export function BuyBox({
      the quantity that earns it, so raising the stepper still changes what the
      block says; it changes the honest half. */
   const rung = tierFor(product.bulkTiers, quantity);
-  const unit = unitPriceFor(size.priceNaira, product.bulkTiers, quantity);
+  const unit = unitPriceFor(size.priceMinor, product.bulkTiers, quantity);
   const line: CartLineKey = {
     productSlug: product.slug,
     colourId: colour.id,
@@ -165,8 +165,9 @@ export function BuyBox({
       )}
 
       <Price
-        amount={size.priceNaira}
-        compareAt={size.compareAtNaira}
+        amount={size.priceMinor}
+        currency={size.currency}
+        compareAt={size.compareAtMinor}
         bulkAmount={unit}
         bulkQty={rung?.minQty ?? null}
         size="lg"
@@ -251,7 +252,8 @@ export function BuyBox({
 
       <BulkTierTable
         tiers={product.bulkTiers}
-        basePrice={size.priceNaira}
+        basePrice={size.priceMinor}
+        currency={size.currency}
         quantity={quantity}
       />
 

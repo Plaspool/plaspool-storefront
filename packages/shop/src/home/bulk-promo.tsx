@@ -2,7 +2,9 @@ import { Link } from "../components/link";
 import { cn, controlSurface } from "@plaspool/ui";
 
 import { listProducts, STANDARD_TIERS } from "../data/catalog";
-import { formatNaira } from "../data/money";
+import type { CurrencyCode } from "../data/currency-config";
+import { formatMinor } from "../data/format-money";
+import type { SizeOption } from "../data/types";
 import { BulkTierTable } from "../components/bulk-tier-table";
 
 /**
@@ -38,13 +40,15 @@ import { BulkTierTable } from "../components/bulk-tier-table";
  * the catalogue — still a figure somebody can go and buy, which is the whole
  * promise of the band.
  */
-async function referencePrice(): Promise<number | null> {
-  const products = await listProducts();
+async function referencePrice(currency?: CurrencyCode): Promise<SizeOption | null> {
+  const products = await listProducts(false, currency);
   const sizes = products.flatMap((product) => product.sizes);
   if (!sizes.length) return null;
   const kilo = sizes.filter((size) => size.weightGrams === 1000);
   const pool = kilo.length ? kilo : sizes;
-  return pool.reduce((min, size) => (size.priceNaira < min.priceNaira ? size : min)).priceNaira;
+  /* The SIZE, not its bare figure: the band renders a price, and a lone
+     number would arrive with no currency to render it in. */
+  return pool.reduce((min, size) => (size.priceMinor < min.priceMinor ? size : min));
 }
 
 /* Descendant overrides, so each beats the table's own single-class utilities
@@ -58,7 +62,7 @@ const INVERTED_TABLE = cn(
   "[&_tr]:border-brand-ink/20",
 );
 
-export async function BulkPromo() {
+export async function BulkPromo({ currency }: { currency?: CurrencyCode } = {}) {
   /*
    * NO LADDER MEANS NOTHING TO PROMOTE. `STANDARD_TIERS` is empty while the
    * shop offers no bulk discounts; rendering this band over an empty ladder
@@ -67,7 +71,7 @@ export async function BulkPromo() {
    */
   if (!STANDARD_TIERS.length) return null;
 
-  const price = await referencePrice();
+  const price = await referencePrice(currency);
   /*
    * NOTHING TO QUOTE MEANS NOTHING TO SHOW. An empty catalogue makes this band a
    * discount ladder over a price that does not exist — the table needs a base
@@ -115,12 +119,16 @@ export async function BulkPromo() {
               <span className="font-mono tabular-nums text-brand-ink">1 kg</span> spool of PLA
               Matte, listed at{" "}
               <span className="font-mono font-bold tabular-nums text-brand-ink">
-                {formatNaira(price)}
+                {formatMinor(price.priceMinor, price.currency)}
               </span>
               .
             </p>
             <div className={cn("mt-4", INVERTED_TABLE)}>
-              <BulkTierTable tiers={STANDARD_TIERS} basePrice={price} />
+              <BulkTierTable
+                tiers={STANDARD_TIERS}
+                basePrice={price.priceMinor}
+                currency={price.currency}
+              />
             </div>
           </div>
         </div>

@@ -198,6 +198,21 @@ export type CartResult =
   | { ok: true; view: ApiCartView }
   | { ok: false; reason: "offline" }
   | { ok: false; reason: "gone" }
+  /**
+   * The basket already has lines, in a DIFFERENT currency from the one asked
+   * for, and the cart's currency can never be updated — it is written at
+   * creation and order totals freeze against it.
+   *
+   * ═══ ITS OWN REASON, NOT A `detail` STRING TO MATCH ON ═══
+   * This is the only cart refusal with a QUESTION attached: switching means
+   * emptying the basket, so a shopper has to agree to it before the retry with
+   * `replace: true`. A caller that had to recognise it by comparing
+   * `detail === "currency_locked"` would be one typo away from silently
+   * treating "may I throw away your basket?" as a generic failure — and the
+   * generic failure copy says "try again", which here would either loop or
+   * quietly discard the lines. Named, so the switch is exhaustive.
+   */
+  | { ok: false; reason: "currency_locked" }
   | { ok: false; reason: "refused"; status: number; detail?: string };
 
 async function call(path: string, init: RequestInit = {}): Promise<CartResult> {
@@ -233,7 +248,17 @@ async function call(path: string, init: RequestInit = {}): Promise<CartResult> {
      not a failure. */
   if (res.status === 404) return { ok: false, reason: "gone" };
 
-  return { ok: false, reason: "refused", status: res.status, detail: await detailOf(res) };
+  const detail = await detailOf(res);
+  /* Read from the SAME place every other refusal detail comes from, so a
+     server that moves it between `error` and `detail` does not break this.
+     Status-checked as well as name-checked: `currency_locked` is a 409 by
+     contract, and a 4xx that merely mentioned the string should not be able
+     to trigger a "shall I empty your basket?" prompt. */
+  if (res.status === 409 && detail === "currency_locked") {
+    return { ok: false, reason: "currency_locked" };
+  }
+
+  return { ok: false, reason: "refused", status: res.status, detail };
 }
 
 /** The API's `detail` string when it sent one. Never trusted to exist, and
@@ -261,9 +286,44 @@ export function readCart(): Promise<CartResult> {
  * visitor would set a cookie on people who never touch the shop and fill the
  * carts table with empties — and the API's own rate budget on this endpoint is
  * sized for a real basket rather than a page view.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE CURRENCY IS WRITTEN HERE AND NEVER AGAIN. THIS IS THE SHARPEST EDGE IN
+ * THE FEATURE.
+ *
+ * A cart's currency is set at creation and is NEVER updated — order totals
+ * freeze against it. So the switcher has to set the currency BEFORE the first
+ * item is added, which is why it lives in the site header and why there is
+ * deliberately no currency control on the checkout page: by checkout the
+ * question has already been answered and cannot be reopened.
+ *
+ * THIS ENDPOINT IS ALSO NOT REALLY A CREATE. It returns the EXISTING cart when
+ * the cookie has one and IGNORES the body — so calling it with a new currency
+ * is a no-op for an empty cart (the silent, free case) and a `409
+ * currency_locked` for one with lines. `replace` is the answer to that 409 and
+ * nothing else.
+ *
+ * `replace` DISCARDS THE BASKET. It must never be passed speculatively, on a
+ * retry loop, or as a default — only after a shopper has been told what it
+ * costs them and said yes. It is a separate argument rather than an option on
+ * the currency for exactly that reason: no call site can set it by accident
+ * while meaning to set a currency.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
-export function createCart(): Promise<CartResult> {
-  return call("/cart", { method: "POST" });
+export function createCart(
+  /** Omitted means "whatever the shop's default is" — the server decides, and
+   *  a storefront that has never read the currency config must not assert a
+   *  currency of its own. */
+  currency?: string,
+  /** Throw away the existing basket to change its currency. Only ever true in
+   *  response to a `currency_locked` refusal the shopper has agreed to. */
+  replace = false,
+): Promise<CartResult> {
+  if (!currency) return call("/cart", { method: "POST" });
+  return call("/cart", {
+    method: "POST",
+    body: JSON.stringify(replace ? { currency, replace: true } : { currency }),
+  });
 }
 
 /**

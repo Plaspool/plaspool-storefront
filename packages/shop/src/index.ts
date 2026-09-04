@@ -196,3 +196,17 @@ export { ReturnRequestPage, returnRequestMetadata } from "./returns/return-reque
    this package exports. */
 export * from "./returns/return-modal";
 export * from "./returns/returns-cta";
+
+/* ═══ THE CURRENCY'S PLACE IN THE URL ═══
+   `withCurrency` is what the `usd/` route files use to tell a shared page
+   component which currency it is rendering; the rest is exported alongside it
+   because a route that serves a currency variant is also the thing that has to
+   describe one. Everything else about currency — the config, the preference
+   cookie, the money formatter — stays internal until a component outside this
+   package needs it. */
+export {
+  DEFAULT_CURRENCY,
+  canonicalPath,
+  currencyFromSegment,
+  withCurrency,
+} from "./data/currency-routing";

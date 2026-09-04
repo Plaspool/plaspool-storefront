@@ -46,16 +46,24 @@ export function savingsFor(basePrice: number, tiers: BulkTier[], qty: number): n
   return basePrice * qty - lineTotal(basePrice, tiers, qty);
 }
 
-/** The "From ₦X" figure on a card: the cheapest size. */
+/**
+ * The "From X" figure on a card: the cheapest size, IN MINOR UNITS.
+ *
+ * Returns a bare number because every caller pairs it with
+ * `cheapestSize(product).currency` — the size and its currency are read
+ * together or not at all, and a helper that answered `{amount, currency}` here
+ * would just be `cheapestSize` with one field hidden.
+ */
 export function priceFrom(product: Product): number {
-  return Math.min(...product.sizes.map((s) => s.priceNaira));
+  return Math.min(...product.sizes.map((s) => s.priceMinor));
 }
 
 /** The size `priceFrom` quotes. A card's add button adds this one, so the
- *  price shown and the price added always agree. */
+ *  price shown and the price added always agree — and its `currency` is the
+ *  one `priceFrom`'s figure is denominated in. */
 export function cheapestSize(product: Product): SizeOption {
   return product.sizes.reduce((min, size) =>
-    size.priceNaira < min.priceNaira ? size : min,
+    size.priceMinor < min.priceMinor ? size : min,
   );
 }
 

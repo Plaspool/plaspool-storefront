@@ -123,6 +123,10 @@ export function ProductCard({ product, className }: ProductCardProps) {
       <Price
         from
         amount={priceFrom(product)}
+        /* `priceFrom` is the CHEAPEST size's figure, so the currency that
+           denominates it is that same size's — read together, never assumed.
+           See `priceFrom`'s own comment. */
+        currency={cheapestSize(product).currency}
         size="sm"
         className="mt-1.5"
       />
