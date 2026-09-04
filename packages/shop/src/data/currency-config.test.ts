@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { CATALOG_LIST_REVALIDATE } from "./config";
 import {
   CURRENCY_CONFIG_PATH,
+  CURRENCY_CONFIG_REVALIDATE,
   NAIRA_ONLY,
   isCurrencyCode,
   isSwitchable,
@@ -83,7 +85,40 @@ describe("the gate, while dollars are switched off", () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toContain(CURRENCY_CONFIG_PATH);
     expect(init.credentials).toBeUndefined();
-    expect(init.cache).toBe("no-store");
+  });
+
+  it("uses a revalidate window and NEVER `no-store`, or the catalogue goes dynamic", async () => {
+    /*
+     * ═══════════════════════════════════════════════════════════════════════
+     * THE REGRESSION THIS PINS ACTUALLY HAPPENED, AND THE BUILD IS WHAT CAUGHT
+     * IT.
+     *
+     * `ShopShell` calls `readCurrencyConfig` on the server, in the `(shop)`
+     * LAYOUT — so whatever this fetch opts into, every shop route opts into.
+     * Written with `cache: "no-store"` (copied from `delivery-config.ts`,
+     * where it is correct because that one is only called from a client
+     * effect), it turned `/store`, every category and every product page from
+     * prerendered-and-KV-served into a full render per view. The route table
+     * went from `○`/`●` to `ƒ` on every row. That is the storefront #9 Error
+     * 1102 condition.
+     *
+     * THE WINDOW IS THE CATALOGUE'S, NOT THE ENDPOINT'S SHORTER `s-maxage`. A
+     * route takes the shortest window it composes, so 60s here dragged
+     * `/store` from five minutes to one — five times the KV writes on the
+     * busiest page in the shop.
+     * ═══════════════════════════════════════════════════════════════════════
+     */
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(respond(200, { config: { currencies: ["NGN"], default: "NGN", revision: 1 } }));
+    global.fetch = fetchMock;
+
+    await readCurrencyConfig();
+
+    const init = fetchMock.mock.calls[0][1];
+    expect(init.cache).toBeUndefined();
+    expect(init.next).toEqual({ revalidate: CURRENCY_CONFIG_REVALIDATE });
+    expect(CURRENCY_CONFIG_REVALIDATE).toBe(CATALOG_LIST_REVALIDATE);
   });
 });
 

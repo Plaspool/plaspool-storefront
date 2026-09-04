@@ -61,6 +61,37 @@ export function wantsServiceAreas(config: DeliveryConfig): boolean {
   );
 }
 
+/**
+ * The one country districts exist for.
+ *
+ * ═══ DISTRICTS ARE A NIGERIAN CONCEPT, NOT A GENERIC ADDRESS FIELD ═══
+ * The served-areas list is Abuja and Lagos districts priced at Nigerian zone
+ * rates. Shown to somebody entering a London address it is a picker with
+ * nothing in it that could be right — and worse, a leftover key from a
+ * previous Nigerian address would ride the submit and price an international
+ * parcel at a Maitama rate.
+ *
+ * A CONSTANT AND NOT A CONFIG FIELD, because the delivery config does not
+ * carry one. `districts.source` names the endpoint, not the country it applies
+ * to. When the admin grows a country scope for districts this becomes a read
+ * of it; until then the storefront must not send a district for an address
+ * that is not in Nigeria, and this is the honest way to say so.
+ */
+const DISTRICT_COUNTRY = "NG";
+
+/**
+ * Whether districts apply to the address as it currently stands.
+ *
+ * `countryCode` may legitimately be empty while a shopper is mid-form, which
+ * is the config's default country — the same fallback `submittedAddress` uses
+ * to build `countryCode`, so the picker and the payload cannot disagree about
+ * which country they are describing.
+ */
+export function districtsApply(address: Address, config: DeliveryConfig): boolean {
+  const country = (address.countryCode || config.country.default).toUpperCase();
+  return country === DISTRICT_COUNTRY;
+}
+
 const PAIRED: ReadonlyArray<readonly [DeliveryField["key"], DeliveryField["key"]]> = [
   ["city", "region"],
   ["region", "city"],
@@ -79,13 +110,23 @@ const isPair = (a: DeliveryField, b: DeliveryField) =>
 export function fieldRows(
   config: DeliveryConfig,
   districtChoices: ServiceArea[],
+  /* The address as it stands, so the district row can disappear the moment the
+     shopper picks a country it does not apply to. OPTIONAL so the existing
+     callers and the package's own tests keep their two-argument shape and
+     their current behaviour — an omitted address is read as "the config's
+     default country", which is Nigeria today. */
+  address?: Address,
 ): DeliveryField[][] {
+  const districtsOff = address ? !districtsApply(address, config) : false;
   const visible = config.fields.filter(
     (field) =>
       field.show &&
       // See the header: never a picker with nothing in it, whatever `required`
       // says. This is the rule `checkout-flow.tsx` already followed by hand.
-      !(field.key === "district" && districtChoices.length === 0),
+      !(field.key === "district" && districtChoices.length === 0) &&
+      // AND NEVER OUTSIDE NIGERIA. A district picker over a London address
+      // offers nothing that could be right — see `DISTRICT_COUNTRY`.
+      !(field.key === "district" && districtsOff),
   );
 
   const rows: DeliveryField[][] = [];
@@ -167,7 +208,14 @@ export function submittedAddress(
   if (shown.has("line2")) body.line2 = address.line2 ?? null;
   if (shown.has("region")) body.region = address.region ?? null;
   if (shown.has("postalCode")) body.postalCode = address.postalCode ?? null;
-  if (shown.has("district")) {
+  /* ═══ OMITTED, NOT SENT AS `null`, WHEN THE COUNTRY IS NOT NIGERIA ═══
+     The field is not on screen for such an address (see `fieldRows`), and the
+     rule this whole function follows is that a hidden field is absent from the
+     body rather than present and empty. It also matters more here than
+     elsewhere: a district key left over from a previous Nigerian address would
+     otherwise ride an international submit and price the parcel at an Abuja
+     zone rate. */
+  if (shown.has("district") && districtsApply(address, config)) {
     body.district = effectiveDistrict(address, config, areas, choices);
   }
 

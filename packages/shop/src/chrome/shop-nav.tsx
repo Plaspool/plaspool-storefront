@@ -21,6 +21,8 @@ import { BrandLogo } from "@plaspool/brand";
 
 import { useCart } from "../cart/cart-context";
 import { AccountMenu } from "../account/account-menu";
+import { CurrencySwitcher } from "./currency-switcher";
+import { isSwitchable, type CurrencyConfig } from "../data/currency-config";
 import { MobileAccountLinks } from "../account/mobile-account-links";
 import type { Category } from "../data/types";
 
@@ -124,7 +126,13 @@ function CartButton() {
   );
 }
 
-function MobileMenu({ categories }: { categories: Category[] }) {
+function MobileMenu({
+  categories,
+  currencyConfig,
+}: {
+  categories: Category[];
+  currencyConfig: CurrencyConfig;
+}) {
   return (
     <Sheet>
       <SheetTrigger asChild>
@@ -163,6 +171,26 @@ function MobileMenu({ categories }: { categories: Category[] }) {
                 nested in one. A sheet that is already a list should not open a
                 second list inside itself. */}
             <MobileAccountLinks linkClassName={cn(SHEET_LINK, LINK_FOCUS)} />
+            {/* ═══ THE SWITCHER'''S ONLY HOME BELOW `sm` ═══
+                The header row is four controls wide on a phone already, so the
+                switcher is `hidden sm:flex` up there and lives here instead —
+                a shopper on a phone must still be able to choose a currency
+                before their first add, because a cart'''s currency is written at
+                creation and cannot be changed afterwards. Renders nothing when
+                the shop offers one currency, exactly as the header copy does,
+                so the separator above it is not left hanging over an empty
+                block. */}
+            {isSwitchable(currencyConfig) && (
+              <>
+                <Separator className="my-4" />
+                <p className="px-2 pb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Currency
+                </p>
+                <SheetClose asChild>
+                  <CurrencySwitcher config={currencyConfig} className="mx-2 w-fit" />
+                </SheetClose>
+              </>
+            )}
           </nav>
         </ScrollArea>
       </SheetContent>
@@ -185,16 +213,21 @@ function MobileMenu({ categories }: { categories: Category[] }) {
  */
 export interface ShopNavProps {
   categories: Category[];
+  /* Fetched by `ShopShell` on the server, for the reason the comment above
+     gives for the categories. `CurrencySwitcher` renders nothing at all when
+     this lists a single currency, which is every deploy until an operator
+     enables dollars. */
+  currencyConfig: CurrencyConfig;
 }
 
-export function ShopNav({ categories }: ShopNavProps) {
+export function ShopNav({ categories, currencyConfig }: ShopNavProps) {
   const [mobileSearchOpen, setMobileSearchOpen] = React.useState(false);
 
   return (
     <header data-print-hide className="sticky top-0 z-40 border-b border-brand-line bg-background/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
         <div className="flex min-w-0 items-center gap-4 lg:gap-6">
-          <MobileMenu categories={categories} />
+          <MobileMenu categories={categories} currencyConfig={currencyConfig} />
 
           <Link
             href="/store"
@@ -234,6 +267,14 @@ export function ShopNav({ categories }: ShopNavProps) {
           >
             <Search aria-hidden="true" className="h-5 w-5" />
           </Button>
+
+          {/* BEFORE THE CART, DELIBERATELY. The currency has to be chosen
+              before the first item is added — a cart's currency is written at
+              creation and never updated — so the control that sets it sits on
+              the side of the basket a shopper reaches first. Hidden below
+              `sm`, where the row is already four controls wide; the mobile
+              menu carries it instead. */}
+          <CurrencySwitcher config={currencyConfig} className="hidden sm:flex" />
 
           <CartButton />
           {/* AT EVERY WIDTH. It was `hidden md:inline-flex`, so below 768px a shopper

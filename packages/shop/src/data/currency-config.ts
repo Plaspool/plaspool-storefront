@@ -1,4 +1,4 @@
-import { COMMERCE_API_BASE } from "./config";
+import { CATALOG_LIST_REVALIDATE, COMMERCE_API_BASE } from "./config";
 
 /**
  * The currency config — the server's answer to "what may this shop charge in?"
@@ -29,8 +29,36 @@ import { COMMERCE_API_BASE } from "./config";
  * COOKIELESS AND SHARED-CACHED, like the delivery config. Every shopper gets
  * the same answer and nothing per-viewer may go into it, so this sends no
  * credentials.
+ *
+ * ═══ AND IT IS FETCHED WITH A REVALIDATE WINDOW, NEVER `no-store` ═══
+ * `ShopShell` calls this on the server, in the `(shop)` LAYOUT, so whatever
+ * this fetch opts into every shop route opts into. A `cache: "no-store"` here
+ * — which is what `delivery-config.ts` correctly uses, because it is only ever
+ * called from a client effect — turned the ENTIRE catalogue dynamic: `/store`,
+ * every category and every product page went from prerendered-and-KV-served to
+ * a full render per view. That is the storefront #9 Error 1102 condition, and
+ * the build's route table is where it showed up (`ƒ` on every row that had
+ * been `○` or `●`).
+ *
+ * ═══ AND THE WINDOW IS THE CATALOGUE'S, NOT THE ENDPOINT'S `s-maxage` ═══
+ * A route takes the SHORTEST window of every fetch it composes. At the
+ * endpoint's own 60s this pulled `/store` from a 5-minute window down to one
+ * minute — five times the re-renders and five times the KV writes on the
+ * busiest page in the shop, against a cap this account has already had deploys
+ * fail on. Matching `CATALOG_LIST_REVALIDATE` leaves every existing window
+ * exactly where it was.
+ *
+ * The cost is that an operator enabling dollars reaches shoppers within five
+ * minutes rather than one. That is the right trade: a currency switch is not
+ * an emergency control, and it cannot be used at all until Paystack has
+ * approved USD — a process measured in days.
  * ═══════════════════════════════════════════════════════════════════════════
  */
+
+/** The catalogue's own list window. See the header on why this is a window
+ *  rather than `no-store`, and why it is the catalogue's rather than the
+ *  endpoint's shorter `s-maxage`. */
+export const CURRENCY_CONFIG_REVALIDATE = CATALOG_LIST_REVALIDATE;
 
 /**
  * The currencies this storefront knows how to render, and nothing else.
@@ -134,7 +162,9 @@ export async function readCurrencyConfig(): Promise<CurrencyConfig> {
   try {
     const res = await fetch(`${COMMERCE_API_BASE}${CURRENCY_CONFIG_PATH}`, {
       // No `credentials`. See the header — this response is shared-cached.
-      cache: "no-store",
+      // `next.revalidate` and NOT `cache: "no-store"`: this runs in the shop
+      // layout, and `no-store` there makes every catalogue route dynamic.
+      next: { revalidate: CURRENCY_CONFIG_REVALIDATE },
     });
     if (!res.ok) return NAIRA_ONLY;
     return parseCurrencyConfig(await res.json());
