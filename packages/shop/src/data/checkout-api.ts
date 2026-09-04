@@ -204,6 +204,21 @@ export type CheckoutError =
    * and must never offer a retry. See `errorCopy`.
    */
   | { code: "checkout_paid" }
+  /**
+   * A discount code the shop will not honour.
+   *
+   * `reason` IS THE API'S OWN WORD and is never shown raw — `errorCopy` maps
+   * the ones this build knows and falls back to a sentence that promises
+   * nothing for the ones it does not. The admin can add reasons at any time
+   * (expiry, minimum spend, per-customer limits) and a storefront that printed
+   * an unrecognised enum at a shopper would be worse than one that says plainly
+   * that the code was not accepted.
+   *
+   * NOT `field`. A rejected code is not a malformed one: the input was fine and
+   * the shop declined it, so the copy is about the code rather than about how
+   * it was typed.
+   */
+  | { code: "discount_rejected"; reason: string }
   | { code: "unresolved_lines"; variantIds: string[] }
   | { code: "currency_mismatch" }
   | { code: "gone" }
@@ -270,6 +285,15 @@ function classify(status: number, body: Record<string, unknown> | null): Checkou
     return { code: "unresolved_lines", variantIds: (body?.variantIds as string[]) ?? [] };
   }
   if (errorCode === "currency_mismatch") return { code: "currency_mismatch" };
+  /* `409 { error: "discount_rejected", reason: "not_found" }` — the shape the
+     discount route answers with. `reason` is carried through rather than
+     collapsed, so the copy can name the cause where it recognises it. */
+  if (errorCode === "discount_rejected") {
+    return {
+      code: "discount_rejected",
+      reason: typeof body?.reason === "string" ? body.reason : "rejected",
+    };
+  }
   if (errorCode === "precondition_failed") {
     /*
      * ═══ `operation` CARRIES TWO DIFFERENT THINGS, AND THAT COST A BUG ═══
@@ -468,6 +492,40 @@ export function cancelCheckout(
        `undefined` and not falsily — revision 0 is a real revision. */
     body: baseRevision === undefined ? undefined : JSON.stringify({ baseRevision }),
   });
+}
+
+/**
+ * Put a discount code on the checkout.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE BODY IS `{ code }` AND THE ROUTE IS `.strict()`.
+ * Sending a `discountCode` field alongside it is a `400 bad_request` naming
+ * the field it did not expect — which is how this contract was discovered, so
+ * it is written down rather than left to be rediscovered.
+ *
+ * AN EMPTY STRING IS A 400, NOT A REMOVAL. Clearing the code is `DELETE`, and
+ * the two are different operations rather than two spellings of one; a caller
+ * that "clears" by applying `""` gets a validation error and no change.
+ *
+ * ═══ IT DOES NOT WORK ON A FROZEN CHECKOUT ═══
+ * The totals are frozen at `converting`, and a code applied afterwards would
+ * change a price the shopper has already been quoted. The review step
+ * therefore THAWS first (`cancelCheckout`), applies, and re-freezes — see
+ * `reprice` in `checkout-flow.tsx`. That whole journey only became possible
+ * when the cancel route shipped.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function applyDiscountCode(code: string): Promise<CheckoutResult<unknown>> {
+  return request("/checkout/discount", {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
+}
+
+/** Take the discount code off again. Answers `204` with no body, which
+ *  `request` reports as a success carrying null — there is nothing to read. */
+export function removeDiscountCode(): Promise<CheckoutResult<unknown>> {
+  return request("/checkout/discount", { method: "DELETE" });
 }
 
 /** Re-read the frozen totals, e.g. after a reload of the review step. Answers
