@@ -13,7 +13,17 @@ export interface EmptyStateProps {
   /** A Lucide icon at its default 24 px reads correctly in the circle. */
   icon: ReactNode;
   title: string;
-  body: string;
+  /**
+   * What to do next. OPTIONAL, because some empty states say it all in the
+   * title and an action button — the cart is the case: "Your cart is empty"
+   * over a "Browse the store" button needs no sentence between them, and the
+   * one that was there listed materials as though the shopper had asked what
+   * the shop sells rather than been told their basket was empty.
+   *
+   * Omit it rather than passing `""`: an empty string still renders the
+   * paragraph, and with it `mt-2` and a line box of vertical space.
+   */
+  body?: string;
   /** Usually a `Button`. Optional, because some empty states have nowhere
    *  useful to send you. */
   action?: ReactNode;
@@ -35,7 +45,7 @@ export function EmptyState({ icon, title, body, action, className }: EmptyStateP
         {icon}
       </span>
       <h2 className="text-lg font-semibold text-foreground">{title}</h2>
-      <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">{body}</p>
+      {body && <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">{body}</p>}
       {action && <div className="mt-6">{action}</div>}
     </div>
   );

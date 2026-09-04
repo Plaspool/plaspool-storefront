@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { CartSkeleton } from "./cart-drawer";
+import { CartRowSkeleton, CartSkeleton } from "./cart-drawer";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -106,5 +106,49 @@ describe("the cart drawer's loading state", () => {
        the photograph's square and the stepper's 36px block, per row. */
     const sized = bars.filter(([, cls]) => /\b(?:h-9|aspect-square)\b/.test(cls));
     expect(sized).toHaveLength(6);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * AND THE ROW THAT IS ON ITS WAY.
+ *
+ * "Add to cart" opens the drawer and posts in the same breath, so for the whole
+ * round trip the sheet showed the basket as it was a moment ago: on a first add
+ * "Your cart is empty" — already false as it rendered — and on a later one, the
+ * existing rows, with the new row and its divider appearing afterwards out of
+ * nowhere. The same row shape now stands in for it until it lands.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+describe("the row that is arriving", () => {
+  const row = renderToStaticMarkup(<CartRowSkeleton />);
+
+  it("is one row, not a list", () => {
+    expect(row.match(/<li/g)).toHaveLength(1);
+    expect(row).not.toContain("<ul");
+    /* No region of its own: it is appended INSIDE the real list, whose own
+       `aria-busy` and label already describe the wait. A second live region
+       nested in the first would announce the same wait twice. */
+    expect(row).not.toContain("aria-busy");
+  });
+
+  it("is the same box as the rows it stands among", () => {
+    expect(row).toContain("flex gap-3 py-4");
+    expect(row).toContain("aspect-square w-16 shrink-0");
+  });
+
+  /* One row, because `add()` adds one thing. Three would promise a basket that
+     is not coming. */
+  it("draws exactly the number of rows it is asked for", () => {
+    const one = renderToStaticMarkup(<CartSkeleton rows={1} label="Adding to your cart" />);
+    expect(one.match(/<li/g)).toHaveLength(1);
+    expect(one).toContain("Adding to your cart");
+  });
+
+  /* The opening skeleton and the arriving row must not drift apart — they are
+     the same component, and this is what says so. */
+  it("is the very shape the opening skeleton repeats", () => {
+    const three = renderToStaticMarkup(<CartSkeleton />);
+    expect(three.split(row)).toHaveLength(4);
   });
 });

@@ -203,12 +203,34 @@ function CartLineRow({
  * the presentational half into its own component and assert THAT. This one is
  * pure markup with no props, no hooks and no context, so it costs nothing.
  */
-export function CartSkeleton() {
+export function CartSkeleton({ rows = 3, label = "Loading your cart" }: { rows?: number; label?: string } = {}) {
   return (
-    <SkeletonRegion label="Loading your cart" className="min-h-0 flex-1">
+    <SkeletonRegion label={label} className="min-h-0 flex-1">
       <ul className="divide-y divide-brand-line px-6">
-        {[0, 1, 2].map((row) => (
-          <li key={row} className="flex gap-3 py-4">
+        {Array.from({ length: rows }, (_, row) => (
+          <CartRowSkeleton key={row} />
+        ))}
+      </ul>
+    </SkeletonRegion>
+  );
+}
+
+/**
+ * ONE row's shape — the unit both the opening skeleton and an arriving item are
+ * built from.
+ *
+ * ═══ WHY AN ARRIVING ITEM NEEDS ONE AT ALL ═══
+ * "Add to cart" opens the drawer and posts in the same breath, so for the whole
+ * round trip the sheet showed the basket as it was a moment ago: on the first
+ * add, "Your cart is empty" — a claim that is already false — and on the
+ * second, the one existing row, with the new row and its divider POPPING IN
+ * later out of nowhere. Nothing on screen said anything was on its way.
+ *
+ * `key` is deliberately not needed here: the caller decides how many.
+ */
+export function CartRowSkeleton() {
+  return (
+          <li className="flex gap-3 py-4">
             {/* `self-start` IS LOAD-BEARING, and measurement is the only way to
                 see it. A flex child defaults to `align-self: stretch`, which
                 hands this a definite height — the row's — and a definite height
@@ -237,14 +259,30 @@ export function CartSkeleton() {
               <TextSkeleton className="w-20 text-xs" />
             </div>
           </li>
-        ))}
-      </ul>
-    </SkeletonRegion>
   );
 }
 
 export function CartDrawer() {
   const cart = useCart();
+
+  /**
+   * A write is in flight for a row THAT IS NOT ON SCREEN YET — an add of
+   * something new, rather than an edit to something already listed.
+   *
+   * ═══ THIS IS THE "IT JUST POPS OUT OF NOWHERE" BUG ═══
+   * `add()` opens the drawer and posts in the same breath, so for the length of
+   * that round trip the sheet showed the basket as it was a moment ago. On a
+   * first add that meant "Your cart is empty" — a sentence already false when
+   * it rendered — and on a later one, the existing rows, with the new row and
+   * its divider appearing later with no warning.
+   *
+   * A key that MERGES into an existing row is deliberately not `incoming`: the
+   * row is already drawn, nothing new is arriving, and the honest feedback is
+   * that row's own stepper going to a placeholder — which `pendingKey` already
+   * drives. So this is only ever true when a row really is about to appear.
+   */
+  const incoming =
+    cart.pendingKey !== null && !cart.resolved.some((line) => line.key === cart.pendingKey);
 
   return (
     <Sheet open={cart.isOpen} onOpenChange={(open) => (open ? cart.open() : cart.close())}>
@@ -302,12 +340,16 @@ export function CartDrawer() {
             is not empty — it is stuck, and those are opposite instructions.
             Saying "empty" over the notice that names the blocking row would be
             the drawer contradicting itself in adjacent paragraphs. */}
-        {cart.hydrated && cart.resolved.length === 0 && cart.unsellable.length === 0 && !cart.problem && (
+        {/* `!incoming` TOO, and for the same reason as `!cart.problem` beside
+            it: "Your cart is empty" is a CLAIM, and it is false the moment the
+            shopper has pressed Add to cart. It used to render anyway for the
+            whole round trip, then be replaced by the row — which is the flash
+            this whole block exists to avoid. */}
+        {cart.hydrated && cart.resolved.length === 0 && cart.unsellable.length === 0 && !cart.problem && !incoming && (
           <div className="flex flex-1 items-center justify-center">
             <EmptyState
               icon={<ShoppingCart aria-hidden="true" />}
               title="Your cart is empty"
-              body="Browse PLA, PETG and TPU by the spool or by the box."
               action={
                 <SheetClose asChild>
                   <Button
@@ -323,6 +365,13 @@ export function CartDrawer() {
           </div>
         )}
 
+        {/* AN ADD INTO AN EMPTY BASKET. There are no rows to list yet and the
+            empty state has stood down, so without this the sheet is blank for
+            the round trip. One row, because `add()` adds one. */}
+        {cart.hydrated && cart.resolved.length === 0 && incoming && (
+          <CartSkeleton rows={1} label="Adding to your cart" />
+        )}
+
         {cart.hydrated && cart.resolved.length > 0 && (
           <>
             <ScrollArea className="min-h-0 flex-1">
@@ -336,6 +385,10 @@ export function CartDrawer() {
                     pending={cart.pendingKey === line.key}
                   />
                 ))}
+                {/* The row that is on its way, in the list, in its place — so
+                    the divider and the item arrive together instead of the
+                    item appearing under a divider that was already there. */}
+                {incoming && <CartRowSkeleton />}
               </ul>
             </ScrollArea>
 

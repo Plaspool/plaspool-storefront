@@ -382,7 +382,16 @@ export function CartProvider({ children, catalog, currencyConfig }: CartProvider
           if (created.ok) return addLine(variantId, amount);
         }
         return added;
-      });
+      /* ═══ THE ROW THIS ADD IS FOR, SO THE DRAWER CAN SAY IT IS COMING ═══
+         `add` opens the drawer and posts in the same breath, so for the whole
+         round trip the sheet was showing the basket as it was a moment ago: on
+         a first add, "Your cart is empty" — a claim already false — and on a
+         later one, the existing rows with the new row and its divider popping
+         in out of nowhere. Naming the row here is what lets the drawer draw a
+         placeholder for it, and it costs nothing: a key that turns out to
+         MERGE into an existing row drives that row's stepper instead, which is
+         the right feedback for what actually happened. */
+      }, lineKey(key));
     },
     [variantFor, open, mutate, view.cart, cartCurrency],
   );
