@@ -17,10 +17,11 @@ import {
 import { lineKey } from "./line-key";
 import { EMPTY_VIEW as EMPTY, outcomeOfRead } from "./read-outcome";
 import { partitionLines } from "./sellable";
+import { maxQtyForLine, stockOf } from "./stock";
 import type { VariantMatch } from "./sellable";
 import type { ApiCartView, CartResult } from "../data/cart-api";
 import type { CartApi, CartLine, CartLineKey, ResolvedLine } from "./types";
-import type { BulkTier, Colour, SizeOption } from "../data/types";
+import type { BulkTier, Colour, SizeOption, VariantStock } from "../data/types";
 
 /**
  * The cart's state, now held by the SERVER.
@@ -73,6 +74,15 @@ export interface CartCatalogEntry {
   bulkTiers: BulkTier[];
   /** `"<colourId>:<sizeId>"` → variant id, priced and active only. */
   variantIds: Record<string, string>;
+  /**
+   * `"<colourId>:<sizeId>"` → the shelf, keyed identically to `variantIds`.
+   *
+   * READ FOR `backorderable` AND NOTHING ELSE on a cart row. The count here
+   * came from an ISR-cached catalogue response and can be an hour old; the
+   * line's own `inStock` is re-quoted on every cart read. `maxQtyForLine` in
+   * `stock.ts` is where the two are combined, and its header says why.
+   */
+  variantStock: Record<string, VariantStock>;
   /** The product's own photograph, for a basket row whose colour has none. */
   coverImageUrl: string | null;
 }
@@ -426,9 +436,28 @@ export function CartProvider({ children, catalog, currencyConfig }: CartProvider
         void mutate(() => removeLine(lineId));
         return;
       }
-      void mutate(() => setLineQty(lineId, Math.trunc(qty)));
+      /* ═══ THE CEILING IS ENFORCED HERE TOO, NOT ONLY IN THE STEPPER ═══
+         A `max` on the control is a courtesy to the shopper; this is the rule.
+         `setQty` is the whole cart's write path and it is reachable without
+         touching a stepper at all — the drawer and `/cart` both call it
+         directly, and a row whose stock fell while the basket sat open is
+         holding a value no control clamped when it was rendered. Sending the
+         over-quantity anyway is how the shopper gets all the way to the freeze
+         and is refused there, which is the bug this change exists to end. */
+      const line = view.lines.find((l) => l.id === lineId);
+      const entry = bySlug.get(key.productSlug);
+      /* Rebuilt from `view.lines` and `bySlug` rather than read off `resolved`,
+         which is declared BELOW this callback — and deliberately not hoisted or
+         stuffed into a ref to get at it. Both halves of the rule are already in
+         scope here, and it is the same pair `resolved` itself feeds to
+         `maxQtyForLine`. */
+      const cap = maxQtyForLine(
+        line?.inStock ?? null,
+        entry ? stockOf(entry, key.colourId, key.sizeId) : null,
+      );
+      void mutate(() => setLineQty(lineId, Math.min(Math.trunc(qty), cap)));
     },
-    [lineIdFor, mutate],
+    [lineIdFor, mutate, view.lines, bySlug],
   );
 
   const remove = React.useCallback(
@@ -536,6 +565,11 @@ export function CartProvider({ children, catalog, currencyConfig }: CartProvider
              constant with nothing behind it in the API, so the cart could not
              claim one the till will not honour. */
           tier: null,
+          /* THE LINE'S COUNT, THE CATALOGUE'S FLAG. `line.inStock` is re-quoted
+             on every cart read; `entry.variantStock` rode in on a catalogue
+             response that may be an hour old. Feeding the stale number here
+             would cap a shopper against stock that has since been restocked. */
+          maxQty: maxQtyForLine(line.inStock, stockOf(entry, colour.id, size.id)),
         };
       });
   }, [split, view.preview]);

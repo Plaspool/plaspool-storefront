@@ -169,6 +169,7 @@ function demoProduct(
     rating: NO_RATING,
     featured: false,
     variantIds: {},
+    variantStock: {},
     ...rest,
   };
 }

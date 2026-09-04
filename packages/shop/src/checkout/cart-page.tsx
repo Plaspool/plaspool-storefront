@@ -11,6 +11,7 @@ import { ProductPhoto } from "../components/product-photo";
 import { formatNaira } from "../data/money";
 import { BulkLinePrice } from "../cart/bulk-line-price";
 import { useCart } from "../cart/cart-context";
+import { stockWarning } from "../cart/stock";
 import { UnsellableNotice } from "../cart/unsellable-notice";
 import type { CartLineKey, ResolvedLine } from "../cart/types";
 import { lineDescriptor, variantDescriptor } from "../cart/line-descriptor";
@@ -208,10 +209,22 @@ export function CartPage() {
                   lineQty={line.qty}
                 />
 
+                {/* THE SAME CAP THE DRAWER APPLIES, from the same `maxQty` the
+                    provider computed — not a second reading of the rule here.
+                    `/cart` and the drawer are two renderings of one basket, and
+                    a ceiling that held in one and not the other is the class of
+                    split `sellable.ts` records at length. */}
+                {stockWarning(line.qty, line.maxQty) !== null && (
+                  <p className="font-mono text-xs font-medium text-muted-foreground">
+                    {`Only ${line.maxQty} left`}
+                  </p>
+                )}
+
                 <div className="flex items-center justify-between gap-3">
                   <QuantityStepper
                     value={line.qty}
                     onChange={(qty) => cart.setQty(toKey(line), qty)}
+                    max={line.maxQty}
                     label={lineDescriptor(line.product.name, line.colour.name, line.size.label)}
                   />
                   <Button

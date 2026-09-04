@@ -30,6 +30,65 @@ export function retryWaitLabel(retryAfter: number | null): string {
   return minutes === 1 ? "about a minute" : `about ${minutes} minutes`;
 }
 
+/**
+ * What the freeze refused, in the numbers it refused it with.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE API SENT THE NUMBER AND THIS FUNCTION USED TO BIN IT.
+ *
+ * `Shortfall` carries `requested` and `available` per variant, and the admin's
+ * route says exactly why:
+ *
+ *     // THE NUMBER, in the body. "Out of stock" is not actionable; "only 3
+ *     // left" lets the shopper reduce the quantity without leaving the page.
+ *
+ * The copy here read `shortfalls.length` and nothing else — "2 items in the
+ * cart no longer have enough stock" — which names no item, gives no number, and
+ * sends the shopper back to a basket where nothing is marked. Every fact needed
+ * to act was in the response and none of it reached the screen.
+ *
+ * ═══ WHY NO PRODUCT NAME, WHEN A SHOPPER WOULD WANT ONE ═══
+ * A `Shortfall` identifies its line by `variantId`, and this module is pure —
+ * `CheckoutError` in, two strings out, which is the only reason the words a
+ * shopper reads are assertable at all (the flow around it is a client component
+ * this `environment: "node"` suite cannot render). Resolving a name means
+ * handing it the catalogue, and the catalogue is exactly what a stale checkout
+ * may no longer agree with.
+ *
+ * So the number does the work, and the CART does the naming: every basket row
+ * now carries its own "Only N left" off the line's live `inStock`, which is
+ * fresher than anything this refusal could reconstruct. See `stock.ts`.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function shortfallBody(shortfalls: { requested: number; available: number }[]): string {
+  /* A refusal with no detail is still a refusal, and it must not render as
+     "0 items". The API always sends at least one, so this is the shape-changed
+     case rather than an expected one — and it degrades to the instruction,
+     which is the half the shopper can still act on. */
+  if (shortfalls.length === 0) {
+    return "Something in your cart is no longer fully in stock. Go back to the cart and adjust the quantity.";
+  }
+
+  /* ONE LINE, ONE SENTENCE, WITH BOTH NUMBERS. This is the common case by a
+     distance, and it is the one where the shopper can act without hunting:
+     they know what they asked for and now they know what there is. */
+  if (shortfalls.length === 1) {
+    const { requested, available } = shortfalls[0];
+    /* `available` CAN BE ZERO — the stock went while they were checking out.
+       "Only 0 left" is a sentence no shop should print; the item is gone and
+       the instruction is different. */
+    if (available <= 0) {
+      return "An item in your cart has sold out since you added it. Go back to the cart and remove it to continue.";
+    }
+    return `You asked for ${requested} of an item and only ${available} ${available === 1 ? "is" : "are"} left. Go back to the cart and lower the quantity to continue.`;
+  }
+
+  /* SEVERAL LINES: the count, then the promise that the cart names them. It
+     does — each row carries its own "Only N left" — so this is a pointer to
+     information that exists rather than the dead end the old copy was. */
+  return `${shortfalls.length} items in your cart no longer have enough stock. Go back to the cart — each one shows how many are left.`;
+}
+
 /** The register from `empty-state.tsx`: what happened, and what to do about
  *  it. Never "Sorry", never vague. */
 export function errorCopy(
@@ -43,10 +102,7 @@ export function errorCopy(
     case "empty_cart":
       return { title: "Your cart is empty", body: "Add something to the cart before checking out." };
     case "insufficient_stock":
-      return {
-        title: "Not enough in stock",
-        body: `${error.shortfalls.length} item${error.shortfalls.length === 1 ? "" : "s"} in the cart no longer have enough stock. Go back to the cart and adjust the quantity.`,
-      };
+      return { title: "Not enough in stock", body: shortfallBody(error.shortfalls) };
     case "no_shipping_address":
       return { title: "No delivery address on file", body: "Enter a delivery address before choosing a delivery option." };
     case "outside_delivery_area":
