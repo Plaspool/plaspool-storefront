@@ -291,8 +291,12 @@ export async function getProduct(
   return toProduct(detail, ctx);
 }
 
-export async function listProductsByCategory(slug: string, fresh = false): Promise<Product[]> {
-  return (await listProducts(fresh)).filter((p) => p.categorySlug === slug);
+export async function listProductsByCategory(
+  slug: string,
+  fresh = false,
+  currency?: CurrencyCode,
+): Promise<Product[]> {
+  return (await listProducts(fresh, currency)).filter((p) => p.categorySlug === slug);
 }
 
 /**
@@ -308,8 +312,12 @@ export async function listProductsByCategory(slug: string, fresh = false): Promi
  * The list endpoint returns newest-first, and `listProducts` preserves that
  * order, so this is a slice rather than a sort.
  */
-export async function listFeaturedProducts(limit = 4, fresh = false): Promise<Product[]> {
-  return (await listProducts(fresh)).slice(0, limit);
+export async function listFeaturedProducts(
+  limit = 4,
+  fresh = false,
+  currency?: CurrencyCode,
+): Promise<Product[]> {
+  return (await listProducts(fresh, currency)).slice(0, limit);
 }
 
 export async function productPaths(): Promise<{ slug: string }[]> {

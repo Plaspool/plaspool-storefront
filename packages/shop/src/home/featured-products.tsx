@@ -3,6 +3,7 @@ import { ArrowRight } from "lucide-react";
 import { cn } from "@plaspool/ui";
 
 import { listFeaturedProducts } from "../data/catalog";
+import type { CurrencyCode } from "../data/currency-config";
 import { ProductGrid } from "../components/product-grid";
 
 /**
@@ -13,8 +14,8 @@ import { ProductGrid } from "../components/product-grid";
  * product. It is the same URL the nav's search submits to.
  */
 
-export async function FeaturedProducts() {
-  const products = await listFeaturedProducts();
+export async function FeaturedProducts({ currency }: { currency?: CurrencyCode } = {}) {
+  const products = await listFeaturedProducts(4, false, currency);
 
   return (
     <section aria-labelledby="shop-featured" className="border-b border-brand-line">

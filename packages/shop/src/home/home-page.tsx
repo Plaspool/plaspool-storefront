@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { primaryCategoryLink } from "../data/catalog";
+import { currencyFromSegment } from "../data/currency-routing";
 import { HeroCarousel } from "./hero-carousel";
 import { CategoryTiles } from "./category-tiles";
 import { FeaturedProducts } from "./featured-products";
@@ -53,16 +54,28 @@ export const storeHomeMetadata: Metadata = {
    below and `ShopShell` around this both call `listCategories()` already, so
    this is the same cached fetch on the same 300s window rather than a third
    request or a shorter window for the route. */
-export async function StoreHomePage() {
+export async function StoreHomePage({
+  params,
+}: {
+  /* OPTIONAL, BECAUSE THIS COMPONENT SERVES TWO ROUTES. `/store` has no
+     params at all; `/usd/store` supplies the segment. An absent `currency`
+     IS the default currency — see `currency-routing.ts`. */
+  params?: Promise<{ currency?: string }>;
+} = {}) {
+  const currency = currencyFromSegment((await params)?.currency);
   const primary = await primaryCategoryLink();
   return (
     <>
       <HeroCarousel primary={primary} />
       <CategoryTiles />
-      <FeaturedProducts />
+      {/* Only the sections that QUOTE A PRICE take the currency. The category
+          tiles, the returns band and the blog strip carry no figures from the
+          catalogue, so threading it into them would be plumbing with nothing
+          on the other end. */}
+      <FeaturedProducts currency={currency} />
       <RewardsBand />
       <WhyShop />
-      <BulkPromo />
+      <BulkPromo currency={currency} />
       <BlogStrip />
     </>
   );

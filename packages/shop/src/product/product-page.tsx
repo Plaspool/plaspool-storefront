@@ -8,6 +8,17 @@ import { Breadcrumb } from "../components/breadcrumb";
 import { ProductBuySection } from "./buy-section";
 import { ProductTabs } from "./product-tabs";
 import { OrderInfo } from "./order-info";
+import { currencyFromSegment } from "../data/currency-routing";
+
+/**
+ * The route's params. `currency` is present only under the `[currency]`
+ * segment — its absence IS the default currency, which owns the bare
+ * `/store/...` path. See `currency-routing.ts`.
+ */
+export interface ProductRouteParams {
+  slug: string;
+  currency?: string;
+}
 
 /**
  * `/store/products/<slug>` — the page the whole store points at.
@@ -20,10 +31,10 @@ import { OrderInfo } from "./order-info";
 export async function productMetadata({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<ProductRouteParams>;
 }): Promise<Metadata> {
-  const { slug } = await params;
-  const product = await getProduct(slug);
+  const { slug, currency: segment } = await params;
+  const product = await getProduct(slug, false, currencyFromSegment(segment));
   if (!product) return {};
   return {
     /* Owner-written SEO copy wins VERBATIM — they wrote the whole title, so
@@ -31,6 +42,9 @@ export async function productMetadata({
        said: the name with the brand, and the derived summary. */
     title: product.seoTitle ?? `${product.name} — PlaSpool`,
     description: product.seoDescription ?? product.overview,
+    /* The default currency's URL, for every variant — see the same note on
+       `categoryMetadata`. Two currencies must not compete as duplicate
+       content. */
     alternates: { canonical: `/store/products/${slug}` },
   };
 }
@@ -43,14 +57,16 @@ export async function ProductPage({
   params,
   fresh = false,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<ProductRouteParams>;
   /* See `CategoryPage` — a prop rather than a `searchParams` read, so the
      prerendered product page keeps its cache and only `/preview` skips it. */
   fresh?: boolean;
 }) {
   // Next 15: page params are a promise.
-  const { slug } = await params;
-  const product = await getProduct(slug, fresh);
+  const { slug, currency: segment } = await params;
+  /* Undefined on the bare `/store/...` path, which is the default currency and
+     therefore sends no `?currency=` — see `CategoryPage`. */
+  const product = await getProduct(slug, fresh, currencyFromSegment(segment));
   if (!product) notFound();
 
   const category = await getCategory(product.categorySlug, fresh);

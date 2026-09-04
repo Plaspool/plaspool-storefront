@@ -1,5 +1,10 @@
+"use client";
+
 import NextLink from "next/link";
+import { usePathname } from "next/navigation";
 import type { ComponentProps } from "react";
+
+import { currencyFromPathname, currencyHref } from "../data/currency-routing";
 
 /**
  * The shop's `<Link>`. Identical to `next/link` in every respect except that
@@ -61,6 +66,43 @@ import type { ComponentProps } from "react";
  * site.
  * ═══════════════════════════════════════════════════════════════════════════
  */
-export function Link(props: ComponentProps<typeof NextLink>) {
-  return <NextLink prefetch={false} {...props} />;
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * IT ALSO KEEPS A SHOPPER INSIDE THE CURRENCY THEY ARE BROWSING IN.
+ *
+ * The currency is a path segment (`/usd/store/…`, see `currency-routing.ts`),
+ * because a cookie read server-side would make the whole catalogue dynamic and
+ * cost it the prerendering that keeps it off the Worker's critical path. That
+ * leaves one problem: every card, breadcrumb and nav item in this package
+ * links to `/store/…`, and following one out of `/usd/store` would drop the
+ * shopper silently back into naira mid-journey.
+ *
+ * ═══ READ FROM THE PATHNAME, NOT A PROP AND NOT A CONTEXT ═══
+ * A context cannot be read here, because `Link` is rendered from Server
+ * Components throughout this package. Threading a `currency` prop would touch
+ * nearly every component in it to restate something the URL already says. The
+ * page a shopper is ON is the statement of which currency they are browsing
+ * in, so a link out of it stays in the same tree — one place, no plumbing, and
+ * impossible to forget at a call site.
+ *
+ * ONLY CATALOGUE PATHS MOVE. `/cart`, `/checkout` and `/account` are returned
+ * untouched: a cart's currency is written server-side at creation and is
+ * authoritative, so a URL asserting a different one would contradict it. See
+ * `currencyHref`.
+ *
+ * ═══ THIS IS WHY THE FILE IS NOW `"use client"` ═══
+ * `usePathname()` requires it. In practice nothing is added to the bundle that
+ * was not already there — `next/link` is itself a client component, so every
+ * `<Link>` already crossed this boundary; the wrapper simply crosses it one
+ * level earlier.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function Link({ href, ...props }: ComponentProps<typeof NextLink>) {
+  const pathname = usePathname();
+  /* Only a string href is rewritten. Next also accepts a `UrlObject`, which no
+     call site in this package uses; one arriving here is passed through
+     untouched rather than being half-understood. */
+  const next =
+    typeof href === "string" ? currencyHref(href, currencyFromPathname(pathname)) : href;
+  return <NextLink prefetch={false} href={next} {...props} />;
 }

@@ -2,6 +2,7 @@ import { Link } from "../components/link";
 import { cn, controlSurface } from "@plaspool/ui";
 
 import { listProducts, STANDARD_TIERS } from "../data/catalog";
+import type { CurrencyCode } from "../data/currency-config";
 import { formatMinor } from "../data/format-money";
 import type { SizeOption } from "../data/types";
 import { BulkTierTable } from "../components/bulk-tier-table";
@@ -39,8 +40,8 @@ import { BulkTierTable } from "../components/bulk-tier-table";
  * the catalogue — still a figure somebody can go and buy, which is the whole
  * promise of the band.
  */
-async function referencePrice(): Promise<SizeOption | null> {
-  const products = await listProducts();
+async function referencePrice(currency?: CurrencyCode): Promise<SizeOption | null> {
+  const products = await listProducts(false, currency);
   const sizes = products.flatMap((product) => product.sizes);
   if (!sizes.length) return null;
   const kilo = sizes.filter((size) => size.weightGrams === 1000);
@@ -61,7 +62,7 @@ const INVERTED_TABLE = cn(
   "[&_tr]:border-brand-ink/20",
 );
 
-export async function BulkPromo() {
+export async function BulkPromo({ currency }: { currency?: CurrencyCode } = {}) {
   /*
    * NO LADDER MEANS NOTHING TO PROMOTE. `STANDARD_TIERS` is empty while the
    * shop offers no bulk discounts; rendering this band over an empty ladder
@@ -70,7 +71,7 @@ export async function BulkPromo() {
    */
   if (!STANDARD_TIERS.length) return null;
 
-  const price = await referencePrice();
+  const price = await referencePrice(currency);
   /*
    * NOTHING TO QUOTE MEANS NOTHING TO SHOW. An empty catalogue makes this band a
    * discount ladder over a price that does not exist — the table needs a base

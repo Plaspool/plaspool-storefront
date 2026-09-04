@@ -15,6 +15,17 @@ import { FilterRail } from "./filter-rail";
 import { FilterDrawer } from "./filter-drawer";
 import { ListingSearch } from "./listing-search";
 import { SortSelect } from "./sort-select";
+import { currencyFromSegment } from "../data/currency-routing";
+
+/**
+ * The route's params. `currency` is present only under the `[currency]`
+ * segment — its absence IS the default currency, which owns the bare
+ * `/store/...` path. See `currency-routing.ts`.
+ */
+export interface CategoryRouteParams {
+  category: string;
+  currency?: string;
+}
 
 /**
  * `/store/[category]` — the listing.
@@ -50,7 +61,7 @@ async function metaFor(category: string, fresh = false) {
 export async function categoryMetadata({
   params,
 }: {
-  params: Promise<{ category: string }>;
+  params: Promise<CategoryRouteParams>;
 }): Promise<Metadata> {
   const { category } = await params;
   const meta = await metaFor(category);
@@ -60,6 +71,13 @@ export async function categoryMetadata({
        and "All filament" and "Support material" would both double a word. */
     title: `${meta.name} — PlaSpool`,
     description: meta.blurb,
+    /* ═══ THE CANONICAL IS ALWAYS THE DEFAULT CURRENCY'S URL ═══
+       `/store/pla` and `/usd/store/pla` are the same listing with a different
+       symbol in front of each number. Left to compete they are duplicate
+       content — the ranking splits and a shopper in Lagos can be shown the
+       dollar page. Consolidated on the naira URL, which is what every existing
+       link and search result already points at. `canonicalPath` states the
+       rule and the trade-off it accepts. */
     alternates: { canonical: `/store/${category}` },
   };
 }
@@ -74,7 +92,7 @@ export async function CategoryPage({
   params,
   fresh = false,
 }: {
-  params: Promise<{ category: string }>;
+  params: Promise<CategoryRouteParams>;
   /* A PROP, NEVER A `searchParams` READ. Awaiting `searchParams` here is what
      made this route dynamic for EVERY visitor — the #9 regression the header
      above describes — and it does that whether or not the query is present.
@@ -82,7 +100,11 @@ export async function CategoryPage({
      while `/store/[category]` stays prerendered and untouched. */
   fresh?: boolean;
 }) {
-  const { category } = await params;
+  const { category, currency: segment } = await params;
+  /* Undefined on `/store/...`, which IS the default currency — `getJson` then
+     sends no `?currency=` at all, so the naira pages keep using the cache
+     entry the shop has been filling since launch. See `currencyQuery`. */
+  const currency = currencyFromSegment(segment);
 
   const isAll = category === "all";
   /* Both reads at once: the category header and the grid are independent
@@ -90,7 +112,9 @@ export async function CategoryPage({
      reason. The blog's pages use the same `Promise.all` shape. */
   const [meta, base] = await Promise.all([
     metaFor(category, fresh),
-    isAll ? listProducts(fresh) : listProductsByCategory(category, fresh),
+    isAll
+      ? listProducts(fresh, currency)
+      : listProductsByCategory(category, fresh, currency),
   ]);
   if (!meta) notFound();
 
