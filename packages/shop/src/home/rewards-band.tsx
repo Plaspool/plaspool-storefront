@@ -1,5 +1,5 @@
-import { Link } from "../components/link";
 import { Recycle } from "lucide-react";
+import { cn, controlSurface } from "@plaspool/ui";
 
 import { getRewardsProgram, pointsLabel, unitLabel } from "../data/marketing";
 import { listServiceAreas } from "../data/returns-api";
@@ -38,6 +38,36 @@ import { ReturnsCta } from "../returns/returns-cta";
  * `ReturnsCta` opens the request dialog for a signed-in shopper and asks a
  * guest to sign in FROM THE DIALOG rather than being refused here — this
  * component still does not read the session itself, and does not need to.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * PAINTED, AND EVERY CLASS BELOW IS COPIED FROM `BulkPromo` RATHER THAN
+ * INVENTED HERE.
+ *
+ * This was a hairline-ruled section like `WhyShop` and `CategoryTiles`, which
+ * is the right register for a page of them and the wrong one for the section
+ * that has moved up to fourth precisely because it is the only offer on this
+ * page a shopper cannot get from another filament shop. `bg-brand
+ * text-brand-ink` is the footer's ground and `BulkPromo`'s — the store already
+ * had exactly one inverted band, so this is a second instance of an existing
+ * treatment rather than a new one. The eyebrow, heading, `/70` body,
+ * `text-brand-ink` figures and white key are that band's, class for class, so
+ * the two read as siblings.
+ *
+ * NO `border-b`. The ground change IS the section boundary; a `brand-line`
+ * hairline on navy is a pale scratch across the bottom of a painted band.
+ *
+ * ═══ THE CTA IS A BUTTON NOW, AND THE COMMENT THAT ARGUED OTHERWISE WAS
+ * ARGUING ABOUT AN UNPAINTED BAND ═══
+ * It was an underlined link, on the rule that no home-page section raises a
+ * second call to action over the product cards' own "Add to cart". That rule
+ * is about `NEO_SURFACE`, the neobrutalist primary — this is
+ * `controlSurface("default")`, the machined WHITE key, which is what both
+ * `BulkPromo` and the marketing hero already use on brand-painted ground. It
+ * is not competing with the primary; it is the only tone that clears SC
+ * 1.4.11's 3:1 for a control boundary against #231c50, where the ink key
+ * measures about 1.1:1. An underlined `brand-line` link on this ground was
+ * the same failure in text form.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 export async function RewardsBand() {
   const [program, areas] = await Promise.all([getRewardsProgram(), listServiceAreas()]);
@@ -47,63 +77,79 @@ export async function RewardsBand() {
   const perReturn = minUnitsPerReturn * pointsPerUnit;
 
   return (
-    <section aria-labelledby="shop-rewards" className="border-b border-brand-line">
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 md:py-14 lg:px-8">
-        <div className="flex items-start gap-4">
+    <section aria-labelledby="shop-rewards" className="bg-brand text-brand-ink">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 md:py-16 lg:px-8">
+        <div className="flex items-start gap-4 sm:gap-5">
+          {/* `text-brand-ink`, not `text-muted-foreground`. That grey was tuned
+              for a white page and on this ground is very nearly the ground
+              itself. One step larger than it was, because it is now the only
+              mark in the band's left margin. */}
           <Recycle
             aria-hidden="true"
-            className="mt-0.5 h-6 w-6 shrink-0 text-muted-foreground"
+            className="mt-1 h-7 w-7 shrink-0 text-brand-ink sm:h-8 sm:w-8"
           />
           <div className="min-w-0">
+            {/* `BulkPromo`'s eyebrow, and the one line on this band NOT taken
+                from the programme — it names the kind of offer, which
+                `program.name` deliberately does not. Safe to spell here for
+                exactly that reason: it is not a programme noun, so a rename in
+                the admin does not strand it. */}
+            <p className="font-mono text-xs uppercase tracking-widest text-brand-ink/60">
+              Send spools back
+            </p>
             <h2
               id="shop-rewards"
-              className="text-xl font-semibold text-foreground sm:text-2xl"
+              className="mt-3 text-2xl font-bold leading-tight text-brand-ink sm:text-3xl"
             >
               {program.name}
             </h2>
 
-            <p className="mt-3 max-w-prose text-base leading-7 text-muted-foreground">
+            <p className="mt-4 max-w-prose text-base leading-7 text-brand-ink/70">
               {"Send back your empty "}
               {unitLabel(2, program).toLowerCase()}
               {" and earn "}
               {/* The two figures the programme is actually defined by. Mono,
                   because they are quantities — the design system's rule that a
-                  measurement is never set in the body face. */}
-              <span className="font-mono tabular-nums text-foreground">{pointsPerUnit}</span>
+                  measurement is never set in the body face. Full-strength
+                  `text-brand-ink` against the `/70` sentence around them is
+                  how `BulkPromo` picks its own figures out. */}
+              <span className="font-mono font-bold tabular-nums text-brand-ink">
+                {pointsPerUnit}
+              </span>
               {` ${pointsLabel(pointsPerUnit, program).toLowerCase()} each. `}
               {"A return starts at "}
-              <span className="font-mono tabular-nums text-foreground">
+              <span className="font-mono font-bold tabular-nums text-brand-ink">
                 {minUnitsPerReturn}
               </span>
               {` ${unitLabel(minUnitsPerReturn, program).toLowerCase()}, which is `}
-              <span className="font-mono tabular-nums text-foreground">{perReturn}</span>
+              <span className="font-mono font-bold tabular-nums text-brand-ink">
+                {perReturn}
+              </span>
               {` ${pointsLabel(perReturn, program).toLowerCase()}.`}
             </p>
 
-            {/* TWO LINKS, NOT A BUTTON. `NEO_SURFACE` marks the one thing a
-                screen most wants — this page's is the product cards' own "Add
-                to cart" — and no section of the home page raises a second one
-                over it. `ReturnsCta` is styled identically to the policy link
-                beside it: same underline, same weight, same restrained
-                register the rest of this band already keeps. */}
-            <p className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-              {/* TEMPORARILY HIDDEN with the `/shipping` route itself — the
-                  policy page is not legible and 404s until it is redesigned,
-                  so this band is down to one link for now. See
-                  `apps/storefront/app/(site)/shipping/page.tsx`. */}
-              {/* <Link
-                href="/shipping"
-                className="underline decoration-brand-line underline-offset-4 hover:decoration-foreground"
-              >
-                How returns work
-              </Link> */}
+            {/* ONE CONTROL, TEMPORARILY. A "How returns work" link to
+                `/shipping` sat beside this one and had been commented out
+                since that page stopped being legible — see
+                `apps/storefront/app/(site)/shipping/page.tsx`. The dead block
+                is gone now rather than carried across the repaint, since every
+                class in it described the unpainted band. When `/shipping` is
+                redesigned the link comes back HERE, as a plain
+                `text-brand-ink/70` underline — NOT as a second key; the
+                `flex flex-wrap` row is left in place for it. */}
+            <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3">
               <ReturnsCta
                 program={program}
                 areas={areas ?? []}
                 label="Request a pickup"
-                className="underline decoration-brand-line underline-offset-4 hover:decoration-foreground"
+                className={cn(
+                  "inline-flex h-11 items-center justify-center rounded-md px-6 text-sm font-medium",
+                  /* `default` — the white key. See the header for why the ink
+                     key cannot be used on this ground. */
+                  controlSurface("default"),
+                )}
               />
-            </p>
+            </div>
           </div>
         </div>
       </div>

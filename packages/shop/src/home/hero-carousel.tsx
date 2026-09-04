@@ -106,6 +106,23 @@ export function HeroCarousel({ primary }: { primary: CategoryLink }) {
             <p className="mt-4 max-w-prose text-base leading-7 text-muted-foreground">
               {slide.body}
             </p>
+            {/* ═══ ONE CTA, AND THE SECOND ONE IS GONE ON PURPOSE ═══
+                "Browse all filament" stood here as a `default` key beside the
+                primary. It pointed at `/store/all` — a superset of wherever
+                `primary.href` sends a shopper — so the pair asked the same
+                question twice and split the hero's emphasis between two
+                controls that both mean "go look at spools".
+
+                It had already been rewritten once: it was `#bulk` / "Bulk
+                pricing" until that band stopped rendering for want of a
+                discount ladder, and the catalogue link was what it was
+                repointed to rather than what it was written for. A second CTA
+                kept alive because the layout has room for one is the weaker
+                half of this section, and the category tiles directly below are
+                the browse affordance it was standing in for.
+
+                `flex flex-wrap gap-3` stays: the row is still a row, and the
+                moment there is a real second destination it goes back here. */}
             <div className="mt-7 flex flex-wrap gap-3">
               <Link
                 href={primary.href}
@@ -115,21 +132,6 @@ export function HeroCarousel({ primary }: { primary: CategoryLink }) {
                 )}
               >
                 {primary.label}
-              </Link>
-              {/* WAS `#bulk`, LABELLED "Bulk pricing". That anchor was the bulk
-                  band, which now renders nothing because there is no discount
-                  ladder to show — so the link both advertised a price the till
-                  will not honour and jumped to a section that no longer exists.
-                  Points at the full catalogue instead: true, useful, and it
-                  keeps the second CTA the layout is built around. */}
-              <Link
-                href="/store/all"
-                className={cn(
-                  "inline-flex h-11 items-center justify-center rounded-md px-6 text-sm font-medium",
-                  controlSurface("default"),
-                )}
-              >
-                Browse all filament
               </Link>
             </div>
           </div>
