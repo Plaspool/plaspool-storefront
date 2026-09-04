@@ -64,6 +64,38 @@ export function errorCopy(
             title: "We don't deliver to that address yet",
             body: "Check the state and town are right. If they are, we don't reach there yet — contact us and we'll see what we can do.",
           };
+    case "outside_service_region":
+      /* THE `simple`-MODE REFUSAL, AND IT NEEDS ITS OWN SENTENCE. The admin
+         gave this a different code from `outside_delivery_area` precisely
+         because there is no district list to name here — so this copy names
+         no district, in either mode, and does not tell the shopper to change
+         one they were never shown.
+
+         IT ALSO DOES NOT SAY "TRY AGAIN". The same address refused once will
+         be refused identically every time; the only moves that exist are a
+         different address or talking to us, so those are the two offered. */
+      return {
+        title: "We don't deliver to that area yet",
+        body: "We don't reach that part of the country yet. Try a different delivery address, or contact us and we'll see what we can do.",
+      };
+    case "checkout_paid":
+      /* ═══ THE ONLY "ERROR" ON THIS SCREEN THAT IS GOOD NEWS ═══
+         The payment succeeded and its inline completion did not, so the cart
+         is stuck at `converting` while the money is gone and an order is
+         being built from it. This reached the shopper as the default's "That
+         didn't go through. Try again." — an instruction to pay twice, beside
+         a live Pay button.
+
+         THREE THINGS THIS COPY OWES, none of which the default can give:
+         it says the payment WORKED; it never offers a retry; and it points at
+         their ORDERS, never at the cart — the cart is where a second attempt
+         begins. "don't pay again" is stated outright rather than implied,
+         because the person reading it is looking at a screen that just showed
+         them a failure banner. */
+      return {
+        title: "Your payment went through",
+        body: "This order is already paid and we're finishing it now. Check your orders for the confirmation — don't pay again.",
+      };
     case "unresolved_lines":
       return { title: "An item in the cart is no longer available", body: "Go back to the cart and remove it, then try again." };
     case "currency_mismatch":

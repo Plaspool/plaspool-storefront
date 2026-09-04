@@ -39,6 +39,7 @@ import { useCart } from "../cart/cart-context";
 import {
   createPaymentIntent,
   currentCartRevision,
+  cancelCheckout,
   freezeCheckout,
   setCheckoutAddress,
   setCheckoutShipping,
@@ -512,15 +513,153 @@ export function CheckoutFlow() {
    * return, which is a worse failure for being quieter. `event.persisted` is
    * what distinguishes an actual bfcache restore from an ordinary re-render.
    */
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * THAWING A CHECKOUT THE SHOPPER WALKED AWAY FROM.
+   *
+   * Freezing sends the cart to `converting`, and until the admin shipped
+   * `POST /checkout/cancel` NOTHING could bring it back. A shopper who reached
+   * Paystack and did not pay — declined card, closed the tab, changed their
+   * mind about the address — got `409 precondition_failed` from every later
+   * address or shipping edit, permanently, and the cart cookie kept resolving
+   * to the same dead basket. The journey `idempotencyKey` above describes
+   * ("abandons the review step, comes back, changes the delivery option and
+   * re-freezes at a different total") was written against an API that could
+   * not perform it. This is what makes it real.
+   *
+   * ═══ THE TOTALS GO WITH IT, AND THAT IS THE POINT, NOT A SIDE EFFECT ═══
+   * A thaw CLEARS the frozen totals server-side: `/checkout/totals` and
+   * `/payments/intents` both 404 until a fresh `freezeCheckout`. So the cached
+   * `FrozenTotals` here are, from this moment, a number on screen that nothing
+   * will honour — and a Pay button over a 404ing intent route is the worst
+   * version of this bug, not a smaller one. They are dropped, and
+   * `idempotencyKey` with them: the key is minted per freeze/revision, so the
+   * next freeze must mint its own.
+   *
+   * ═══ `checkout_paid` IS NOT AN ERROR TO SWALLOW ═══
+   * A capture whose inline completion failed leaves a genuinely PAID cart at
+   * `converting`, indistinguishable from a stuck one. The API refuses to thaw
+   * it and is right to. Surfaced through `applyError` like any other refusal —
+   * its copy says the payment worked and sends the shopper to their orders —
+   * and the totals are LEFT ON SCREEN in that one case, because they are the
+   * totals that were actually charged. Only the ability to pay again is taken
+   * away.
+   * ═══════════════════════════════════════════════════════════════════════════
+   */
+  const thawCheckout = React.useCallback(async (): Promise<boolean> => {
+    const result = await cancelCheckout();
+    if (!result.ok && result.error.code === "checkout_paid") {
+      applyError(result.error);
+      /* The key, and only the key. Killing `payNow` is the whole remedy here;
+         the total stays because it is the one that was charged. */
+      setIdempotencyKey(null);
+      return false;
+    }
+    /* ═══ FAIL CLOSED ON EVERY OTHER REFUSAL ═══
+       A network failure or a 500 leaves the cart's state UNKNOWN, not known-
+       frozen. Keeping the totals on the optimistic reading would leave a Pay
+       button over an intent route that may already 404. Dropping them costs a
+       re-freeze the shopper was about to do anyway; keeping them costs a dead
+       button at the moment of payment. The refusal itself is deliberately not
+       surfaced — the shopper did not ask for this call and has nothing to do
+       about it, and the step they land on re-freezes on its own submit. */
+    setTotals(null);
+    setIdempotencyKey(null);
+    return result.ok;
+  }, [applyError]);
+
+  /**
+   * Whether there is a live freeze that an unload would strand.
+   *
+   * A REF, NOT A DEPENDENCY. The `pagehide` listener below must not be torn
+   * down and rebuilt on every render, and it must not close over a `step` from
+   * whichever render happened to bind it.
+   */
+  const frozenRef = React.useRef(false);
+  React.useEffect(() => {
+    frozenRef.current = step === "review" && totals !== null;
+  }, [step, totals]);
+
+  /**
+   * Back from Paystack, onto this exact review step.
+   *
+   * CLEARING THE GUARD IS SAFE, AND WAS NOT ALWAYS. With the idempotency key
+   * stable for this freeze (see `idempotencyKey` above), a Pay now click after
+   * a bfcache restore replays the same intent rather than opening a second one.
+   * Leaving the guard permanently set after hand-off would trade a fixed
+   * double-charge for a Pay now button that silently does nothing on return,
+   * which is a worse failure for being quieter. `event.persisted` is what
+   * distinguishes an actual bfcache restore from an ordinary re-render.
+   *
+   * ═══ AND THIS IS THE HIGHEST-VALUE PLACE TO THAW ═══
+   * The shopper is demonstrably back and demonstrably has not paid — the whole
+   * ambiguity that makes the other call sites cautious is absent here. The
+   * `pagehide` handler below deliberately skips the Paystack hand-off (see its
+   * own comment), so this is the only thing that unfreezes that journey; the
+   * two are complements, not belt-and-braces.
+   *
+   * LANDS ON THE CONTACT STEP, because that step's submit IS the re-freeze.
+   * Staying on `review` with no totals renders a step with nothing in it, and
+   * inventing a "get a new total" button here would be a second way to do what
+   * `submitContact` already does. Everything the shopper typed is still in
+   * state, so this is one click from a fresh total.
+   */
   React.useEffect(() => {
     function onPageShow(event: PageTransitionEvent) {
-      if (event.persisted) {
-        payingRef.current = false;
-        setRedirecting(false);
-      }
+      if (!event.persisted) return;
+      payingRef.current = false;
+      setRedirecting(false);
+      if (!frozenRef.current) return;
+      void thawCheckout().then((thawed) => {
+        /* Only on a real thaw. A `checkout_paid` refusal must leave the
+           shopper on the screen showing the banner that explains it, not walk
+           them back into a flow that would re-charge them. */
+        if (thawed) setStep("contact");
+      });
     }
     window.addEventListener("pageshow", onPageShow);
     return () => window.removeEventListener("pageshow", onPageShow);
+  }, [thawCheckout]);
+
+  /**
+   * The tab closing, or any navigation off this page, with a total still
+   * frozen.
+   *
+   * ═══ THE ONLY PATH THAT COVERS "CLOSED THE TAB" ═══
+   * The API's implicit thaw — `PUT /checkout/addresses` and
+   * `/checkout/shipping` now unfreeze before they write — cannot see this one,
+   * because no request is ever made. Without this, closing the tab on the
+   * review step is still a permanently dead cart.
+   *
+   * ═══ `pagehide`, NOT `visibilitychange` ═══
+   * `visibilitychange` → hidden fires on every tab switch, so thawing there
+   * would release the total of anyone who alt-tabs away to read their card
+   * number and comes back — the exact shopper this feature is for.
+   * `pagehide` fires on close and on navigation away, and not on a tab
+   * switch. It is also the one that fires reliably on mobile, where
+   * `beforeunload` frequently never runs at all.
+   *
+   * ═══ IT MUST NOT FIRE ON THE WAY TO PAYSTACK ═══
+   * `payNow` ends in `window.location.href = authorizationUrl`, which is a
+   * navigation, which is a `pagehide`. Cancelling there would thaw the cart in
+   * the same breath as sending the shopper to pay for it — the worst bug this
+   * change could introduce. `payingRef` is already set synchronously before
+   * that redirect and deliberately NOT cleared once the hand-off starts, so it
+   * is exactly the signal needed. Coming back from Paystack is then the
+   * `pageshow` handler's job, above.
+   *
+   * `keepalive`, because the document is going away and an ordinary fetch is
+   * cancelled with it. Not awaited and not error-checked: there is no one left
+   * to tell, and `cancelCheckout` is idempotent, so the worst case is the next
+   * address edit thawing it implicitly instead.
+   */
+  React.useEffect(() => {
+    function onPageHide() {
+      if (!frozenRef.current || payingRef.current) return;
+      void cancelCheckout(undefined, { keepalive: true });
+    }
+    window.addEventListener("pagehide", onPageHide);
+    return () => window.removeEventListener("pagehide", onPageHide);
   }, []);
 
   React.useEffect(() => {
@@ -917,7 +1056,17 @@ export function CheckoutFlow() {
                  goes here only when the next move is somewhere ELSE — the cart
                  for a checkout with nothing in it, and us for the two the
                  shopper cannot fix by trying harder. */
-              error.code === "gone" || error.code === "empty_cart" ? (
+              /* ═══ THE ORDER, AND POINTEDLY NOT THE CART ═══
+                 Checked FIRST, ahead of every branch that offers "Back to
+                 cart". This shopper has paid; the cart is where a second
+                 attempt starts, so it is the one destination that must not be
+                 on this screen. Their order is the thing they actually want
+                 and the thing that proves the money arrived. */
+              error.code === "checkout_paid" ? (
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/account/orders">See your order</Link>
+                </Button>
+              ) : error.code === "gone" || error.code === "empty_cart" ? (
                 <Button
                   asChild
                   variant="outline"
@@ -1186,9 +1335,30 @@ export function CheckoutFlow() {
                       a dead end. */}
                   <div className="flex items-start justify-between gap-3">
                     <p className="text-sm font-semibold text-foreground">Deliver to</p>
+                    {/* ═══ THAWS ON THE WAY OUT, AND THAT IS WHAT MAKES THE
+                        BUTTON HONEST ═══
+                        This sent the shopper to the address step while the
+                        cart stayed frozen at `converting`, so the address they
+                        went back to fix was refused with a 409 the moment they
+                        submitted it — a "Change" control that could not change
+                        anything. `thawCheckout` drops the stale totals with
+                        it, so the walk back through delivery and contact ends
+                        at a freshly frozen total rather than the old one.
+
+                        The step moves EITHER WAY. A refusal here leaves the
+                        cart frozen, but the shopper asked to go and editing
+                        the address is now itself a thaw (the API unfreezes on
+                        `PUT /checkout/addresses`), so sending them is the
+                        recovery. The one exception is a paid checkout, where
+                        `thawCheckout` raises the banner and this must not walk
+                        them into a flow that would charge them twice. */}
                     <button
                       type="button"
-                      onClick={() => setStep("address")}
+                      onClick={() => {
+                        void thawCheckout().then((thawed) => {
+                          if (thawed) setStep("address");
+                        });
+                      }}
                       className="shrink-0 text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     >
                       Change
@@ -1282,7 +1452,19 @@ export function CheckoutFlow() {
                 <Button
                   type="button"
                   onClick={payNow}
-                  disabled={busy || redirecting || rateLimited || error?.code === "gone"}
+                  /* `checkout_paid` DISABLES THIS, and that is the entire
+                     remedy for it. The money is already taken and an order is
+                     being built; a live Pay button under a banner saying so is
+                     an invitation to be charged twice. `idempotencyKey` is
+                     nulled at the same time, so even a click that got through
+                     would return early — this is the visible half of that. */
+                  disabled={
+                    busy ||
+                    redirecting ||
+                    rateLimited ||
+                    error?.code === "gone" ||
+                    error?.code === "checkout_paid"
+                  }
                   tone="primary"
                   className="h-12 text-base"
                 >
