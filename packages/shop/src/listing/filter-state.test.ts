@@ -21,7 +21,7 @@ function product(over: Partial<Product> = {}): Product {
     rating: { average: 0, count: 0, distribution: [0, 0, 0, 0, 0] },
     colours: [{ id: "black", name: "Black", hex: "#000000", inStock: true, imageUrl: null }],
     sizes: [
-      { id: "1kg", label: "1 kg", weightGrams: 1000, priceNaira: 18500, compareAtNaira: null },
+      { id: "1kg", label: "1 kg", weightGrams: 1000, priceMinor: 1850000, compareAtMinor: null, currency: "NGN" as const },
     ],
     ...over,
   } as Product;
@@ -132,8 +132,8 @@ describe("applyFilters", () => {
   it("filters on the cheapest size, matching the price the card shows", () => {
     const p = product({
       sizes: [
-        { id: "1kg", label: "1 kg", weightGrams: 1000, priceNaira: 18500, compareAtNaira: null },
-        { id: "250g", label: "250 g", weightGrams: 250, priceNaira: 6500, compareAtNaira: null },
+        { id: "1kg", label: "1 kg", weightGrams: 1000, priceMinor: 1850000, compareAtMinor: null, currency: "NGN" as const },
+        { id: "250g", label: "250 g", weightGrams: 250, priceMinor: 650000, compareAtMinor: null, currency: "NGN" as const },
       ],
     });
     expect(applyFilters([p], parseFilters({ max: "10000" }))).toHaveLength(1);

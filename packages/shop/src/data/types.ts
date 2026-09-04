@@ -1,3 +1,5 @@
+import type { CurrencyCode } from "./currency-config";
+
 export type Material = "PLA" | "PLA+" | "PETG" | "ABS" | "ASA" | "TPU";
 export type DiameterMm = 1.75 | 2.85;
 
@@ -19,10 +21,28 @@ export interface SizeOption {
   id: string;
   label: string;
   weightGrams: number;
-  /** Whole Naira. */
-  priceNaira: number;
-  /** Struck-through reference price, or null when there is no discount. */
-  compareAtNaira: number | null;
+  /**
+   * MINOR UNITS, in `currency` — not whole naira.
+   *
+   * ═══ THIS FIELD WAS `priceNaira`, AND THE RENAME IS THE POINT ═══
+   * It held `Math.round(minor / 100)` with the currency thrown away, which was
+   * exactly right for a shop that could only charge naira and is a silent
+   * mispricing for one that can charge dollars: $49.99 became the number 50,
+   * and every render printed `₦50`. Not an error, not a `NaN` — a plausible
+   * price, in the wrong currency, in the wrong denomination.
+   *
+   * Minor units are also the only honest place to apply a bulk rung: the
+   * ladder is basis points, and rounding to a whole unit BEFORE taking a
+   * percentage off it loses a hundredth of the precision the server keeps.
+   */
+  priceMinor: number;
+  /** Struck-through reference, minor units in the same `currency`, or null
+   *  when there is no discount. */
+  compareAtMinor: number | null;
+  /** What `priceMinor` and `compareAtMinor` are denominated in. Read off the
+   *  variant's own `price.currency` — never assumed, never inferred from the
+   *  shop's default. */
+  currency: CurrencyCode;
 }
 
 /** A quantity ladder. `minQty` ascending, no duplicates. */

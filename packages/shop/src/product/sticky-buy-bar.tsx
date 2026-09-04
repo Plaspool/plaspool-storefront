@@ -52,7 +52,7 @@ export function StickyBuyBar({
   onQuantityChange,
   className,
 }: StickyBuyBarProps) {
-  const unit = unitPriceFor(size.priceNaira, product.bulkTiers, quantity);
+  const unit = unitPriceFor(size.priceMinor, product.bulkTiers, quantity);
   const line: CartLineKey = {
     productSlug: product.slug,
     colourId: colour.id,
@@ -99,6 +99,7 @@ export function StickyBuyBar({
         */}
         <Price
           amount={unit}
+          currency={size.currency}
           size="md"
           className="shrink-0"
           amountClassName="text-sm sm:text-base"

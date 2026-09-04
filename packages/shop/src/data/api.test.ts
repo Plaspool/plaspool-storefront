@@ -57,7 +57,8 @@ describe("the weight axis", () => {
     const [size] = sizesFrom([variant({ optionValues: LIVE_OPTIONS })]);
     expect(size.label).toBe("1kg");
     expect(size.weightGrams).toBe(1000);
-    expect(size.priceNaira).toBe(23500);
+    expect(size.priceMinor).toBe(2350000);
+    expect(size.currency).toBe("NGN");
   });
 
   it("still prefers `Weight` when a variant carries both", () => {
@@ -143,7 +144,7 @@ describe("toProduct on the payload that emptied the shop", () => {
 
   it("quotes it at the price the API sent", () => {
     const product = toProduct(liveProduct, ctx);
-    expect(product?.sizes.map((s) => s.priceNaira)).toEqual([23500]);
+    expect(product?.sizes.map((s) => s.priceMinor)).toEqual([2350000]);
   });
 
   it("gives it the real colour rather than the no-colour fallback", () => {
@@ -237,7 +238,7 @@ describe("a product whose only variant has no weight axis", () => {
     const [size] = sizesFrom([sizeless]);
     expect(size.label).toBe("");
     expect(size.weightGrams).toBe(0);
-    expect(size.priceNaira).toBe(20000);
+    expect(size.priceMinor).toBe(2000000);
   });
 
   it("keeps the product rather than dropping it", () => {

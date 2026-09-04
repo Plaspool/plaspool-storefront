@@ -2,7 +2,9 @@ import { cn } from "@plaspool/ui";
 
 import type { BulkTier } from "../data/types";
 import { percentFromBps } from "../data/bulk";
-import { formatNaira, savingsFor, tierFor, unitPriceFor } from "../data/money";
+import { savingsFor, tierFor, unitPriceFor } from "../data/money";
+import { formatMinor } from "../data/format-money";
+import type { CurrencyCode } from "../data/currency-config";
 
 /**
  * The quantity ladder. Hairline rules and no card chrome, per the design
@@ -23,13 +25,18 @@ const HEAD = "px-2 pb-2 text-xs font-semibold text-muted-foreground";
 export interface BulkTierTableProps {
   tiers: BulkTier[];
   /** Unit price before any tier applies. */
+  /** MINOR UNITS, in `currency`. The rungs are basis points off this, and
+   *  taking a percentage off a figure already rounded to a whole unit throws
+   *  away a hundredth of the precision the server keeps. */
   basePrice: number;
+  /** What `basePrice` is denominated in. No default — see `Price`. */
+  currency: CurrencyCode;
   /** The quantity in the buy box. Highlights the rung it has reached and
    *  totals the saving beneath. */
   quantity?: number;
 }
 
-export function BulkTierTable({ tiers, basePrice, quantity }: BulkTierTableProps) {
+export function BulkTierTable({ tiers, basePrice, currency, quantity }: BulkTierTableProps) {
   if (tiers.length === 0) return null;
 
   const reached = quantity === undefined ? null : tierFor(tiers, quantity);
@@ -77,7 +84,7 @@ export function BulkTierTable({ tiers, basePrice, quantity }: BulkTierTableProps
                     −{percentFromBps(tier.percentBps)}%
                   </td>
                   <td className={cn(CELL, "text-right font-mono font-bold tabular-nums text-foreground")}>
-                    {formatNaira(unitPriceFor(basePrice, tiers, tier.minQty))}
+                    {formatMinor(unitPriceFor(basePrice, tiers, tier.minQty), currency)}
                   </td>
                 </tr>
               );
@@ -90,7 +97,7 @@ export function BulkTierTable({ tiers, basePrice, quantity }: BulkTierTableProps
         <p className="mt-3 text-sm text-muted-foreground">
           You save{" "}
           <span className="font-mono font-bold tabular-nums text-foreground">
-            {formatNaira(savings)}
+            {formatMinor(savings, currency)}
           </span>
         </p>
       )}

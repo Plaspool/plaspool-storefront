@@ -468,7 +468,7 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
        applied in `partitionLines`; a second `continue` here is how the two
        projections drifted apart the first time. */
     return split.sellable.map(({ line, entry, colour, size }) => {
-        /* THE SERVER'S PRICE, not `size.priceNaira`. The two agree today, and
+        /* THE SERVER'S PRICE, not `size.priceMinor`. The two agree today, and
            when they stop agreeing the server is the one that takes the money. */
         const unitPrice = majorUnits(line.unit);
         const frozen = totals.get(line.variantId);
@@ -528,7 +528,22 @@ export function CartProvider({ children, catalog }: CartProviderProps) {
     /* List price minus what is actually charged. Zero today, because nothing
        discounts server-side — and it appears on its own the day something does,
        rather than needing this file to learn about it. */
-    const list = resolved.reduce((sum, r) => sum + r.size.priceNaira * r.qty, 0);
+    /* ═══ DIVIDED, BECAUSE `subtotal` ABOVE IS WHOLE UNITS ═══
+       `size.priceMinor` is minor units now (it was `priceNaira`, whole units,
+       when this line was written). `subtotal` comes through `majorUnits()`.
+       Subtracting one from the other without this division is a 100x error
+       that renders as a perfectly plausible saving — the confusion
+       `money-units.test.ts` exists to pin. Rounded per unit before
+       multiplying, exactly as `priceNaira` did, so the figure does not move.
+
+       THIS PROVIDER IS STILL NAIRA-SHAPED, knowingly: it works in whole units
+       via `majorUnits()`, which rounds cents away. Correct while a cart can
+       only be NGN, and the first thing to migrate when it cannot — the cart's
+       own currency is already on `view.cart.currency`. */
+    const list = resolved.reduce(
+      (sum, r) => sum + Math.round(r.size.priceMinor / 100) * r.qty,
+      0,
+    );
     return {
       lines,
       resolved,

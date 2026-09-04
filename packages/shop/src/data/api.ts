@@ -1,4 +1,5 @@
 import { COMMERCE_API_BASE } from "./config";
+import { isCurrencyCode, type CurrencyCode } from "./currency-config";
 import type {
   Badge,
   Category,
@@ -500,10 +501,28 @@ export function coloursFrom(variants: ApiVariant[]): Colour[] {
  * a product entirely rather than returning one that crashes the first card that
  * renders it.
  */
+/**
+ * The variant's currency, or naira.
+ *
+ * A code this build cannot render has no symbol and no precision rule, so
+ * printing a figure beside it would be a number with no stated denomination.
+ * Falls back rather than propagating — and the fallback is only ever reached
+ * by a response this storefront was not built for.
+ */
+function currencyOf(code: string): CurrencyCode {
+  return isCurrencyCode(code) ? code : "NGN";
+}
+
 export function sizesFrom(variants: ApiVariant[]): SizeOption[] {
   const byLabel = new Map<
     string,
-    { label: string; grams: number | null; minor: number; compareMinor: number | null }
+    {
+      label: string;
+      grams: number | null;
+      minor: number;
+      compareMinor: number | null;
+      currency: CurrencyCode;
+    }
   >();
   for (const variant of variants) {
     if (!variant.price) continue;
@@ -519,6 +538,11 @@ export function sizesFrom(variants: ApiVariant[]): SizeOption[] {
       if (variant.price.amount < existing.minor) {
         existing.minor = variant.price.amount;
         existing.compareMinor = variant.compareAtMinor ?? null;
+        /* THE CURRENCY TRAVELS WITH THE PRICE THAT WON, for the same reason
+           the compare-at does. Variants of one size should all be quoted in
+           the shop's requested currency, but a mixed response must not leave
+           the winning figure labelled with a losing variant's code. */
+        existing.currency = currencyOf(variant.price.currency);
       }
       existing.grams = existing.grams ?? grams;
     } else {
@@ -527,6 +551,7 @@ export function sizesFrom(variants: ApiVariant[]): SizeOption[] {
         grams,
         minor: variant.price.amount,
         compareMinor: variant.compareAtMinor ?? null,
+        currency: currencyOf(variant.price.currency),
       });
     }
   }
@@ -535,15 +560,20 @@ export function sizesFrom(variants: ApiVariant[]): SizeOption[] {
       id,
       label: s.label,
       weightGrams: s.grams ?? 0,
-      /* MINOR UNITS BECOME WHOLE NAIRA HERE AND NOWHERE ELSE. `Math.round`
-         rather than a truncation, and no float arithmetic survives the call. */
-      priceNaira: Math.round(s.minor / 100),
-      /* Same conversion, same place. Whether it DRAWS is `Price`'s render-time
-         `compareAt > amount` — a reference at or below the price is carried
-         honestly and never shown. */
-      compareAtNaira: s.compareMinor == null ? null : Math.round(s.compareMinor / 100),
+      /* ═══ NO CONVERSION HAPPENS HERE ANY MORE ═══
+         This used to be `Math.round(s.minor / 100)`, which turned the API's
+         minor units into whole naira and dropped the currency on the way. It
+         now carries what the server sent, and `formatMoney` does the division
+         at the point of RENDER, where the currency is still attached and its
+         own precision is known. */
+      priceMinor: s.minor,
+      /* Whether it DRAWS is still `Price`'s render-time `compareAt > amount` —
+         a reference at or below the price is carried honestly and never
+         shown. */
+      compareAtMinor: s.compareMinor,
+      currency: s.currency,
     }))
-    .sort((a, b) => a.priceNaira - b.priceNaira);
+    .sort((a, b) => a.priceMinor - b.priceMinor);
 }
 
 
