@@ -49,10 +49,13 @@ function CartLineRow({
   line,
   onQtyChange,
   onRemove,
+  pending = false,
 }: {
   line: ResolvedLine;
   onQtyChange: (qty: number) => void;
   onRemove: () => void;
+  /** A write for THIS row is in flight. */
+  pending?: boolean;
 }) {
   const { product, colour, size, qty, unitPrice, effectiveUnitPrice, bulkPercentBps, bulkQty, total } =
     line;
@@ -78,16 +81,29 @@ function CartLineRow({
       />
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div className="flex min-w-0 items-start justify-between gap-3">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <SheetClose asChild>
+              {/* ═══ IT WRAPS. IT USED TO BE `truncate`, AND THAT HID THE NAME ═══
+                  `truncate` is `white-space: nowrap` plus an ellipsis, and it
+                  only reads well when the box is genuinely narrower than the
+                  text. Inside the Radix table wrapper it was neither: the row
+                  had 519px in a 384px drawer, so the element took its full
+                  319px, never truncated, and the tail was sliced off by an
+                  ancestor's `overflow: hidden` with no ellipsis to show for it.
+
+                  Wrapping is the right answer even with that fixed. A cart row
+                  is the last place to abbreviate what somebody is about to pay
+                  for, there are only ever a handful of rows, and a second line
+                  costs 20px. `break-words` so a long unbroken token — an SKU, a
+                  URL-ish name — still cannot push the row wide again. */}
               <Link
                 href={`/store/products/${product.slug}`}
-                className="block truncate rounded-sm text-sm font-semibold text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="block break-words rounded-sm text-sm font-semibold text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 {product.name}
               </Link>
             </SheetClose>
-            <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
+            <p className="mt-0.5 break-words font-mono text-xs text-muted-foreground">
               {variantDescriptor(colour.name, size.label)}
             </p>
           </div>
@@ -111,7 +127,13 @@ function CartLineRow({
           {/* `max` IS THE WHOLE FIX ON THIS SURFACE. Without it the stepper
               offered 99 of a variant the shop had four of, and the refusal
               arrived at the checkout freeze — after the address. */}
-          <QuantityStepper value={qty} onChange={onQtyChange} max={line.maxQty} label={descriptor} />
+          <QuantityStepper
+            value={qty}
+            onChange={onQtyChange}
+            max={line.maxQty}
+            pending={pending}
+            label={descriptor}
+          />
           <BulkLinePrice
             unitPrice={unitPrice}
             effectiveUnitPrice={effectiveUnitPrice}
@@ -136,6 +158,7 @@ function CartLineRow({
           variant="ghost"
           size="sm"
           onClick={onRemove}
+          disabled={pending}
           aria-label={`Remove ${descriptor} from cart`}
           className="h-auto w-fit gap-1.5 px-2 py-1 text-xs text-muted-foreground focus-visible:ring-brand focus-visible:ring-offset-background"
         >
@@ -310,6 +333,7 @@ export function CartDrawer() {
                     line={line}
                     onQtyChange={(qty) => cart.setQty(toKey(line), qty)}
                     onRemove={() => cart.remove(toKey(line))}
+                    pending={cart.pendingKey === line.key}
                   />
                 ))}
               </ul>

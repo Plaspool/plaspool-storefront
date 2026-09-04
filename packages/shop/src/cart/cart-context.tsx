@@ -114,6 +114,17 @@ export function CartProvider({ children, catalog, currencyConfig }: CartProvider
   /** A write is in flight. The drawer disables its steppers rather than letting
    *  two edits race and land in the order the network chose. */
   const [pending, setPending] = React.useState(false);
+  /**
+   * WHICH ROW is being written, as its `ResolvedLine.key`, or null.
+   *
+   * `pending` alone says only that SOME write is in flight, which is enough to
+   * stop two edits racing and not enough to tell a shopper anything: pressing
+   * plus on one row would have to blank every row's figure, or none of them.
+   * Keyed on the triple rather than the server line id because that is what
+   * `resolved` rows carry and what the drawer already renders against — see
+   * `ResolvedLine.key`.
+   */
+  const [pendingKey, setPendingKey] = React.useState<string | null>(null);
 
   /**
    * The currency any cart minted here is created in.
@@ -295,13 +306,19 @@ export function CartProvider({ children, catalog, currencyConfig }: CartProvider
    *               way; anything else at least stops the UI from lying.
    * ═══════════════════════════════════════════════════════════════════════════
    */
-  const mutate = React.useCallback(async (run: () => Promise<CartResult>) => {
+  const mutate = React.useCallback(async (
+    run: () => Promise<CartResult>,
+    /** The row this write belongs to, for per-row feedback. Absent for writes
+     *  that are not about one row — creating the cart, emptying it. */
+    key?: string,
+  ) => {
     /* A WRITE SUPERSEDES ANY READ STILL IN THE AIR. Every mutation answers with
        the whole new cart, so a `load` issued before this one started is stale
        the moment this runs — and letting it land afterwards would undo the
        edit on screen. Same rule as `readSeq` itself: issue order wins. */
     readSeq.current += 1;
     setPending(true);
+    setPendingKey(key ?? null);
     setProblem(null);
     try {
       const result = await run();
@@ -334,6 +351,7 @@ export function CartProvider({ children, catalog, currencyConfig }: CartProvider
       return result;
     } finally {
       setPending(false);
+      setPendingKey(null);
     }
   }, []);
 
@@ -433,7 +451,7 @@ export function CartProvider({ children, catalog, currencyConfig }: CartProvider
       /* Below one reads as "take it out" rather than an invalid state to
          refuse — the same rule the local cart followed. */
       if (qty < 1) {
-        void mutate(() => removeLine(lineId));
+        void mutate(() => removeLine(lineId), lineKey(key));
         return;
       }
       /* ═══ THE CEILING IS ENFORCED HERE TOO, NOT ONLY IN THE STEPPER ═══
@@ -455,7 +473,7 @@ export function CartProvider({ children, catalog, currencyConfig }: CartProvider
         line?.inStock ?? null,
         entry ? stockOf(entry, key.colourId, key.sizeId) : null,
       );
-      void mutate(() => setLineQty(lineId, Math.min(Math.trunc(qty), cap)));
+      void mutate(() => setLineQty(lineId, Math.min(Math.trunc(qty), cap)), lineKey(key));
     },
     [lineIdFor, mutate, view.lines, bySlug],
   );
@@ -464,7 +482,7 @@ export function CartProvider({ children, catalog, currencyConfig }: CartProvider
     (key: CartLineKey) => {
       const lineId = lineIdFor(key);
       if (!lineId) return;
-      void mutate(() => removeLine(lineId));
+      void mutate(() => removeLine(lineId), lineKey(key));
     },
     [lineIdFor, mutate],
   );
@@ -624,6 +642,7 @@ export function CartProvider({ children, catalog, currencyConfig }: CartProvider
       savings: Math.max(0, list - subtotal),
       hydrated,
       pending,
+      pendingKey,
       changes: view.changes,
       problem,
       add,
@@ -646,6 +665,7 @@ export function CartProvider({ children, catalog, currencyConfig }: CartProvider
     lines,
     hydrated,
     pending,
+    pendingKey,
     add,
     addVariants,
     setQty,
