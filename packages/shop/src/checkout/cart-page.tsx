@@ -225,6 +225,7 @@ export function CartPage() {
                     value={line.qty}
                     onChange={(qty) => cart.setQty(toKey(line), qty)}
                     max={line.maxQty}
+                    pending={cart.pendingKey === line.key}
                     label={lineDescriptor(line.product.name, line.colour.name, line.size.label)}
                   />
                   <Button
@@ -232,6 +233,7 @@ export function CartPage() {
                     variant="ghost"
                     size="sm"
                     onClick={() => cart.remove(toKey(line))}
+                    disabled={cart.pendingKey === line.key}
                     className="h-auto px-2 py-1 text-xs text-muted-foreground"
                   >
                     Remove

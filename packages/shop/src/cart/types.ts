@@ -120,6 +120,21 @@ export interface CartApi {
    */
   pending: boolean;
   /**
+   * WHICH row is being written, as its `ResolvedLine.key`, or null.
+   *
+   * ═══ `pending` ALONE COULD NOT DRIVE FEEDBACK, ONLY DISABLING ═══
+   * Pressing plus used to do nothing visible at all: the figure a stepper shows
+   * is the SERVER's `qty`, so it cannot move until the round trip lands, and
+   * nothing on the row said a round trip was happening. The button looked
+   * broken, so shoppers pressed it again.
+   *
+   * A single boolean cannot fix that, because the honest response — replace the
+   * figure with a placeholder — has to happen on ONE row. Driving it from
+   * `pending` would blank every figure in the basket over an edit to one of
+   * them, which trades a dead control for a flickering cart.
+   */
+  pendingKey: string | null;
+  /**
    * What the SERVER changed without being asked: a line dropped because its
    * variant vanished, a quantity clamped to what is left. Surfaced because a
    * basket that silently edits itself is the failure this exists to prevent.
