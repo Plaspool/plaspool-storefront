@@ -135,7 +135,6 @@ export function CartPage() {
         <EmptyState
           icon={<ShoppingCart aria-hidden="true" />}
           title="Your cart is empty"
-          body="Browse PLA, PETG and TPU by the spool or by the box."
           action={
             <Button asChild>
               <Link href="/store">Browse the store</Link>
