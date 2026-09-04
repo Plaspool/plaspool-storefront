@@ -96,6 +96,27 @@ export function errorCopy(
         title: "Your payment went through",
         body: "This order is already paid and we're finishing it now. Check your orders for the confirmation — don't pay again.",
       };
+    case "discount_rejected":
+      /* ═══ THE REASON IS NAMED ONLY WHERE IT IS RECOGNISED ═══
+         `reason` is the admin's own enum and it will grow — expiry, minimum
+         spend, per-customer limits. Printing an unrecognised value at a
+         shopper ("Discount rejected: min_subtotal_not_met") is worse than
+         saying plainly that the code was not accepted, so unknown reasons get
+         a sentence that promises nothing and blames nobody.
+
+         NOTHING HERE SUGGESTS RETRYING THE SAME CODE. It will be refused
+         identically every time; the moves that exist are a different code or
+         carrying on without one. */
+      return {
+        title:
+          error.reason === "not_found"
+            ? "That code isn't recognised"
+            : "That code can't be used",
+        body:
+          error.reason === "not_found"
+            ? "Check the spelling, or carry on without it — your order is otherwise ready."
+            : "It may have expired or not apply to this order. Carry on without it, or try a different code.",
+      };
     case "unresolved_lines":
       return { title: "An item in the cart is no longer available", body: "Go back to the cart and remove it, then try again." };
     case "currency_mismatch":

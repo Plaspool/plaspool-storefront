@@ -34,13 +34,17 @@ import { saveReceiptSnapshot } from "./receipt-snapshot";
 import { getPointsBalance } from "../data/points-api";
 import type { PointsBalance } from "../data/points-api";
 import { PointsOffer } from "./points-offer";
+import { STEP_LABELS, stepsFor, type Step } from "./checkout-steps";
+import { DiscountCodeField } from "./discount-code-field";
 import { majorUnits } from "../data/cart-api";
 import { useCart } from "../cart/cart-context";
 import {
   createPaymentIntent,
   currentCartRevision,
   cancelCheckout,
+  applyDiscountCode,
   freezeCheckout,
+  removeDiscountCode,
   setCheckoutAddress,
   setCheckoutShipping,
   startCheckout,
@@ -68,24 +72,14 @@ import type {
  * top of every step that needs a `baseRevision`.
  */
 
-type Step = "address" | "delivery" | "contact" | "review";
-
-const STEP_ORDER: Step[] = ["address", "delivery", "contact", "review"];
-
-function StepHeader({ step }: { step: Step }) {
-  const labels: Record<Step, string> = {
-    address: "Delivery address",
-    delivery: "Delivery option",
-    contact: "Contact",
-    review: "Review and pay",
-  };
-  const index = STEP_ORDER.indexOf(step);
+function StepHeader({ step, steps }: { step: Step; steps: Step[] }) {
+  const index = steps.indexOf(step);
   return (
     <div className="mb-6">
       <p className="font-mono text-xs uppercase tracking-wide text-muted-foreground">
-        Step {index + 1} of {STEP_ORDER.length}
+        Step {index + 1} of {steps.length}
       </p>
-      <h1 className="mt-1 text-2xl font-bold text-foreground">{labels[step]}</h1>
+      <h1 className="mt-1 text-2xl font-bold text-foreground">{STEP_LABELS[step]}</h1>
     </div>
   );
 }
@@ -305,7 +299,7 @@ function Field({
 export function CheckoutFlow() {
   const cart = useCart();
 
-  const [step, setStep] = React.useState<Step>("address");
+  const [step, setStep] = React.useState<Step>("details");
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<CheckoutError | null>(null);
 
@@ -376,7 +370,7 @@ export function CheckoutFlow() {
        the shopper comes back to it later, because the mode may have moved
        while they were on the delivery step. The window matches the
        endpoint's own `s-maxage`, so a re-entry inside it costs nothing. */
-    if (step !== "address") return;
+    if (step !== "details") return;
     if (configReadAt.current && Date.now() - configReadAt.current < CONFIG_REREAD_MS) return;
 
     let cancelled = false;
@@ -554,6 +548,21 @@ export function CheckoutFlow() {
   const [pointsBalance, setPointsBalance] = React.useState<PointsBalance | null>(null);
   const [redeemPoints, setRedeemPoints] = React.useState(0);
 
+  /**
+   * The discount code currently on the checkout, or null.
+   *
+   * TRACKED LOCALLY BECAUSE THE FROZEN TOTALS DO NOT NAME IT. A code shows up
+   * in `totals.adjustments` as a label and an amount — the operator's own
+   * wording, rendered verbatim — and there is no field on it saying which code
+   * produced it. So the field below would have no way to show what is applied,
+   * or to offer to remove it, without remembering what it sent.
+   *
+   * The SERVER is still the authority on whether it applies: this is only what
+   * was accepted, and every total on screen comes from a freeze that the server
+   * computed with the code in hand.
+   */
+  const [appliedDiscount, setAppliedDiscount] = React.useState<string | null>(null);
+
   const [totals, setTotals] = React.useState<FrozenTotals | null>(null);
   const [checkoutId, setCheckoutId] = React.useState<string | null>(null);
   const [redirecting, setRedirecting] = React.useState(false);
@@ -709,7 +718,10 @@ export function CheckoutFlow() {
         /* Only on a real thaw. A `checkout_paid` refusal must leave the
            shopper on the screen showing the banner that explains it, not walk
            them back into a flow that would re-charge them. */
-        if (thawed) setStep("contact");
+        /* BACK TO THE DETAILS STEP, whose submit re-freezes. It used to be
+           `contact`, which no longer exists — that step was one email field
+           and is now part of the details form. */
+        if (thawed) setStep("details");
       });
     }
     window.addEventListener("pageshow", onPageShow);
@@ -808,6 +820,10 @@ export function CheckoutFlow() {
 
   const email = customerEmail ?? guestEmail;
 
+  /* The steps this checkout actually has — two, unless the server offered a
+     real delivery choice. See `stepsFor`. */
+  const steps = React.useMemo(() => stepsFor(shippingOptions.length), [shippingOptions.length]);
+
   /**
    * One configured field as a control.
    *
@@ -885,8 +901,20 @@ export function CheckoutFlow() {
     );
   };
 
-  async function submitAddress(e: React.FormEvent) {
+  /**
+   * The one form: address AND email, submitted together.
+   *
+   * The email used to be its own step with a single field on it — and for a
+   * signed-in customer not even that, just their own address read back with a
+   * Continue button underneath. It is validated here now, before anything is
+   * written server-side, so a missing one costs nothing.
+   */
+  async function submitDetails(e: React.FormEvent) {
     e.preventDefault();
+    if (!email) {
+      setError({ code: "field", field: "email" });
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -914,8 +942,39 @@ export function CheckoutFlow() {
         applyError(result.error);
         return;
       }
-      setShippingOptions(result.data.options);
-      setSelectedShippingId(result.data.options[0]?.id ?? null);
+      const options = result.data.options;
+      setShippingOptions(options);
+      setSelectedShippingId(options[0]?.id ?? null);
+
+      /* ═══ ONE OPTION IS NOT A CHOICE, SO IT IS NOT A SCREEN ═══
+         The shop offers exactly one delivery option today, and the step that
+         asked about it was a radio group with a single filled circle and a
+         Continue button. Selected here instead, and the shopper goes straight
+         to the total — which is the thing they were trying to reach. The step
+         reappears on its own the day a second option exists, because
+         `stepsFor` counts them. */
+      if (options.length <= 1) {
+        if (options[0]) {
+          /* THE REVISION IS RE-READ, NEVER ARITHMETIC ON THE LAST ONE. Setting
+             the address just moved it, and `rev2.revision + 1` is a guess that
+             produces `400 {"detail":"baseRevision"}` the moment the server
+             bumps it by anything other than one. The file header is explicit:
+             read it back immediately before the call. */
+          const rev3 = await currentCartRevision();
+          if (!rev3) {
+            setError({ code: "gone" });
+            return;
+          }
+          const shipping = await setCheckoutShipping(options[0].id, rev3.revision);
+          if (!shipping.ok) {
+            applyError(shipping.error);
+            return;
+          }
+        }
+        await freezeAndReview();
+        return;
+      }
+
       setStep("delivery");
     } finally {
       setBusy(false);
@@ -938,38 +997,40 @@ export function CheckoutFlow() {
         applyError(result.error);
         return;
       }
-      setStep("contact");
+      /* STRAIGHT TO THE TOTAL. This used to hand off to a contact step that
+         asked for an email already collected on step one. */
+      await freezeAndReview();
     } finally {
       setBusy(false);
     }
   }
 
   /**
-   * Freezes the checkout and only then advances to the review step — not a
-   * `useEffect` reacting to `step === "review"`, deliberately. Freezing is a
-   * write with real consequences (it spends the reservation's one extension),
-   * so it happens as a direct result of the contact step's submit rather than
-   * as a side effect of a render the freeze itself also causes.
+   * Freeze the checkout and advance to the review step.
+   *
+   * NOT A `useEffect` REACTING TO `step === "review"`, deliberately. Freezing
+   * is a write with real consequences (it spends the reservation's one
+   * extension), so it happens as a direct result of a submit rather than as a
+   * side effect of a render the freeze itself also causes.
+   *
+   * `redeem` DEFAULTS TO THE CURRENT SELECTION but is passed explicitly by
+   * `reprice`, because state set in the same tick is not readable here — a
+   * shopper moving the points slider on the review step would otherwise
+   * re-freeze against the PREVIOUS number and be quoted a total that does not
+   * match the control they just moved.
    */
-  async function submitContact(e: React.FormEvent) {
-    e.preventDefault();
-    if (!email) {
-      setError({ code: "field", field: "email" });
+  async function freezeAndReview(redeem: number = redeemPoints) {
+    const rev = await currentCartRevision();
+    if (!rev) {
+      setError({ code: "gone" });
       return;
     }
-    setBusy(true);
-    setError(null);
-    try {
-      const rev = await currentCartRevision();
-      if (!rev) {
-        setError({ code: "gone" });
-        return;
-      }
-      const result = await freezeCheckout(rev.revision, redeemPoints);
-      if (!result.ok) {
-        applyError(result.error);
-        return;
-      }
+    const result = await freezeCheckout(rev.revision, redeem);
+    if (!result.ok) {
+      applyError(result.error);
+      return;
+    }
+    {
       setTotals(result.data.totals);
       setCheckoutId(rev.cartId);
       /* Minted here, once, from the id that will not change for the rest of
@@ -979,6 +1040,45 @@ export function CheckoutFlow() {
          doc comment for why the revision has to be part of the key. */
       setIdempotencyKey(`ckout_${rev.cartId}_${rev.revision}`);
       setStep("review");
+    }
+  }
+
+  /**
+   * Re-price the frozen checkout after the shopper changes something on the
+   * review step.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════
+   * THAW, MUTATE, RE-FREEZE — AND ONLY THE CANCEL ROUTE MAKES THIS POSSIBLE.
+   *
+   * Points and discount codes both move the total, and the total on the review
+   * step is FROZEN: the cart is at `converting`, `/checkout/discount` will not
+   * touch it, and a freeze over a freeze is not a repricing. So the sequence is
+   * `cancelCheckout()` to thaw, then the mutation, then a fresh
+   * `freezeCheckout` — which is exactly the journey the cancel route was added
+   * for. Before it existed, a shopper who wanted to spend points had to be
+   * asked BEFORE they could see what the points were worth against, which is
+   * why the widget was buried on a contact step.
+   *
+   * ═══ THE OLD TOTAL IS DROPPED THE INSTANT THE THAW SUCCEEDS ═══
+   * A thaw clears the frozen totals server-side, so what is on screen is
+   * already void. `thawCheckout` nulls them, and this only re-populates them
+   * from a NEW freeze — the review step shows its "working out your total"
+   * state in between rather than a stale figure with a live Pay button over it.
+   *
+   * A `checkout_paid` refusal stops everything: `thawCheckout` raises the
+   * banner and returns false, and re-pricing an order that has been paid for is
+   * the one thing that must never happen here.
+   * ═══════════════════════════════════════════════════════════════════════════
+   */
+  async function reprice(change: { redeem?: number; discount?: () => Promise<boolean> }) {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const thawed = await thawCheckout();
+      if (!thawed) return;
+      if (change.discount && !(await change.discount())) return;
+      await freezeAndReview(change.redeem ?? redeemPoints);
     } finally {
       setBusy(false);
     }
@@ -1140,7 +1240,7 @@ export function CheckoutFlow() {
           Back to cart
         </Link>
 
-        <StepHeader step={step} />
+        <StepHeader step={step} steps={steps} />
         {error && (
           <ErrorBanner
             error={error}
@@ -1184,8 +1284,8 @@ export function CheckoutFlow() {
           />
         )}
 
-        {step === "address" && (
-          <form onSubmit={submitAddress} className="flex flex-col gap-4">
+        {step === "details" && (
+          <form onSubmit={submitDetails} className="flex flex-col gap-4">
             {savedAddresses.length > 0 && (
               <fieldset className="flex flex-col gap-2">
                 <legend className="mb-2 text-sm font-semibold text-foreground">
@@ -1321,14 +1421,60 @@ export function CheckoutFlow() {
               />
             )}
 
+            {/* ═══ THE CONTACT STEP, FOLDED IN ═══
+                This was step three of four, carrying one field — and for a
+                signed-in customer not even that, just their own address read
+                back to them above a Continue button. It belongs with the rest
+                of "who you are and where this is going". */}
+            <div className="border-t border-brand-line pt-4">
+              {checkingSession ? (
+                /* The signed-in box is what usually resolves here, so the wait
+                   is drawn as that box rather than as a sentence — the field
+                   swaps in at the same height when the session comes back a
+                   guest. See `CLAUDE.md`, "Loading states — skeletons, never
+                   prose". */
+                <SkeletonRegion
+                  label="Checking your account"
+                  className="border border-brand-line px-4 py-3"
+                >
+                  <Skeleton className="h-3 w-20" />
+                  <Skeleton className="mt-1.5 h-4 w-48" />
+                </SkeletonRegion>
+              ) : customerEmail ? (
+                <div className="border-2 border-foreground bg-brand-soft px-4 py-3">
+                  <p className="text-xs text-muted-foreground">Signed in as</p>
+                  <p className="text-sm font-semibold text-foreground">{customerEmail}</p>
+                </div>
+              ) : (
+                <Field id="co-email" label="Email" required>
+                  <Input
+                    id="co-email"
+                    type="email"
+                    required
+                    value={guestEmail}
+                    onChange={(e) => setGuestEmail(e.target.value)}
+                    placeholder="you@example.com"
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Your receipt and order access go to this address.
+                  </p>
+                </Field>
+              )}
+            </div>
+
             <Button
               type="submit"
-              disabled={busy || rateLimited}
+              disabled={busy || rateLimited || !email}
               tone="primary"
               className="mt-2 h-12 text-base"
             >
               {busy && <Loader2 aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" />}
-              Continue to delivery
+              {/* NAMES WHERE IT GOES, and where it goes depends on whether
+                  there is a delivery choice to make. A button promising
+                  "Continue to delivery" on a shop with one option was the
+                  clearest possible signal that the step existed for its own
+                  sake. */}
+              {shippingOptions.length > 1 ? "Continue to delivery" : "Continue to payment"}
             </Button>
           </form>
         )}
@@ -1373,55 +1519,7 @@ export function CheckoutFlow() {
               className="mt-2 h-12 text-base"
             >
               {busy && <Loader2 aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" />}
-              Continue to contact
-            </Button>
-          </form>
-        )}
-
-        {step === "contact" && (
-          <form onSubmit={submitContact} className="flex flex-col gap-4">
-            {checkingSession ? (
-              /* The signed-in box is what usually resolves here, so the wait is
-                 drawn as that box rather than as a sentence — the field swaps in
-                 at the same height when the session comes back a guest. See
-                 `CLAUDE.md`, "Loading states — skeletons, never prose". */
-              <SkeletonRegion label="Checking your account" className="border border-brand-line px-4 py-3">
-                <Skeleton className="h-3 w-20" />
-                <Skeleton className="mt-1.5 h-4 w-48" />
-              </SkeletonRegion>
-            ) : customerEmail ? (
-              <div className="border-2 border-foreground bg-brand-soft px-4 py-3">
-                <p className="text-xs text-muted-foreground">Signed in as</p>
-                <p className="text-sm font-semibold text-foreground">{customerEmail}</p>
-              </div>
-            ) : (
-              <Field id="co-email" label="Email" required>
-                <Input
-                  id="co-email"
-                  type="email"
-                  required
-                  value={guestEmail}
-                  onChange={(e) => setGuestEmail(e.target.value)}
-                  placeholder="you@example.com"
-                />
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Your receipt and order access go to this address.
-                </p>
-              </Field>
-            )}
-            <PointsOffer
-              balance={pointsBalance}
-              chosen={redeemPoints}
-              onChange={setRedeemPoints}
-              disabled={busy}
-            />
-            <Button
-              type="submit"
-              disabled={busy || rateLimited || !email}
-              tone="primary"
-              className="mt-2 h-12 text-base"
-            >
-              Continue to review
+              Continue to payment
             </Button>
           </form>
         )}
@@ -1469,7 +1567,7 @@ export function CheckoutFlow() {
                       type="button"
                       onClick={() => {
                         void thawCheckout().then((thawed) => {
-                          if (thawed) setStep("address");
+                          if (thawed) setStep("details");
                         });
                       }}
                       className="shrink-0 text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
@@ -1560,6 +1658,63 @@ export function CheckoutFlow() {
                       {formatNaira(majorUnits(totals.grandTotal))}
                     </span>
                   </div>
+                </div>
+
+                {/* ═══════════════════════════════════════════════════════════
+                    THE TWO THINGS THAT CHANGE THE TOTAL, BESIDE THE TOTAL.
+
+                    Points used to be asked for on a step BEFORE the total
+                    existed — a shopper was invited to spend a balance without
+                    being shown what it came off. Discount codes had nowhere to
+                    go at all. Both belong here, next to the number they move,
+                    and both work the same way: thaw, apply, re-freeze (see
+                    `reprice`). That round trip is only possible because the
+                    cancel route exists.
+
+                    DISABLED WHILE ANYTHING IS IN FLIGHT. Two repricings racing
+                    would resolve in whichever order the network chose and leave
+                    the shopper looking at a total that matches neither control.
+                    ═══════════════════════════════════════════════════════════ */}
+                <div className="flex flex-col gap-4 border-2 border-foreground p-4">
+                  <PointsOffer
+                    balance={pointsBalance}
+                    chosen={redeemPoints}
+                    onChange={(next) => {
+                      setRedeemPoints(next);
+                      void reprice({ redeem: next });
+                    }}
+                    disabled={busy || redirecting}
+                  />
+                  <DiscountCodeField
+                    applied={appliedDiscount}
+                    disabled={busy || redirecting}
+                    onApply={(code) =>
+                      reprice({
+                        discount: async () => {
+                          const result = await applyDiscountCode(code);
+                          if (!result.ok) {
+                            applyError(result.error);
+                            return false;
+                          }
+                          setAppliedDiscount(code);
+                          return true;
+                        },
+                      })
+                    }
+                    onRemove={() =>
+                      reprice({
+                        discount: async () => {
+                          const result = await removeDiscountCode();
+                          if (!result.ok) {
+                            applyError(result.error);
+                            return false;
+                          }
+                          setAppliedDiscount(null);
+                          return true;
+                        },
+                      })
+                    }
+                  />
                 </div>
 
                 <Button
