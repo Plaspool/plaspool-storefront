@@ -39,6 +39,7 @@ import { DiscountCodeField } from "./discount-code-field";
 import { majorUnits } from "../data/cart-api";
 import { useCart } from "../cart/cart-context";
 import {
+  REDEMPTION_ADJUSTMENT_CODE,
   createPaymentIntent,
   currentCartRevision,
   cancelCheckout,
@@ -1679,6 +1680,16 @@ export function CheckoutFlow() {
                   <PointsOffer
                     balance={pointsBalance}
                     chosen={redeemPoints}
+                    /* WHAT THE FREEZE GRANTED, not what was asked for. The
+                       quote is re-decided server-side and can come back empty
+                       on a 200 — the panel's own header lists the ways — so
+                       the widget is handed the answer rather than assuming
+                       its request succeeded. */
+                    granted={
+                      totals.adjustments.find(
+                        (a) => a.code === REDEMPTION_ADJUSTMENT_CODE,
+                      ) ?? null
+                    }
                     onChange={(next) => {
                       setRedeemPoints(next);
                       void reprice({ redeem: next });

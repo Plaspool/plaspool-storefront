@@ -119,6 +119,23 @@ export interface Adjustment {
   amount: ApiMoney;
 }
 
+/**
+ * The adjustment code a points redemption arrives under.
+ *
+ * ═══ MIRRORED FROM THE API, WHICH IS THE ONLY PLACE IT IS DECIDED ═══
+ * `REDEMPTION_ADJUSTMENT_CODE` in the admin's
+ * `server/marketing/redemption/port.ts`. Adjustments are rendered generically
+ * from `adjustment.label` everywhere else in this package — that is the rule,
+ * and this constant is not a way around it. It exists for exactly one question
+ * the checkout has to answer and cannot answer from a label: DID THE FREEZE
+ * GRANT THE POINTS THE SHOPPER ASKED TO SPEND?
+ *
+ * The freeze answers "no" with a 200 and no adjustment at all — see
+ * `PointsOffer`'s header for the several ordinary ways that happens — so the
+ * absence of this code is the only signal a decline gives.
+ */
+export const REDEMPTION_ADJUSTMENT_CODE = "points_redemption";
+
 export interface FrozenTotals {
   currency: string;
   lines: TotalsLine[];
