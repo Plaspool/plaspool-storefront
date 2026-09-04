@@ -145,3 +145,88 @@ describe("a district we don't reach, in a shop that may not ask for districts", 
     );
   });
 });
+
+describe("a checkout refused because the money was already taken", () => {
+  /*
+   * ═══════════════════════════════════════════════════════════════════════════
+   * THE ONE PIECE OF COPY ON THIS SCREEN THAT COULD COST A SECOND CHARGE.
+   *
+   * `checkout_paid` means a capture succeeded and its inline completion did
+   * not — the cart is stuck at `converting` but the card HAS been charged and
+   * an order is being created from it. Before this, the code fell through to
+   * `unknown`, whose body is "Try again." Told to a shopper whose money is
+   * gone, beside a Pay button, that is an instruction to pay twice.
+   *
+   * So this case owes three things the default cannot give it: it must say the
+   * payment worked, it must NOT say "try again", and it must point AWAY from
+   * the basket — the basket is where a second attempt starts.
+   * ═══════════════════════════════════════════════════════════════════════════
+   */
+  it("tells the shopper their payment went through, not that it failed", () => {
+    const copy = errorCopy({ code: "checkout_paid" });
+
+    expect(copy.title).toBe("Your payment went through");
+    expect(copy.body).toBe(
+      "This order is already paid and we're finishing it now. Check your orders for the confirmation — don't pay again.",
+    );
+  });
+
+  it("never tells them to try again, which is what the default would have said", () => {
+    const copy = errorCopy({ code: "checkout_paid" });
+
+    expect(copy.body).not.toMatch(/try again/i);
+    expect(copy.title).not.toMatch(/didn't go through/i);
+  });
+
+  it("never sends them back to the basket, which is where a second charge starts", () => {
+    const copy = errorCopy({ code: "checkout_paid" });
+
+    expect(`${copy.title} ${copy.body}`).not.toMatch(/cart|basket/i);
+  });
+
+  it("is not reachable from the unknown fall-through any more", () => {
+    /* The regression guard proper: if the variant is ever dropped from
+       `CheckoutError`, this stops matching the switch case and inherits the
+       default's wording — which is exactly the bug. */
+    expect(errorCopy({ code: "checkout_paid" })).not.toEqual(
+      errorCopy({ code: "unknown", status: 409, requestId: null }),
+    );
+  });
+});
+
+describe("an address outside the region the shop serves at all", () => {
+  /*
+   * `outside_service_region` is the simple-delivery-mode refusal, and the
+   * admin deliberately gave it a DIFFERENT code from `outside_delivery_area`
+   * because under `simple` there is no district list to name. It was falling
+   * through to `unknown` — "That didn't go through. Try again." — for an
+   * address that will be refused every single time it is retried.
+   */
+  it("says we don't reach there, rather than that something went wrong", () => {
+    const copy = errorCopy({ code: "outside_service_region" });
+
+    expect(copy.title).toBe("We don't deliver to that area yet");
+    expect(copy.body).toBe(
+      "We don't reach that part of the country yet. Try a different delivery address, or contact us and we'll see what we can do.",
+    );
+  });
+
+  it("never names a district, because this mode never showed one", () => {
+    expect(errorCopy({ code: "outside_service_region" }).body).not.toMatch(/district/i);
+    expect(errorCopy({ code: "outside_service_region" }, "simple").body).not.toMatch(/district/i);
+  });
+
+  it("never says try again, because retrying the same address cannot work", () => {
+    expect(errorCopy({ code: "outside_service_region" }).body).not.toMatch(/try again/i);
+  });
+
+  it("stays distinct from outside_delivery_area, which is a different refusal", () => {
+    /* Same shape of problem, different cause: one is a district switched off,
+       the other is a region the shop does not serve. Collapsing them would
+       tell a `simple`-mode shopper to change a district they were never
+       shown. */
+    expect(errorCopy({ code: "outside_service_region" })).not.toEqual(
+      errorCopy({ code: "outside_delivery_area" }, "simple"),
+    );
+  });
+});

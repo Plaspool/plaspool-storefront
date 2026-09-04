@@ -171,6 +171,39 @@ export type CheckoutError =
   | { code: "insufficient_stock"; shortfalls: Shortfall[] }
   | { code: "no_shipping_address" }
   | { code: "outside_delivery_area" }
+  /**
+   * The shop does not serve that part of the country AT ALL — the refusal
+   * `simple` address mode produces, and a DIFFERENT code from
+   * `outside_delivery_area` on purpose.
+   *
+   * The admin split the two because under `simple` there is no district list
+   * to name, so the older code's copy ("pick a different district") is an
+   * instruction the shopper cannot follow — they were never shown a picker.
+   * Collapsing them here would put those words back on the screen.
+   *
+   * It fell through to `unknown` until now, which told a shopper to "try
+   * again" for an address that will be refused identically every time.
+   */
+  | { code: "outside_service_region" }
+  /**
+   * The checkout was ALREADY PAID, and the cart is refusing to reopen.
+   *
+   * ═══ THE ONE REFUSAL HERE THAT MUST NEVER READ AS A FAILURE ═══
+   * A capture whose inline completion failed leaves a genuinely paid cart at
+   * `converting`, indistinguishable from one merely stuck there. The API
+   * refuses to thaw it, and it is RIGHT to: reopening and re-freezing would
+   * build the order from numbers the customer was never charged.
+   *
+   * This fell past both `precondition_failed` branches to `unknown`, whose
+   * copy is "That didn't go through. Try again." — said to somebody whose
+   * card HAS been charged, beside a control that invites them to charge it
+   * again. It is the `checkout_start` fall-through this branch's own comment
+   * describes, with money on the other end of it.
+   *
+   * Its copy must send the shopper to their ORDER, never back to the basket,
+   * and must never offer a retry. See `errorCopy`.
+   */
+  | { code: "checkout_paid" }
   | { code: "unresolved_lines"; variantIds: string[] }
   | { code: "currency_mismatch" }
   | { code: "gone" }
@@ -220,6 +253,13 @@ function classify(status: number, body: Record<string, unknown> | null): Checkou
   if (errorCode === "outside_delivery_area" || detail === "outside_delivery_area") {
     return { code: "outside_delivery_area" };
   }
+  /* The `simple`-mode sibling of the refusal above, kept SEPARATE because the
+     admin deliberately gave it its own code — there is no district list to
+     name in that mode, so it cannot inherit copy that names one. Both
+     spellings accepted, for the same reason the branch above accepts two. */
+  if (errorCode === "outside_service_region" || detail === "outside_service_region") {
+    return { code: "outside_service_region" };
+  }
   if (status === 400 && detail && ["email", "shipping", "optionId"].includes(detail)) {
     return { code: "field", field: detail };
   }
@@ -254,6 +294,15 @@ function classify(status: number, body: Record<string, unknown> | null): Checkou
      */
     const reason =
       typeof body?.reason === "string" ? body.reason : (body?.operation as string | undefined);
+    /* ═══ READ FIRST, BECAUSE IT IS THE ONLY ONE THAT COSTS MONEY TO GET
+       WRONG ═══
+       Ordered ahead of its neighbours deliberately. The others are all
+       "you cannot proceed"; this one is "you already did, and it worked". A
+       future edit that adds a broader match above it would turn a paid
+       checkout back into a retry prompt, so it sits where nothing can shadow
+       it. Same `reason`-then-`operation` read as everything else in this
+       branch — see the comment above on why both spellings stay accepted. */
+    if (reason === "checkout_paid") return { code: "checkout_paid" };
     if (reason === "no_shipping_address") return { code: "no_shipping_address" };
     /* `checkout_start` IS an empty cart: that route's only other refusal is
        `insufficient_stock`, matched above. */
@@ -343,6 +392,81 @@ export function freezeCheckout(
     body: JSON.stringify(
       redeemPoints && redeemPoints > 0 ? { baseRevision, redeemPoints } : { baseRevision },
     ),
+  });
+}
+
+/** The cart as the cancel route hands it back — reopened, and with the frozen
+ *  totals already discarded. `status` is `"open"` on success. */
+export interface ReopenedCart {
+  id: string;
+  status: string;
+  revision: number;
+  currency: string;
+}
+
+/**
+ * Thaw a frozen checkout: `converting -> open`, cancelling the pending payment
+ * intent and CLEARING the frozen totals.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THIS IS THE CALL THAT MAKES ABANDONING THE PAYMENT PAGE SURVIVABLE.
+ *
+ * A cart that reached `converting` could never go back. A shopper who was sent
+ * to Paystack and did not pay — declined card, closed tab, changed their mind
+ * about the address — got `409 precondition_failed` from every later address
+ * or shipping edit, FOREVER, and the cart cookie kept resolving to the same
+ * dead basket. The flow `idempotencyKey` describes ("abandons the review step,
+ * comes back, changes the delivery option and re-freezes at a different
+ * total") was written for an API that could not perform it.
+ *
+ * ═══ SAFE TO OVER-CALL, UNSAFE TO CALL BLINDLY ═══
+ * Idempotent: an already-open cart answers 200 and writes nothing, so firing
+ * it from several handlers costs nothing. But a cart that was actually PAID
+ * refuses with `checkout_paid`, and that refusal must be surfaced rather than
+ * swallowed — see the variant's own comment. Callers that cannot show an
+ * error (an unload beacon) must still not be written as if the refusal cannot
+ * happen; they simply are not the ones who report it.
+ *
+ * ═══ AFTER THIS, THERE ARE NO TOTALS ═══
+ * `GET /checkout/totals` and `POST /payments/intents` both 404 until
+ * `freezeCheckout` runs again. That is fail-closed and deliberate: it stops a
+ * stale total being charged against an address that has since changed. Any
+ * `FrozenTotals` still held in component state after a thaw is a number on
+ * screen that nothing will honour, and must be dropped rather than reused.
+ *
+ * `baseRevision` IS OPTIONAL HERE, unlike every other write in this file. The
+ * highest-value call sites (a bfcache restore, a tab closing) have no chance
+ * to read a fresh revision first, and a guard they cannot satisfy would just
+ * mean not calling at all. Pass one when there is one to pass; omitting it
+ * only forgoes the `stale_write` check.
+ *
+ * Rate limit: 10 per cart per 15 minutes, on its OWN bucket — it does not
+ * spend the `/checkout/start` allowance.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function cancelCheckout(
+  baseRevision?: number,
+  /**
+   * `keepalive` LETS THIS OUTLIVE THE DOCUMENT, which is the only reason the
+   * "closed the tab" case can be covered at all — an ordinary fetch is
+   * cancelled with the page that started it.
+   *
+   * Not `sendBeacon`, deliberately. The commerce API is CROSS-ORIGIN and this
+   * call is worthless without the cart cookie; a beacon posting JSON
+   * cross-origin needs a preflight and gives no control over credentials
+   * mode, whereas `fetch` carries this module's `credentials: "include"`
+   * unchanged and negotiates CORS the same way every other call here does.
+   */
+  init?: { keepalive?: boolean },
+): Promise<CheckoutResult<{ cart: ReopenedCart }>> {
+  return request("/checkout/cancel", {
+    method: "POST",
+    keepalive: init?.keepalive,
+    /* `undefined` rather than `{}` when there is nothing to send: `request()`
+       sets the JSON content-type only when there IS a body, so an empty object
+       would declare a content-type for no content. Compared against
+       `undefined` and not falsily — revision 0 is a real revision. */
+    body: baseRevision === undefined ? undefined : JSON.stringify({ baseRevision }),
   });
 }
 
