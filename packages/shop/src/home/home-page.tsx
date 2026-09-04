@@ -25,8 +25,21 @@ import { BlogStrip } from "./blog-strip";
  * the page is composed so that any of them dropping out leaves a shorter page
  * rather than a gap.
  *
- * REWARDS SITS AFTER `BulkPromo`, which is the second money conversation on the
- * page: buying by the box, then what happens to the empties.
+ * ═══ REWARDS SITS ABOVE `WhyShop`, NOT AFTER `BulkPromo` ═══
+ * It used to close the money conversation — buy by the box, then what happens
+ * to the empties — which put the one section on this page that is unique to
+ * PlaSpool sixth, below three claims any filament shop could make. Sending
+ * empty spools back for points is the thing a shopper cannot get elsewhere, so
+ * it now comes straight off the featured products, while they are still
+ * looking at spools, and `WhyShop` follows as the supporting argument it
+ * always was.
+ *
+ * IT IS ALSO PAINTED NOW, which is what makes the order safe. `RewardsBand`
+ * and `BulkPromo` are both `bg-brand` bands, and `WhyShop` sitting between
+ * them is what keeps the page from ending on two purples with no seam — the
+ * fault the marketing landing page's CTA comment describes from the other
+ * side. Reordering these three again means checking that no two painted
+ * sections end up adjacent.
  */
 
 export const storeHomeMetadata: Metadata = {
@@ -47,9 +60,9 @@ export async function StoreHomePage() {
       <HeroCarousel primary={primary} />
       <CategoryTiles />
       <FeaturedProducts />
+      <RewardsBand />
       <WhyShop />
       <BulkPromo />
-      <RewardsBand />
       <BlogStrip />
     </>
   );
