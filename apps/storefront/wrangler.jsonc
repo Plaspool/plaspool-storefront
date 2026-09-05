@@ -91,24 +91,27 @@
        * plaspool.com, with `stale-while-revalidate` holding them there for up
        * to 30 days.
        *
-       * Create them once, then paste the ids Wrangler prints in place of the
-       * placeholders below:
+       * Created with, and note the `--env dev` and the working directory —
+       * there is no Wrangler config at the repository root, so running these
+       * from there reports "No environment found in configuration with name
+       * dev" and then creates the namespace in the wrong place:
        *
+       *   cd apps/storefront
        *   npx wrangler kv namespace create NEXT_INC_CACHE_KV --env dev
        *   npx wrangler kv namespace create NEXT_TAG_CACHE_KV --env dev
        *
-       * A deploy WILL fail while these placeholders are here. That is
-       * deliberate — a loud failure is the correct outcome for a cache binding
-       * nobody has created yet, and far better than the silent no-op above.
+       * Wrangler titles them `dev-NEXT_INC_CACHE_KV` and `dev-NEXT_TAG_CACHE_KV`
+       * in the dashboard, which is how to tell them apart from production's at
+       * a glance.
        */
       "kv_namespaces": [
         {
           "binding": "NEXT_INC_CACHE_KV",
-          "id": "REPLACE_WITH_DEV_NEXT_INC_CACHE_KV_ID"
+          "id": "b18ec42ebde0488dbf9881e627d409d8"
         },
         {
           "binding": "NEXT_TAG_CACHE_KV",
-          "id": "REPLACE_WITH_DEV_NEXT_TAG_CACHE_KV_ID"
+          "id": "988206958ebe4e478f2af24a1cddec66"
         }
       ],
       /*
