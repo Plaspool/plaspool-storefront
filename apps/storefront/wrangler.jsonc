@@ -80,6 +80,29 @@
     "dev": {
       "name": "plaspool-storefront-dev",
       /*
+       * The hostname, declared here rather than clicked into the dashboard so
+       * that what serves `dev.plaspool.com` is recorded in the repository.
+       *
+       * `custom_domain: true` is the difference between a route and a domain.
+       * A plain route pattern attaches this Worker to a hostname the zone
+       * already resolves; a custom domain makes Cloudflare CREATE the DNS
+       * record and issue the certificate for it. `dev.plaspool.com` does not
+       * exist yet, so it has to be the latter — a route alone would deploy
+       * cleanly and then answer nothing, because nothing resolves.
+       *
+       * ⚠  PRODUCTION IS DELIBERATELY NOT DECLARED THE SAME WAY. `plaspool.com`
+       * is already attached to the production Worker and is serving; adding it
+       * here would hand Wrangler ownership of a live hostname's DNS and
+       * certificate on the next deploy, which is not a change to make from a
+       * config edit nobody is watching. Leave it where it is.
+       */
+      "routes": [
+        {
+          "pattern": "dev.plaspool.com",
+          "custom_domain": true
+        }
+      ],
+      /*
        * ⚠  ITS OWN NAMESPACES, AND THIS IS THE ONE THING HERE THAT CAN DAMAGE
        * PRODUCTION.
        *
