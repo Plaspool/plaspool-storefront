@@ -7,8 +7,32 @@
  *        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_...
  *        CLERK_SECRET_KEY=sk_live_...
  *
- *   2. node scripts/set-clerk-keys.mjs            # do it, stop before committing
- *      node scripts/set-clerk-keys.mjs --push     # ...and commit + push
+ *   2. node scripts/set-clerk-keys.mjs               # the PRODUCTION Worker
+ *      node scripts/set-clerk-keys.mjs --env dev     # dev.plaspool.com's Worker
+ *      node scripts/set-clerk-keys.mjs --push        # ...and commit + push
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ⚠  A SECRET BELONGS TO ONE WORKER. RUN THIS ONCE PER ENVIRONMENT.
+ *
+ * `wrangler.jsonc` gives the development environment its own Worker —
+ * `plaspool-storefront-dev` — and a Cloudflare secret is scoped to the Worker
+ * it was set on. It is NOT inherited the way `main` and `compatibility_date`
+ * are. The config file already warns that `kv_namespaces`, `services` and
+ * `vars` are not inherited; secrets are the same and are easier to miss,
+ * because nothing in the repository lists them.
+ *
+ * WHAT THAT OMISSION LOOKS LIKE, having cost an evening once: sign-in on
+ * `dev.plaspool.com` answers `501 {"error":"not_implemented"}` from
+ * `/api/auth/bridge` and nothing else is wrong. The site renders, Clerk signs
+ * the shopper in, and the browser then reports `session_exists` on the next
+ * attempt because the Clerk session is real and only the SHOP session is
+ * missing. `apps/storefront/lib/auth/config.ts` explains why that 501 is the
+ * correct report of a missing key rather than a crash.
+ *
+ * BOTH ENVIRONMENTS SHARE ONE CLERK INSTANCE (`clerk.plaspool.com`), so it is
+ * the SAME `sk_live_…` on both Workers — there is no second key to fetch. Run
+ * the command twice, once with `--env dev`.
+ * ═══════════════════════════════════════════════════════════════════════════
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * THE TWO KEYS ARE NOT THE SAME KIND OF THING, AND THIS IS THE WHOLE POINT.
@@ -52,6 +76,41 @@ const die = (m) => {
   console.error(`\n  ✖ ${m}\n`);
   process.exit(1);
 };
+
+/**
+ * Which Wrangler environment the SECRET is uploaded to. Absent means the
+ * production Worker — the top-level `name` in `wrangler.jsonc`, and the
+ * behaviour this script has always had.
+ *
+ * NOT VALIDATED AGAINST A LIST HERE, deliberately. Wrangler already checks the
+ * name against the config and says `No environment found in configuration with
+ * name <x>`, which is a better error than anything this script could invent and
+ * cannot go stale when an environment is added. All that is checked is that a
+ * value was actually supplied — `--env` with nothing after it would otherwise
+ * be handed to wrangler as a missing argument and fail somewhere less obvious.
+ *
+ * ⚠  AFFECTS THE SECRET ONLY. The publishable key is a single committed
+ * constant in `lib/auth/publishable.ts` serving BOTH deployments, so steps 1
+ * and 3 below do the same work whichever environment is named — which is
+ * correct, and is why `--env dev` is safe to run on a clean tree.
+ */
+function wranglerEnv() {
+  const i = process.argv.findIndex((a) => a === '--env' || a.startsWith('--env='));
+  if (i === -1) return null;
+
+  const value = process.argv[i].startsWith('--env=')
+    ? process.argv[i].slice('--env='.length)
+    : process.argv[i + 1];
+
+  if (!value || value.startsWith('--')) {
+    die('`--env` needs a value, e.g. `--env dev`. Omit it entirely for production.');
+  }
+  return value;
+}
+
+const WRANGLER_ENV = wranglerEnv();
+/* Spread into every wrangler invocation; empty for production. */
+const ENV_ARGS = WRANGLER_ENV ? ['--env', WRANGLER_ENV] : [];
 
 if (!existsSync(ENV_FILE)) {
   die(
@@ -139,6 +198,7 @@ if (sk) {
 console.log(`
   Clerk instance : ${host}
   Mode           : ${mode}
+  Worker         : ${WRANGLER_ENV ? `plaspool-storefront (env "${WRANGLER_ENV}")` : 'plaspool-storefront (production)'}
 `);
 
 /* ── 1. Publishable key → committed source ───────────────────────────────── */
@@ -205,8 +265,8 @@ if (sk && !skipSecret) {
    * so this script stays correct if the deployment model ever changes back.
    */
   const attempts = [
-    ['versions', 'secret', 'put', 'CLERK_SECRET_KEY'],
-    ['secret', 'put', 'CLERK_SECRET_KEY'],
+    ['versions', 'secret', 'put', 'CLERK_SECRET_KEY', ...ENV_ARGS],
+    ['secret', 'put', 'CLERK_SECRET_KEY', ...ENV_ARGS],
   ];
 
   let ok = false;
@@ -228,11 +288,11 @@ if (sk && !skipSecret) {
        * Cloudflare never returns secret values, and this must never print one.
        */
       try {
-        const listed = execFileSync('npx', ['wrangler', 'versions', 'secret', 'list'], {
-          cwd: APP,
-          encoding: 'utf8',
-          shell: true,
-        });
+        const listed = execFileSync(
+          'npx',
+          ['wrangler', 'versions', 'secret', 'list', ...ENV_ARGS],
+          { cwd: APP, encoding: 'utf8', shell: true },
+        );
         /*
          * NOT LISTED IS THE EXPECTED ANSWER HERE, and calling it a warning was
          * misleading. `versions secret list` reports the secrets on the
@@ -240,12 +300,36 @@ if (sk && !skipSecret) {
          * — that is the whole reason it is the command this Worker needs — so a
          * freshly uploaded secret is absent from that list until the next
          * Workers Builds deploy carries it forward.
+         *
+         * ⚠  BUT "EXPECTED" IS NOT THE SAME AS "DONE", AND THE OLD ONE-LINER
+         * READ AS IF IT WERE. The key is sitting on a version nothing is
+         * serving; every request still runs the previously deployed one, where
+         * `CLERK_SECRET_KEY` is absent and `/api/auth/bridge` answers
+         * `501 not_implemented`. On production that resolves itself, because
+         * merging to `master` deploys within the hour. On the DEVELOPMENT
+         * Worker it does not: `develop` can sit untouched for days, so the
+         * secret waits on an undeployed version and sign-in stays broken with
+         * a green build, a green deploy and a successful run of this script.
+         *
+         * That is exactly what happened — `wrangler versions list --env dev`
+         * showed `Add variable: CLERK_SECRET_KEY` on a version created hours
+         * after the one actually serving traffic. So say what makes it live.
          */
-        console.log(
-          listed.includes('CLERK_SECRET_KEY')
-            ? '  ✔ Cloudflare lists CLERK_SECRET_KEY on the deployed version'
-            : '  · Not on the DEPLOYED version yet — expected; the next deploy carries it',
-        );
+        if (listed.includes('CLERK_SECRET_KEY')) {
+          console.log('  ✔ Cloudflare lists CLERK_SECRET_KEY on the deployed version');
+        } else {
+          const envFlag = ENV_ARGS.join(' ');
+          console.log(
+            '  · Uploaded, but NOT on the version currently serving traffic.\n' +
+              '    Until a deploy carries it forward, sign-in still answers 501.\n' +
+              '    Ship the next build, or promote the version holding it now:\n\n' +
+              `      cd apps/storefront\n` +
+              `      npx wrangler versions list ${envFlag}`.trimEnd() +
+              '\n' +
+              `      npx wrangler versions deploy <id-of-"Add variable: CLERK_SECRET_KEY"> ${envFlag}`.trimEnd() +
+              '\n',
+          );
+        }
       } catch {
         /* Non-fatal: the upload above succeeded, this is only corroboration. */
       }
@@ -274,6 +358,16 @@ if (sk && !skipSecret) {
 }
 
 /* ── 3. Prove the publishable key actually reaches the bundle ────────────── */
+/*
+ * ALWAYS THE DEFAULT (PRODUCTION) BUILD, EVEN UNDER `--env dev`, and that is
+ * not an oversight. What this step checks is that the committed publishable key
+ * survives compilation, and that key is one constant serving both deployments —
+ * so a development-target build would prove exactly the same thing while
+ * leaving a development-target `.open-next/` on disk. `deploy-dev.mjs` has the
+ * long note on why a stale build directory is the hazard here: `wrangler deploy`
+ * ships whatever is already in it, so the wrong one lying around is how
+ * `dev.plaspool.com` config reaches production.
+ */
 console.log('\n  Building — this is the check that was missing last time.\n');
 execFileSync('npm', ['run', 'build'], { cwd: ROOT, stdio: 'inherit', shell: true });
 
