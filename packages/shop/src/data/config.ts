@@ -1,4 +1,4 @@
-import { ENV } from "@plaspool/brand/environment";
+import { commerceApiBase } from "@plaspool/brand/environment";
 
 /*
  * `SHOW_FIXTURE_REVIEWS` USED TO LIVE HERE AND IS DELETED.
@@ -51,7 +51,20 @@ import { ENV } from "@plaspool/brand/environment";
  * anywhere naming CORS as the cause.
  * ═══════════════════════════════════════════════════════════════════════════
  */
-export const COMMERCE_API_BASE = ENV.api;
+/**
+ * ⚠  RESOLVED FROM THE HOSTNAME IN THE BROWSER, from the build on the server.
+ *
+ * See the long note at the foot of `packages/brand/src/environment.ts`. The
+ * short version: every call made through this constant from the browser carries
+ * credentials, and a build-time value that inlined wrongly once already sent
+ * `dev.plaspool.com`'s cart to the production API without erroring. The page
+ * knows what host it is on; that answer cannot drift from reality the way an
+ * inlined literal can.
+ *
+ * Server-side there is no `window`, so this is the build's answer — which is
+ * also the only answer available while prerendering.
+ */
+export const COMMERCE_API_BASE = commerceApiBase();
 
 /**
  * Catalogue cache windows, matching the blog's two-tier shape next door

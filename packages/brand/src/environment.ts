@@ -132,14 +132,51 @@ const DEVELOPMENT_BRANCH = "develop";
  * ═══════════════════════════════════════════════════════════════════════════
  */
 export function resolveTarget(env: Record<string, string | undefined> = process.env): Target {
-  const explicit = env.PLASPOOL_TARGET;
+  const explicit = env.NEXT_PUBLIC_PLASPOOL_TARGET;
   if (explicit === "production" || explicit === "development") return explicit;
 
   return env.WORKERS_CI_BRANCH === DEVELOPMENT_BRANCH ? "development" : "production";
 }
 
+/**
+ * ⚠  WRITTEN OUT AS A LITERAL `process.env.NEXT_PUBLIC_…` EXPRESSION, AND IT
+ *    MUST STAY THAT WAY. THIS LINE IS THE ENTIRE CLIENT-SIDE MECHANISM.
+ *
+ * A bundler inlines an environment variable by TEXTUALLY replacing the exact
+ * source `process.env.NEXT_PUBLIC_PLASPOOL_TARGET` with a string literal before
+ * the code ever runs. It cannot see through a function call, a destructure or a
+ * parameter default.
+ *
+ * ═══ THIS SHIPPED BROKEN ONCE, EXACTLY HERE ═══
+ * `TARGET` used to be `resolveTarget()`, which reads `env.PLASPOOL_TARGET` off a
+ * parameter defaulting to `process.env`. The literal text therefore never
+ * appeared in the source, nothing was inlined, and the browser ran the real
+ * function against its own `process.env` shim — which carries ONLY
+ * `NEXT_PUBLIC_*` — got `undefined` for both variables and fell to
+ * `"production"`. The compiled chunk read:
+ *
+ *   function(e=t.default.env){let r=e.PLASPOOL_TARGET; …return"production"}
+ *
+ * So `dev.plaspool.com` rendered the development catalogue server-side and then
+ * had the shopper's own browser call `admin.plaspool.com/api/shop/customer/me`.
+ * The server and the client disagreed about which shop they were — the precise
+ * failure the header above describes, delivered by the code written to prevent
+ * it. Caught only by opening DevTools and reading a request URL.
+ *
+ * THE `NEXT_PUBLIC_` PREFIX IS ALSO LOAD-BEARING, and a previous note here
+ * claimed the opposite. Next's `env` config key inlines under webpack; this app
+ * builds with TURBOPACK, where `NEXT_PUBLIC_` is the guaranteed path. Nobody
+ * sets this variable by hand — `next.config.ts` assigns it from the branch
+ * before compilation — so the prefix documents its reach, not its origin.
+ *
+ * `resolveTarget()` is kept for the server, for tests, and as the fallback when
+ * nothing was inlined; it is no longer what the browser depends on.
+ */
+const INLINED = process.env.NEXT_PUBLIC_PLASPOOL_TARGET;
+
 /** The resolved target for this build. */
-export const TARGET: Target = resolveTarget();
+export const TARGET: Target =
+  INLINED === "production" || INLINED === "development" ? INLINED : resolveTarget();
 
 /** Every host and flag this build should be using. */
 export const ENV: Environment = ENVIRONMENTS[TARGET];
@@ -150,3 +187,67 @@ export const ENV: Environment = ENVIRONMENTS[TARGET];
  * the wrong admin origin blocks every credentialed call the cart makes.
  */
 export { ENVIRONMENTS };
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE BROWSER'S CROSS-CHECK: WHICH DEPLOYMENT IS THIS PAGE ACTUALLY ON?
+ *
+ * Everything above is decided at BUILD time, which is unavoidable — a page
+ * prerendered into HTML (`/store`, `/store/all`, `/robots.txt`) is rendered on a
+ * machine with no request and no hostname, so the table is the only answer
+ * available. That part is correct and stays.
+ *
+ * But it means the whole arrangement rests on the bundler having inlined a
+ * literal, AND THAT ASSUMPTION FAILED ONCE ALREADY — silently, in the direction
+ * that matters most. `dev.plaspool.com` served the development catalogue and
+ * then had the shopper's own browser POST their cart to the PRODUCTION API.
+ * Nothing errored; it took reading a request URL in DevTools to find.
+ *
+ * A hostname cannot be wrong in that way. The page is being served FROM a host;
+ * asking which one is not a derivation that can drift from reality, it IS
+ * reality. So in the browser the host decides, and the build-time answer is
+ * only the fallback.
+ *
+ * ⚠  WHAT THIS DELIBERATELY DOES NOT COVER, AND WHY THAT IS FINE.
+ * Only the COMMERCE API is resolved this way, because only the commerce API is
+ * called from the browser with credentials — the cart, the session exchange,
+ * the account, checkout. `site_domain` is NOT: it reaches `layout.tsx`'s
+ * metadata and JSON-LD, which are server-rendered into the HTML, and a value
+ * that disagreed between server and client there would be a hydration mismatch
+ * rather than a fix. The blog API is server-only for the same reason it needs
+ * nothing here.
+ *
+ * ⚠  AN UNKNOWN HOST FALLS BACK TO THE BUILD, IT DOES NOT GUESS. A preview on
+ * `*.workers.dev`, a future hostname nobody added here, `localhost` — all of
+ * them keep whatever the build decided. Mapping an unknown host to production
+ * "because most hosts are" would be exactly the silent wrong answer this exists
+ * to remove.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+const HOSTS: Readonly<Record<string, Target>> = {
+  "plaspool.com": "production",
+  /* Redirected to the apex in production, but it costs nothing to be right
+     during the hop, and a redirect that ever stops firing should not silently
+     change which API the page talks to. */
+  "www.plaspool.com": "production",
+  "dev.plaspool.com": "development",
+};
+
+/**
+ * The commerce API for a given hostname, or the build's answer when the host is
+ * not one this app knows it is served on.
+ *
+ * Split from `commerceApiBase()` so it is testable: the suite runs in Node with
+ * no `window`, and a parameter is safe here in a way it was NOT safe for
+ * `TARGET` — this is resolved at RUNTIME, so nothing needs a bundler to
+ * statically replace it.
+ */
+export function apiBaseForHost(hostname: string | null | undefined): string {
+  const target = hostname ? HOSTS[hostname] : undefined;
+  return target ? ENVIRONMENTS[target].api : ENV.api;
+}
+
+/** The commerce API this page should be talking to. */
+export function commerceApiBase(): string {
+  return apiBaseForHost(typeof window === "undefined" ? null : window.location.hostname);
+}

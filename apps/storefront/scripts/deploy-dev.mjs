@@ -62,7 +62,7 @@ function run(step, args) {
      * hazard — it would silently bake development hosts into the NEXT
      * production build run from that same window, with nothing to see.
      */
-    env: { ...process.env, PLASPOOL_TARGET: TARGET },
+    env: { ...process.env, NEXT_PUBLIC_PLASPOOL_TARGET: TARGET },
   });
 
   if (result.error) {

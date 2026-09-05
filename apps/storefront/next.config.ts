@@ -3,13 +3,30 @@ import { ENVIRONMENTS, resolveTarget } from "@plaspool/brand/environment";
 
 /**
  * WHICH DEPLOYMENT THIS BUILD IS. Resolved exactly once, here, in Node — where
- * `WORKERS_CI_BRANCH` is visible — and handed to the rest of the app through
- * the `env` key below. `packages/brand/src/environment.ts` carries the full
+ * `WORKERS_CI_BRANCH` is visible — and handed to the rest of the app by the
+ * assignment below. `packages/brand/src/environment.ts` carries the full
  * argument for why it is derived rather than written down, and for why the
  * client must be told the answer instead of computing it.
  */
 const TARGET = resolveTarget();
 const ENV = ENVIRONMENTS[TARGET];
+
+/**
+ * ⚠  ASSIGNED BEFORE THE BUILD READS IT. THIS IS WHAT REACHES THE BROWSER.
+ *
+ * `next.config.ts` is evaluated in Node before compilation starts, so mutating
+ * `process.env` here is visible to the bundler when it inlines
+ * `NEXT_PUBLIC_*` — which is how `packages/brand/src/environment.ts` gets a
+ * literal instead of a lookup. Setting it here rather than in the environment
+ * keeps the promise that nobody configures this: the branch decides, and this
+ * line carries the decision across the server/client boundary.
+ *
+ * DO NOT REPLACE THIS WITH THE `env` CONFIG KEY. That is what was here first,
+ * and it does not inline into the client bundle under Turbopack — which this
+ * app builds with. The result was a development site whose browser called the
+ * production API; the long note in `environment.ts` has the compiled evidence.
+ */
+process.env.NEXT_PUBLIC_PLASPOOL_TARGET = TARGET;
 
 /**
  * Third-party origins the storefront actually talks to. Named here rather than
@@ -168,26 +185,6 @@ const SECURITY_HEADERS = [
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@plaspool/ui", "@plaspool/brand", "@plaspool/web", "@plaspool/blog", "@plaspool/shop"],
-  /**
-   * ⚠  THIS IS WHAT STOPS THE BROWSER DISAGREEING WITH THE SERVER, AND IT IS
-   * NOT OPTIONAL.
-   *
-   * `WORKERS_CI_BRANCH` exists only in Node during the build. Next replaces
-   * every non-`NEXT_PUBLIC_` `process.env.X` in CLIENT code with `undefined`,
-   * so a browser resolving the target for itself would always conclude
-   * `production` — and `cart-api.ts` runs in the browser. A development build
-   * would render the development catalogue server-side and then post the
-   * shopper's cart to the PRODUCTION API.
-   *
-   * The `env` key inlines a literal into both bundles, so the client is TOLD
-   * the answer rather than deriving it. `resolveTarget()` reads this back and
-   * prefers it over the branch for exactly that reason.
-   *
-   * NOT `NEXT_PUBLIC_`-prefixed on purpose: the `env` key inlines it into the
-   * client bundle regardless, and the prefix would wrongly imply it is
-   * something an operator sets in a dashboard. Nobody sets this.
-   */
-  env: { PLASPOOL_TARGET: TARGET },
   experimental: {
     // Barrel-export packages pulled in wholesale via transpilePackages inflate
     // First Load JS on every route that imports from them; this makes Next

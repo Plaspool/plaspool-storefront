@@ -1,6 +1,8 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
-import { ENVIRONMENTS, resolveTarget, type Target } from "./environment";
+import { apiBaseForHost, ENV, ENVIRONMENTS, resolveTarget, type Target } from "./environment";
 
 /**
  * The environment switch, which decides which database the shop talks to.
@@ -53,7 +55,7 @@ describe("resolveTarget — the default direction", () => {
 
 describe("resolveTarget — the client/server boundary", () => {
   /*
-   * `PLASPOOL_TARGET` is what `next.config.ts` inlines into BOTH bundles so the
+   * `NEXT_PUBLIC_PLASPOOL_TARGET` is what `next.config.ts` inlines into BOTH bundles so the
    * browser is told the answer rather than deriving it. The branch variable
    * does not exist in the browser, so if it were read first the client would
    * always resolve to production — and `cart-api.ts` runs in the browser. See
@@ -61,13 +63,13 @@ describe("resolveTarget — the client/server boundary", () => {
    */
   it("prefers the inlined target over the branch", () => {
     expect(
-      resolveTarget({ PLASPOOL_TARGET: "development", WORKERS_CI_BRANCH: "master" }),
+      resolveTarget({ NEXT_PUBLIC_PLASPOOL_TARGET: "development", WORKERS_CI_BRANCH: "master" }),
     ).toBe("development");
   });
 
   it("lets the inlined target pin production even on develop", () => {
     expect(
-      resolveTarget({ PLASPOOL_TARGET: "production", WORKERS_CI_BRANCH: "develop" }),
+      resolveTarget({ NEXT_PUBLIC_PLASPOOL_TARGET: "production", WORKERS_CI_BRANCH: "develop" }),
     ).toBe("production");
   });
 
@@ -79,8 +81,98 @@ describe("resolveTarget — the client/server boundary", () => {
    */
   it("ignores an unrecognised inlined value and falls back to the branch", () => {
     expect(
-      resolveTarget({ PLASPOOL_TARGET: "staging", WORKERS_CI_BRANCH: "develop" }),
+      resolveTarget({ NEXT_PUBLIC_PLASPOOL_TARGET: "staging", WORKERS_CI_BRANCH: "develop" }),
     ).toBe("development");
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE SOURCE-TEXT GUARD, BECAUSE THE BUG THIS CATCHES IS INVISIBLE TO EVERY
+ * BEHAVIOURAL TEST ABOVE.
+ *
+ * `resolveTarget()` was correct the whole time it was broken. Every assertion
+ * in this file passed while `dev.plaspool.com` was calling the PRODUCTION API
+ * from the browser, because the defect was not in the logic — it was that the
+ * logic ran at all. A bundler inlines by replacing the exact source text
+ * `process.env.NEXT_PUBLIC_PLASPOOL_TARGET`; route the read through a function
+ * parameter and there is nothing to replace, so the client shipped a live
+ * lookup against a `process.env` shim that only carries `NEXT_PUBLIC_*`, got
+ * `undefined`, and fell to production.
+ *
+ * A unit test cannot see that. It calls the function directly and passes an
+ * object, which is precisely the shape that defeats the bundler. So this reads
+ * the FILE, and asserts the one line that has to survive refactoring.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+describe("the inlined literal", () => {
+  const source = readFileSync(new URL("./environment.ts", import.meta.url), "utf8");
+
+  it("reads process.env.NEXT_PUBLIC_PLASPOOL_TARGET as literal source text", () => {
+    expect(source).toContain("process.env.NEXT_PUBLIC_PLASPOOL_TARGET");
+  });
+
+  /*
+   * `TARGET` must not be a bare `resolveTarget()` call. That was the shipped
+   * bug: correct on the server, silently production in the browser.
+   */
+  it("does not derive TARGET from a call alone", () => {
+    expect(source).not.toMatch(/export const TARGET:\s*Target\s*=\s*resolveTarget\(\)/);
+  });
+
+  /*
+   * The prefix is what makes it reach the client under Turbopack. An
+   * unprefixed name is replaced with `undefined` in client code rather than
+   * with its value — the same silent fallback, one rename away.
+   */
+  it("keeps the NEXT_PUBLIC_ prefix that makes it reach the browser", () => {
+    expect(source).not.toMatch(/process\.env\.PLASPOOL_TARGET\b/);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE HOSTNAME CROSS-CHECK — the layer that does not depend on the bundler.
+ *
+ * Every other mechanism here is a build-time decision, and a build-time
+ * decision shipped wrong once: the browser fell back to `production` on
+ * `dev.plaspool.com` and posted carts to the live API. These assertions are
+ * about the property that made that possible being gone — the answer now comes
+ * from the host serving the page, which cannot disagree with itself.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+describe("apiBaseForHost", () => {
+  it.each([
+    ["plaspool.com", ENVIRONMENTS.production.api],
+    ["www.plaspool.com", ENVIRONMENTS.production.api],
+    ["dev.plaspool.com", ENVIRONMENTS.development.api],
+  ])("serves %s from %s", (hostname, expected) => {
+    expect(apiBaseForHost(hostname)).toBe(expected);
+  });
+
+  /*
+   * ⚠  THE ASSERTION THE SHIPPED BUG WOULD HAVE FAILED. Whatever the build
+   * decided, a page on dev.plaspool.com must never talk to the production API.
+   */
+  it("never sends the development host to the production API", () => {
+    expect(apiBaseForHost("dev.plaspool.com")).not.toBe(ENVIRONMENTS.production.api);
+  });
+
+  /*
+   * An unknown host keeps the build's answer rather than guessing. Mapping it
+   * to production "because most hosts are" would reintroduce a silent wrong
+   * answer through the back door.
+   */
+  it.each([
+    "localhost",
+    "plaspool-storefront-dev.uririnathaniel.workers.dev",
+    "some-preview.example",
+  ])("falls back to the build's answer on %s", (hostname) => {
+    expect(apiBaseForHost(hostname)).toBe(ENV.api);
+  });
+
+  it.each([null, undefined, ""])("falls back when there is no hostname (%s)", (hostname) => {
+    expect(apiBaseForHost(hostname)).toBe(ENV.api);
   });
 });
 
