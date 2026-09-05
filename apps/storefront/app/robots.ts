@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { siteConfig } from "@plaspool/brand";
+import { ENV, siteConfig } from "@plaspool/brand";
 
 /**
  * `/robots.txt` — crawl policy.
@@ -121,7 +121,42 @@ const SEO_CRAWLERS = [
   "SeekportBot",
 ];
 
+/**
+ * The crawl policy for a deployment that is NOT the shop.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE ONE SANCTIONED EXCEPTION TO EVERYTHING ABOVE, AND IT IS NOT A
+ * CONTRADICTION OF IT.
+ *
+ * The header argues at length that this file must never block a search engine.
+ * That argument is about the SHOP — the deployment that exists to be found.
+ * `dev.plaspool.com` is a second, complete copy of that shop pointed at a
+ * different database, and it is the exact thing Google penalises: duplicate
+ * content on a separate host, competing with the real store for the queries the
+ * real store is trying to win.
+ *
+ * So the rule is not "never block a crawler", it is "never block a crawler on
+ * the deployment that sells things". `ENV.indexable` is the only thing allowed
+ * to make this choice, and it is `true` for exactly one environment.
+ *
+ * ⚠  `Disallow: /` IS NOT ON ITS OWN ENOUGH, AND THAT IS A COMMON MISREADING.
+ * It stops a crawler FETCHING the page; it does not stop the URL being indexed
+ * from a link somewhere else — Google will happily list a disallowed URL with
+ * no snippet. The header that actually prevents indexing is
+ * `X-Robots-Tag: noindex`, which `next.config.ts` adds for the same
+ * environments. The two are a pair; removing either one leaves a hole.
+ *
+ * No `Sitemap:` line either. Advertising a sitemap on a host nobody should be
+ * crawling hands a crawler the full URL list it was just asked not to fetch.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+function unindexed(): MetadataRoute.Robots {
+  return { rules: [{ userAgent: "*", disallow: "/" }] };
+}
+
 export default function robots(): MetadataRoute.Robots {
+  if (!ENV.indexable) return unindexed();
+
   return {
     rules: [
       /*

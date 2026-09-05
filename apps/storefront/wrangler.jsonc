@@ -57,5 +57,80 @@
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
+  },
+  /*
+   * ═══════════════════════════════════════════════════════════════════════════
+   * THE DEVELOPMENT ENVIRONMENT — `dev.plaspool.com`, against
+   * `admin.dev.plaspool.com`.
+   *
+   * ⚠  BINDINGS ARE **NOT** INHERITED BY A NAMED ENVIRONMENT. Wrangler treats
+   * `kv_namespaces`, `services` and `vars` as non-inheritable, so everything
+   * below is restated rather than duplicated by mistake. `main`,
+   * `compatibility_date`, `compatibility_flags` and `assets` ARE inherited and
+   * are deliberately absent.
+   *
+   * THE OMISSION THAT WOULD HURT MOST IS SILENT: leave `kv_namespaces` out
+   * entirely and the environment does not fall back to the production
+   * namespaces — it gets NO cache binding, which is the exact condition that
+   * caused Error 1102 (#9), a full server render on every request against a
+   * 10ms CPU budget. Absent bindings degrade to a no-op cache, not to an error.
+   * ═══════════════════════════════════════════════════════════════════════════
+   */
+  "env": {
+    "dev": {
+      "name": "plaspool-storefront-dev",
+      /*
+       * ⚠  ITS OWN NAMESPACES, AND THIS IS THE ONE THING HERE THAT CAN DAMAGE
+       * PRODUCTION.
+       *
+       * The incremental cache is keyed by route, not by origin. Point the
+       * development Worker at the production namespace and its renders — built
+       * from the DEVELOPMENT database, with development prices and a
+       * development catalogue — are written under the keys the live shop reads
+       * back. A deploy to dev would then quietly serve wrong prices on
+       * plaspool.com, with `stale-while-revalidate` holding them there for up
+       * to 30 days.
+       *
+       * Create them once, then paste the ids Wrangler prints in place of the
+       * placeholders below:
+       *
+       *   npx wrangler kv namespace create NEXT_INC_CACHE_KV --env dev
+       *   npx wrangler kv namespace create NEXT_TAG_CACHE_KV --env dev
+       *
+       * A deploy WILL fail while these placeholders are here. That is
+       * deliberate — a loud failure is the correct outcome for a cache binding
+       * nobody has created yet, and far better than the silent no-op above.
+       */
+      "kv_namespaces": [
+        {
+          "binding": "NEXT_INC_CACHE_KV",
+          "id": "REPLACE_WITH_DEV_NEXT_INC_CACHE_KV_ID"
+        },
+        {
+          "binding": "NEXT_TAG_CACHE_KV",
+          "id": "REPLACE_WITH_DEV_NEXT_TAG_CACHE_KV_ID"
+        }
+      ],
+      /*
+       * ⚠  POINTS AT ITSELF, NOT AT PRODUCTION.
+       *
+       * This binding is how the memory queue re-renders a stale ISR page: the
+       * Worker calls itself. Copied from the block above unchanged it would
+       * name `plaspool-storefront`, so every stale page on the DEVELOPMENT site
+       * would be revalidated by asking PRODUCTION to render it — burning
+       * production invocations and writing production's answer into
+       * development's cache.
+       */
+      "services": [
+        {
+          "binding": "WORKER_SELF_REFERENCE",
+          "service": "plaspool-storefront-dev"
+        }
+      ],
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 1
+      }
+    }
   }
 }

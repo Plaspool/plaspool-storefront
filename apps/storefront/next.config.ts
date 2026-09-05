@@ -1,4 +1,15 @@
 import type { NextConfig } from "next";
+import { ENVIRONMENTS, resolveTarget } from "@plaspool/brand/environment";
+
+/**
+ * WHICH DEPLOYMENT THIS BUILD IS. Resolved exactly once, here, in Node — where
+ * `WORKERS_CI_BRANCH` is visible — and handed to the rest of the app through
+ * the `env` key below. `packages/brand/src/environment.ts` carries the full
+ * argument for why it is derived rather than written down, and for why the
+ * client must be told the answer instead of computing it.
+ */
+const TARGET = resolveTarget();
+const ENV = ENVIRONMENTS[TARGET];
 
 /**
  * Third-party origins the storefront actually talks to. Named here rather than
@@ -13,11 +24,15 @@ import type { NextConfig } from "next";
  * account all talk to this origin FROM THE BROWSER with `credentials:
  * "include"`, so a stale value here does not merely break blog covers — it
  * blocks every credentialed call in `connect-src` and the shop reports
- * "We couldn't load your cart" with nothing saying why. Change it here,
- * `packages/blog/src/data/config.ts` and `packages/shop/src/data/config.ts`
- * together, or not at all.
+ * "We couldn't load your cart" with nothing saying why.
+ *
+ * IT USED TO SAY "change it here, `packages/blog/src/data/config.ts` and
+ * `packages/shop/src/data/config.ts` together, or not at all" — three copies
+ * kept in step by hand. All three now read one table
+ * (`packages/brand/src/environment.ts`), so there is one place to change and
+ * the three cannot drift apart.
  */
-const BLOG_API = "https://admin.plaspool.com";
+const BLOG_API = ENV.api;
 /** Cover images 302 from the blog API to a presigned account-scoped R2 host. */
 const R2 = "https://*.r2.cloudflarestorage.com";
 const WAITLISTER = "https://waitlister.me";
@@ -132,10 +147,47 @@ const SECURITY_HEADERS = [
    */
   { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
   { key: "Content-Security-Policy-Report-Only", value: CSP },
+  /**
+   * ⚠  THE HALF OF THE NOINDEX PAIR THAT ACTUALLY PREVENTS INDEXING.
+   *
+   * `app/robots.ts` serves `Disallow: /` on every non-production deployment,
+   * and that stops a crawler FETCHING a page — it does not stop the URL being
+   * indexed from a link elsewhere, which Google does routinely, listing the
+   * bare URL with no snippet. `noindex` is the directive that removes it.
+   *
+   * The two only work together: `noindex` alone would be invisible to a
+   * crawler that robots.txt kept away from the page carrying it, and
+   * `Disallow` alone leaves the URL indexable. Change one, change the other.
+   *
+   * Spread rather than pushed so the array stays a flat list of decisions.
+   */
+  ...(ENV.indexable
+    ? []
+    : [{ key: "X-Robots-Tag", value: "noindex, nofollow" }]),
 ];
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@plaspool/ui", "@plaspool/brand", "@plaspool/web", "@plaspool/blog", "@plaspool/shop"],
+  /**
+   * ⚠  THIS IS WHAT STOPS THE BROWSER DISAGREEING WITH THE SERVER, AND IT IS
+   * NOT OPTIONAL.
+   *
+   * `WORKERS_CI_BRANCH` exists only in Node during the build. Next replaces
+   * every non-`NEXT_PUBLIC_` `process.env.X` in CLIENT code with `undefined`,
+   * so a browser resolving the target for itself would always conclude
+   * `production` — and `cart-api.ts` runs in the browser. A development build
+   * would render the development catalogue server-side and then post the
+   * shopper's cart to the PRODUCTION API.
+   *
+   * The `env` key inlines a literal into both bundles, so the client is TOLD
+   * the answer rather than deriving it. `resolveTarget()` reads this back and
+   * prefers it over the branch for exactly that reason.
+   *
+   * NOT `NEXT_PUBLIC_`-prefixed on purpose: the `env` key inlines it into the
+   * client bundle regardless, and the prefix would wrongly imply it is
+   * something an operator sets in a dashboard. Nobody sets this.
+   */
+  env: { PLASPOOL_TARGET: TARGET },
   experimental: {
     // Barrel-export packages pulled in wholesale via transpilePackages inflate
     // First Load JS on every route that imports from them; this makes Next
@@ -156,7 +208,19 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
   },
+  /**
+   * PRODUCTION ONLY, and the reason is `permanent: true`.
+   *
+   * A 308 is cached by the browser more or less forever. The rule is inert on
+   * `dev.plaspool.com` today — nothing resolves `www.plaspool.com` to the
+   * development Worker — but shipping a permanent redirect to the production
+   * origin from a build that is not production is a loaded gun: the day
+   * anything points a `www.` host at this Worker, every visitor is bounced to
+   * production and pinned there by their own cache.
+   */
   async redirects() {
+    if (TARGET !== "production") return [];
+
     return [
       {
         source: "/:path*",

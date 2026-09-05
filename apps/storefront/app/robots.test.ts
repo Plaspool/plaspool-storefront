@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import robots from "./robots";
 
@@ -104,5 +104,73 @@ describe("robots.txt — everyone else", () => {
 
   it("still points at the sitemap", () => {
     expect(policy.sitemap).toMatch(/\/sitemap\.xml$/);
+  });
+});
+
+/**
+ * The development deployment, which must be the exact opposite of everything
+ * above.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THIS IS THE ONE PLACE THE FILE'S OWN RULE IS INVERTED, SO IT IS ALSO THE ONE
+ * PLACE THE INVERSION HAS TO BE PROVEN.
+ *
+ * The assertions at the top of this file exist to stop anyone blocking a search
+ * engine. `dev.plaspool.com` is the exception: a complete second copy of the
+ * shop, pointed at another database, competing with the real store for its own
+ * search terms. Blocking it is correct, and the production assertions above
+ * still hold because `resolveTarget()` defaults to production under the test
+ * runner, where no branch variable is set.
+ *
+ * Mocked rather than parameterised because `ENV` is a module constant read at
+ * import time — which is what makes it a build-time decision the client cannot
+ * disagree with, and therefore not something the route can be asked to
+ * recompute.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+describe("robots.txt — a deployment that must not be indexed", () => {
+  async function devPolicy() {
+    vi.resetModules();
+    vi.doMock("@plaspool/brand", () => ({
+      ENV: {
+        site: "https://dev.plaspool.com",
+        api: "https://admin.dev.plaspool.com",
+        indexable: false,
+      },
+      siteConfig: {
+        site_name: "PlaSpool",
+        site_description: "",
+        site_domain: "https://dev.plaspool.com",
+      },
+    }));
+    const { default: devRobots } = await import("./robots");
+    vi.doUnmock("@plaspool/brand");
+    return devRobots();
+  }
+
+  it("shuts out every crawler with a wildcard rule", async () => {
+    const dev = await devPolicy();
+    const devRules = Array.isArray(dev.rules) ? dev.rules : [dev.rules];
+    const wildcard = devRules.find((r) => agentsIn(r).includes("*"));
+
+    expect(wildcard?.disallow).toBe("/");
+  });
+
+  /*
+   * A `Sitemap:` line on a host nobody should crawl hands the crawler the full
+   * URL list it was just asked not to fetch.
+   */
+  it("advertises no sitemap", async () => {
+    const dev = await devPolicy();
+    expect(dev.sitemap).toBeUndefined();
+  });
+
+  /*
+   * The production policy must be unaffected by the mock above — if resetting
+   * modules leaked, the assertions at the top of this file would be testing the
+   * development policy without saying so.
+   */
+  it("leaves the production policy still allowing the shop", () => {
+    expect(blockedAgents).not.toContain("*");
   });
 });
