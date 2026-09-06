@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Link } from "../components/link";
 import { AlertTriangle, ArrowLeft, LifeBuoy, Loader2, ShieldAlert } from "lucide-react";
-import { Button, Input, Label, Skeleton, SkeletonRegion, cn } from "@plaspool/ui";
+import { Button, Input, Skeleton, SkeletonRegion, cn } from "@plaspool/ui";
 
 import { EmptyState } from "../components/empty-state";
 import { formatNaira } from "../data/money";
@@ -29,6 +29,13 @@ import {
   wantsServiceAreas,
 } from "./address-fields";
 import { LocationCapture } from "./location-capture";
+import { Field, NATIVE_SELECT_CLASSES } from "./address-field";
+import { CountryField, isCountryServed, type CountryHint } from "./country-field";
+import { RegionField } from "./region-field";
+import { AddressAutofill } from "./address-autofill-button";
+import { prefillFromGeoHint, suggestDistrict, type GeocodedAddress } from "./address-autofill";
+import { readGeoHint, type GeoHint } from "../data/geo-hint";
+import { NIGERIA } from "../data/nigerian-states";
 import { errorCopy } from "./checkout-error-copy";
 import { saveReceiptSnapshot } from "./receipt-snapshot";
 import { getPointsBalance } from "../data/points-api";
@@ -132,9 +139,6 @@ function ErrorBanner({
   );
 }
 
-/** Classed to match `Input` exactly — the same string `return-form.tsx` keeps
- *  for its native selects, for the same reason: the select sits among Inputs
- *  in one form and must read as family, not as a browser default beside them. */
 /**
  * How long a delivery config is trusted before the address step re-reads it.
  *
@@ -168,134 +172,9 @@ const FIELD_IDS: Record<FieldKey, string> = {
   postalCode: "co-postal",
 };
 
-const NATIVE_SELECT_CLASSES =
-  "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm";
-
-/**
- * The delivery country.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * A CONTROL ONLY WHEN THE SERVER UNLOCKS ONE, AND THE LIST IS ALWAYS THE
- * SERVER'S.
- *
- * `country.locked` is true today, which is the shop as it is: it ships from
- * and within Nigeria, so the country is a fact rather than a question, and it
- * renders as fixed text. That is what the form has always shown — the field
- * did not exist as a control and this does not add one.
- *
- * When international selling is switched on the admin sets `locked: false` and
- * fills `country.allowed`. THE STOREFRONT NEVER SPELLS THAT LIST. A hardcoded
- * set of countries is a second, stale answer to a question the delivery config
- * already answers, and the first thing it does when it drifts is offer to ship
- * somewhere the shop has no zone for — which prices at the catch-all and
- * quotes a delivery fee nobody can honour.
- *
- * ═══ CHANGING IT CAN HIDE THE DISTRICT PICKER, AND THAT IS THE POINT ═══
- * Districts are Nigerian. `fieldRows` reads the address, so selecting anywhere
- * else removes the picker in the same render, and `submittedAddress` omits the
- * key from the body rather than sending an empty one. See `districtsApply`.
- * ═══════════════════════════════════════════════════════════════════════════
- */
-function CountryField({
-  config,
-  value,
-  onChange,
-}: {
-  config: DeliveryConfig;
-  value: string;
-  onChange: (countryCode: string) => void;
-}) {
-  const id = "checkout-country";
-  const current = (value || config.country.default).toUpperCase();
-
-  /* LOCKED IS NOT A DISABLED SELECT. A greyed-out control invites a shopper to
-     try to change something they cannot, and a disabled form field is skipped
-     by keyboard navigation while still taking up a tab stop's worth of
-     attention. One country is a statement, so it is written as one. */
-  if (config.country.locked || config.country.allowed.length < 2) {
-    return (
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor={id}>Country</Label>
-        <p id={id} className="text-sm text-muted-foreground">
-          {countryName(current)}
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <Field id={id} label="Country" required>
-      <select
-        id={id}
-        required
-        value={current}
-        onChange={(e) => onChange(e.target.value)}
-        className={NATIVE_SELECT_CLASSES}
-      >
-        {config.country.allowed.map((code) => (
-          <option key={code} value={code}>
-            {countryName(code)}
-          </option>
-        ))}
-      </select>
-    </Field>
-  );
-}
-
-/**
- * An ISO-3166-1 alpha-2 code as a name.
- *
- * `Intl.DisplayNames` where the runtime has it, the CODE ITSELF where it does
- * not — never a hand-written table. A table would be one more list to drift
- * from `country.allowed`, and it would be wrong in a different way from the
- * server rather than merely terse. A bare "GB" beside a country selector is
- * understandable; "United Kingdom" spelled by a storefront that also thinks
- * "NG" is "Nigeria (FCT)" is not.
- *
- * WRAPPED, because `Intl.DisplayNames` is absent on some small-ICU builds and
- * throws for an unknown code on others. This runs in the browser, but the
- * component renders on the server first.
- */
-function countryName(code: string): string {
-  try {
-    return new Intl.DisplayNames(["en"], { type: "region" }).of(code) ?? code;
-  } catch {
-    return code;
-  }
-}
-
-function Field({
-  id,
-  label,
-  required,
-  help,
-  children,
-}: {
-  id: string;
-  label: string;
-  required?: boolean;
-  /** The config's own wording for what this field wants — "House number,
-   *  street, and the nearest landmark." Wired to the input by
-   *  `aria-describedby` rather than left as loose text near it. */
-  help?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id}>
-        {label}
-        {required && <span aria-hidden="true"> *</span>}
-      </Label>
-      {children}
-      {help && (
-        <p id={`${id}-help`} className="text-xs text-muted-foreground">
-          {help}
-        </p>
-      )}
-    </div>
-  );
-}
-
+/* The country and state controls, and the `Field` frame they share, live in
+   `country-field.tsx`, `region-field.tsx` and `address-field.tsx` — split out
+   so they render under Vitest without mounting this component. */
 
 export function CheckoutFlow() {
   const cart = useCart();
@@ -821,6 +700,46 @@ export function CheckoutFlow() {
 
   const email = customerEmail ?? guestEmail;
 
+  /**
+   * Where the preselected country came from, for the sentence under it —
+   * null once the shopper has chosen one themselves. Shown only over the
+   * blank form: a saved address's country is the shopper's own.
+   */
+  const [countryHint, setCountryHint] = React.useState<CountryHint | null>(null);
+
+  /**
+   * ═══ THE COUNTRY, PRESELECTED FROM THE CONNECTION ═══
+   * `/api/geo` answers with where Cloudflare places this IP. Only the country
+   * is acted on, and only if the shop delivers there — `prefillFromGeoHint`
+   * holds both decisions and the reasons. The same guard as the saved-address
+   * prefill: never into a form somebody has touched. Re-run when the config
+   * lands, because the allowed list is the config's and the first pass may
+   * have read the fallback's.
+   */
+  const [geoHint, setGeoHint] = React.useState<GeoHint | null>(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    void readGeoHint().then((hint) => {
+      if (!cancelled) setGeoHint(hint);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  React.useEffect(() => {
+    if (!geoHint) return;
+    const patch = prefillFromGeoHint(geoHint, config);
+    if (!patch || touchedRef.current) return;
+    setAddress((current) =>
+      current.countryCode.toUpperCase() === patch.countryCode ? current : { ...current, ...patch },
+    );
+    setCountryHint("ip");
+  }, [geoHint, config]);
+
+  /** Whether the shop delivers to the country as it stands — the gate on the
+   *  submit. `country-field.tsx` says why the list still offers the rest. */
+  const countryServed = isCountryServed(config, address.countryCode);
+
   /* The steps this checkout actually has — two, unless the server offered a
      real delivery choice. See `stepsFor`. */
   const steps = React.useMemo(() => stepsFor(shippingOptions.length), [shippingOptions.length]);
@@ -880,6 +799,32 @@ export function CheckoutFlow() {
       );
     }
 
+    if (field.key === "region") {
+      return (
+        <Field
+          key={field.key}
+          id={id}
+          label={field.label}
+          required={field.required}
+          help={field.help}
+        >
+          {/* A SELECT OF THE STATES FOR A NIGERIAN ADDRESS, the free-text
+              input for anywhere else — see `region-field.tsx`. Its value is
+              the canonical state name, which is what the district picker
+              under it and the server's zone both match. */}
+          <RegionField
+            id={id}
+            field={field}
+            countryCode={address.countryCode || config.country.default}
+            value={fieldValue(address, field.key, effectiveDistrict)}
+            servedRegions={config.servedRegions}
+            describedBy={describedBy}
+            onChange={(region) => editAddress(fieldPatch("region", region))}
+          />
+        </Field>
+      );
+    }
+
     return (
       <Field
         key={field.key}
@@ -910,8 +855,37 @@ export function CheckoutFlow() {
    * Continue button underneath. It is validated here now, before anything is
    * written server-side, so a missing one costs nothing.
    */
+  /**
+   * The device's fix, merged into the form.
+   *
+   * THE AREA IS RESET WITH THE STATE. A district chosen for the previous
+   * address is no answer for the new one, and the one the fix names is taken
+   * only when exactly one served area fits it — `suggestDistrict` holds the
+   * rule. Through `editAddress`, so a fill detaches a saved address the way a
+   * keystroke does, and the hint under the country says where it came from.
+   */
+  const fillFromDevice = React.useCallback(
+    (result: GeocodedAddress) => {
+      const patch: Partial<Address> = { ...result.patch };
+      if (patch.region !== undefined) {
+        const country = (patch.countryCode ?? address.countryCode ?? config.country.default).toUpperCase();
+        patch.district =
+          country === NIGERIA
+            ? suggestDistrict(districtChoicesFor(serviceAreas, patch.region), result.localities)
+            : null;
+      }
+      editAddress(patch);
+      setCountryHint(patch.countryCode ? "gps" : null);
+    },
+    [address.countryCode, config, editAddress, serviceAreas],
+  );
+
   async function submitDetails(e: React.FormEvent) {
     e.preventDefault();
+    /* The button is already disabled for this; a form can still be submitted
+       by other means, and an unserved country must never reach the API, where
+       it would price at the catch-all zone. */
+    if (!countryServed) return;
     if (!email) {
       setError({ code: "field", field: "email" });
       return;
@@ -1383,22 +1357,27 @@ export function CheckoutFlow() {
 
                 `rows` carries the one thing a flat `fields[]` cannot say:
                 City and State share a line, as they do on screen today. */}
-            {/* ═══ THE COUNTRY, WHICH IS A CONTROL ONLY WHEN THE SERVER SAYS
-                SO ═══
-                `country.locked` is true today, so this renders as fixed text —
-                which is exactly what the form has always shown, since the
-                shop only ships from and within Nigeria. When international
-                selling is switched on the admin sets it false and sends the
-                list in `country.allowed`, and this becomes a real selector.
+            {/* ═══ ONE TAP TO FILL THE ADDRESS FROM THE DEVICE ═══
+                What the fix fills, and what it never touches, is decided in
+                `address-autofill.ts`; the button's copy tells the shopper to
+                check every line, because the area sets the delivery price. */}
+            <AddressAutofill onFill={fillFromDevice} disabled={busy} />
 
-                THE LIST IS NEVER SPELLED HERE. A hardcoded set of countries
-                would be a second, stale answer to a question the delivery
-                config already answers, and the shop would offer to ship
-                somewhere it has no zone for. */}
+            {/* ═══ THE COUNTRY: A SELECT OF EVERY COUNTRY, A SUBMIT ONLY TO
+                THE SERVER'S ═══
+                Preselected from the connection (`/api/geo`) or the device (the
+                button above), and the sentence under it says which.
+                `config.country.allowed` is still the only list a parcel may go
+                to: anywhere else takes the Continue button away — see
+                `country-field.tsx` and `countryServed` on the submit. */}
             <CountryField
               config={config}
               value={address.countryCode}
-              onChange={(countryCode) => editAddress({ countryCode })}
+              hint={chosenAddress === NEW_ADDRESS ? countryHint : null}
+              onChange={(countryCode) => {
+                setCountryHint(null);
+                editAddress({ countryCode });
+              }}
             />
 
             {rows.map((row) =>
@@ -1465,7 +1444,7 @@ export function CheckoutFlow() {
 
             <Button
               type="submit"
-              disabled={busy || rateLimited || !email}
+              disabled={busy || rateLimited || !email || !countryServed}
               tone="primary"
               className="mt-2 h-12 text-base"
             >

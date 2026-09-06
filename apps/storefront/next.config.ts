@@ -81,6 +81,13 @@ const CLERK_IMG = "https://img.clerk.com";
  * cannot be completed — with nothing in the console pointing at the frame.
  */
 const TURNSTILE = "https://challenges.cloudflare.com";
+/**
+ * OpenStreetMap's geocoder, which the checkout's "Fill in from my location"
+ * button calls FROM THE BROWSER with the device's fix — `connect-src` only.
+ * `packages/shop/src/checkout/address-autofill.ts` carries the usage policy
+ * that call keeps to.
+ */
+const NOMINATIM = "https://nominatim.openstreetmap.org";
 
 /**
  * Content-Security-Policy — REPORT-ONLY for now.
@@ -119,7 +126,7 @@ const CSP = [
   `img-src 'self' data: blob: ${BLOG_API} ${R2} ${GTM} ${GA[0]} ${CLERK_IMG}`,
   // next/font self-hosts Inter at build time, so no external font origin.
   "font-src 'self' data:",
-  `connect-src 'self' ${BLOG_API} ${R2} ${WAITLISTER} ${GTM} ${GA.join(" ")} ${VERCEL_INSIGHTS} ${CLERK}`,
+  `connect-src 'self' ${BLOG_API} ${R2} ${WAITLISTER} ${GTM} ${GA.join(" ")} ${VERCEL_INSIGHTS} ${CLERK} ${NOMINATIM}`,
   // The /shop waitlist is an iframe embed; Turnstile is Clerk's bot challenge.
   `frame-src 'self' ${WAITLISTER} ${TURNSTILE}`,
   /*
@@ -147,7 +154,14 @@ const SECURITY_HEADERS = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  /**
+   * `geolocation=(self)`, NOT `()`. The checkout asks for the device's
+   * position — the address fill, and the rider's spot when the config offers
+   * it — and `()` refuses the call to this origin's own scripts, not only to
+   * frames; the button then fails as if the shopper had said no. Camera and
+   * microphone stay closed: nothing here asks.
+   */
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self)" },
   /**
    * A year, now that logins are live.
    *
