@@ -167,6 +167,71 @@ export function previewLines(preview: ApiCartPreview | null): Map<string, Totals
 }
 
 /**
+ * One checkout add-on as it applies to THIS cart, right now.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * RE-EVALUATED ON EVERY READ, AND THE STOREFRONT NEVER EVALUATES IT.
+ *
+ * The operator defines add-ons in the admin — packaging is the first — and
+ * attaches rules that decide, per cart, whether to ASK the shopper or to
+ * INCLUDE it outright. The rules are the API's. Every `GET /cart` answers the
+ * current verdict, and this client renders it and records answers; nothing
+ * here decides whether an add-on applies, and nothing here prices one.
+ *
+ * `title` AND `description` ARE THE OPERATOR'S OWN WORDS, rendered verbatim,
+ * exactly like `adjustment.label`. `imageUrl` is an absolute path on the API
+ * origin, the same shape as `coverImageUrl`.
+ *
+ * ═══ ABSENT ON EVERY RESPONSE FROM A SERVER WITHOUT THE FEATURE ═══
+ * Which is why `ApiCartView.addOns` is optional and is read through
+ * `addOnsOf()` rather than directly — the way `bulkOf` defaults the bulk
+ * fields. Nothing must mean nothing: a cart read before the admin deploy has
+ * no add-ons, and a storefront that crashed on their absence would take the
+ * drawer down for every shopper.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export interface AddOnOffer {
+  /** `"ado_…"` */
+  id: string;
+  title: string;
+  /** One or two plain sentences, or null. */
+  description: string | null;
+  imageUrl: string | null;
+  /** The add-on's list price, minor units. */
+  price: ApiMoney;
+  /**
+   * WHAT WILL BE CHARGED if it is on the order. Usually equals `price`; a
+   * rule may set a different amount, and `{ amount: 0 }` means it is free.
+   * RENDER THIS, NEVER `price`, wherever the shopper is told what it costs —
+   * `price` is what it is worth, and only a row saying "Included" over a
+   * real figure has any use for that.
+   */
+  amount: ApiMoney;
+  /** `"ask"` — the shopper decides. `"include"` — on the order automatically. */
+  mode: "ask" | "include";
+  /** The shopper's recorded answer for an `ask` add-on. `null` = not asked
+   *  yet. Always `null` for `include`. */
+  choice: "accepted" | "declined" | null;
+}
+
+/**
+ * The add-ons on a cart read, or an empty list when the server sent none.
+ *
+ * THE ONE SEAM. `ApiCartView.addOns` is optional because every response from
+ * an admin that predates the feature lacks it, and this is where that absence
+ * becomes `[]` — the provider and the checkout both read through here rather
+ * than each spelling `?? []` and one of them forgetting.
+ */
+export function addOnsOf(view: { addOns?: AddOnOffer[] } | null | undefined): AddOnOffer[] {
+  return view?.addOns ?? NO_ADD_ONS;
+}
+
+/** One shared empty list, so "no add-ons" keeps a stable identity across
+ *  renders and does not re-run everything memoised on it — the same reason
+ *  `checkout-flow.tsx` keeps a `NO_AREAS`. */
+const NO_ADD_ONS: AddOnOffer[] = [];
+
+/**
  * The whole cart in one response — every endpoint returns this shape.
  *
  * WHICH IS WHY THIS CLIENT NEVER RE-READS AFTER A WRITE. A mutation answers the
@@ -185,6 +250,12 @@ export interface ApiCartView {
    * field exists to prevent.
    */
   changes: { lineId?: string; reason?: string }[];
+  /**
+   * The add-ons this cart is offered or given, re-evaluated on every read.
+   * OPTIONAL: a server without the feature sends nothing. Read it through
+   * `addOnsOf()`, never directly — see that function.
+   */
+  addOns?: AddOnOffer[];
 }
 
 /**

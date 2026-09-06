@@ -52,6 +52,13 @@ export interface Order {
   subtotal: number;
   shippingTotal: number;
   taxTotal: number;
+  /**
+   * What the add-ons on this order cost, minor units. `0` on every order
+   * placed before add-ons existed — and ABSENT from a server that predates
+   * them, which is why it is optional here and read `?? 0`. Already inside
+   * `grandTotal`; nothing adds it to anything.
+   */
+  addOnTotal?: number;
   grandTotal: number;
   refundedTotal: number;
   status: OrderStatus;
@@ -81,6 +88,23 @@ export interface OrderLine {
   fulfilledQty: number;
 }
 
+/**
+ * One add-on on an order, as the detail route lists it beside the lines.
+ *
+ * MONEY IS A BARE NUMBER IN MINOR UNITS with the currency beside it — the
+ * order convention, not the cart's `ApiMoney`; see the file header. `mode`
+ * is how it got onto the order, and `amount` is what was CHARGED — zero for
+ * an included-free add-on, where `listPrice` says what it was worth.
+ */
+export interface OrderAddOn {
+  id: string;
+  title: string;
+  mode: "chosen" | "included";
+  amount: number;
+  listPrice: number;
+  currency: string;
+}
+
 export interface OrderEvent {
   id: string;
   type: string;
@@ -100,7 +124,9 @@ export type OrdersListResult =
   | { ok: false; reason: "unauthenticated" | "network" };
 
 export type OrderDetailResult =
-  | { ok: true; order: Order; lines: OrderLine[] }
+  /** `addOns` is empty for every old order and for a server that sends none;
+   *  `getOrder` defaults it so no page has to. */
+  | { ok: true; order: Order; lines: OrderLine[]; addOns: OrderAddOn[] }
   | { ok: false; reason: "not_found" | "network" };
 
 export type OrderEventsResult =
@@ -196,9 +222,13 @@ export async function getOrder(
   const body = (await res.json().catch(() => null)) as {
     order: Order;
     lines: OrderLine[];
+    addOns?: OrderAddOn[];
   } | null;
   if (!body) return { ok: false, reason: "network" };
-  return { ok: true, order: body.order, lines: body.lines };
+  /* DEFENSIVE ON BOTH COUNTS. Every order placed before add-ons shipped has
+     none, and a server that predates them sends no key at all; the page must
+     render those orders exactly as it always did. */
+  return { ok: true, order: body.order, lines: body.lines, addOns: body.addOns ?? [] };
 }
 
 /** The order's timeline. Same authorization as `getOrder` — same `token`,

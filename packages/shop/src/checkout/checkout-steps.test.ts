@@ -59,18 +59,66 @@ describe("the position shown in the header", () => {
     expect(stepPosition("review", three)).toBe(3);
   });
 
-  it("puts review LAST in both shapes, because it is where paying happens", () => {
+  it("puts review LAST in every shape, because it is where paying happens", () => {
     for (const count of [0, 1, 2, 9]) {
-      const steps = stepsFor(count);
-      expect(steps[steps.length - 1]).toBe("review");
+      for (const asks of [0, 1, 2]) {
+        const steps = stepsFor(count, asks);
+        expect(steps[steps.length - 1]).toBe("review");
+      }
     }
+  });
+
+  it("counts the extras step in N of M, on every viewport", () => {
+    /* The sheet is how the step is DRAWN on a phone, not a different flow —
+       so the header over a four-step checkout says 3 of 4 on the extras step
+       whether that step is a page or a bottom sheet. */
+    const four = stepsFor(2, 1);
+    expect(stepPosition("extras", four)).toBe(3);
+    expect(stepPosition("review", four)).toBe(4);
   });
 
   it("has a label for every step it can produce", () => {
     for (const count of [0, 1, 2]) {
-      for (const step of stepsFor(count)) {
-        expect(STEP_LABELS[step]).toBeTruthy();
+      for (const asks of [0, 1]) {
+        for (const step of stepsFor(count, asks)) {
+          expect(STEP_LABELS[step]).toBeTruthy();
+        }
       }
+    }
+  });
+});
+
+/**
+ * ═══ THE EXTRAS STEP, WHICH EXISTS ONLY WHEN THERE IS A QUESTION ═══
+ * The operator can attach add-ons to the checkout — packaging first — with
+ * rules that either ASK the shopper or INCLUDE the add-on outright. Only the
+ * asking earns a screen. An included add-on is a row on the review step, and
+ * a shop with no add-ons at all is exactly today's two steps.
+ */
+describe("the extras step", () => {
+  it("does not exist when nothing is being asked — today's shop, and every old server", () => {
+    expect(stepsFor(1, 0)).toEqual(["details", "review"]);
+    expect(stepsFor(1)).toEqual(["details", "review"]);
+  });
+
+  it("sits between the details and the total when one add-on is asked about", () => {
+    expect(stepsFor(1, 1)).toEqual(["details", "extras", "review"]);
+  });
+
+  it("sits after delivery when there is a delivery choice too", () => {
+    /* The total is the last thing settled, and the delivery option moves it,
+       so the question about extras comes after the question about delivery
+       and before the number. */
+    expect(stepsFor(2, 1)).toEqual(["details", "delivery", "extras", "review"]);
+  });
+
+  it("is one step however many add-ons stack on it", () => {
+    expect(stepsFor(1, 3)).toEqual(["details", "extras", "review"]);
+  });
+
+  it("never promises the step for a count of zero or less", () => {
+    for (const count of [0, -1]) {
+      expect(stepsFor(1, count)).not.toContain("extras");
     }
   });
 });

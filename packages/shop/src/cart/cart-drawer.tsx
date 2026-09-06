@@ -23,6 +23,7 @@ import { Price } from "../components/price";
 import { QuantityStepper } from "../components/quantity-stepper";
 import { ProductPhoto } from "../components/product-photo";
 import { formatNaira } from "../data/money";
+import { addOnAmountLabel, includedAddOns } from "../checkout/add-ons";
 import { BulkLinePrice } from "./bulk-line-price";
 import { useCart } from "./cart-context";
 import { stockWarning } from "./stock";
@@ -408,6 +409,23 @@ export function CartDrawer() {
                   </span>
                 </div>
               )}
+
+              {/* ═══ ONE QUIET LINE PER ADD-ON THE RULES PUT ON THE ORDER ═══
+                  An `include` add-on is never asked about, so the first a
+                  shopper would otherwise hear of it is a row on the review
+                  step. Said here, in passing, so the total on that step has
+                  no surprise in it: "Gift box · ₦1,500 included". The TITLE
+                  and the AMOUNT are the API's — `amount` is what the rule
+                  charges, and a free one is just "Gift box included" — and
+                  the word "included" is ours. Nothing renders on a server
+                  without the feature. */}
+              {includedAddOns(cart.addOns).map((addOn) => (
+                <p key={addOn.id} className="text-xs text-muted-foreground">
+                  {addOn.amount.amount > 0
+                    ? `${addOn.title} · ${addOnAmountLabel(addOn.amount)} included`
+                    : `${addOn.title} included`}
+                </p>
+              ))}
 
               {/* NOT A LINK WHILE SOMETHING UNBUYABLE IS IN THE BASKET.
                   `/checkout` answers `unresolved_lines` for exactly this cart

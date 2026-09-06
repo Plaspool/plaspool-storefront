@@ -6,6 +6,7 @@ import { isSwitchable, type CurrencyCode, type CurrencyConfig } from "../data/cu
 import { resolveCurrency, storedCurrency } from "../data/currency-preference";
 import {
   addLine,
+  addOnsOf,
   bulkOf,
   createCart,
   majorUnits,
@@ -612,6 +613,11 @@ export function CartProvider({ children, catalog, currencyConfig }: CartProvider
     [resolved],
   );
 
+  /* Through the seam, so a server that sends no `addOns` is an empty list
+     here rather than `undefined` reaching the drawer — and a STABLE empty
+     list, so the memo below does not re-run on every render for it. */
+  const addOns = addOnsOf(view);
+
   const value = React.useMemo<CartApi>(() => {
     /* SELLABLE UNITS ONLY. The badge is a promise that there are things in the
        basket worth opening it for; counting a line nothing can draw, price or
@@ -654,6 +660,7 @@ export function CartProvider({ children, catalog, currencyConfig }: CartProvider
       pendingKey,
       changes: view.changes,
       problem,
+      addOns,
       add,
       addVariants,
       setQty,
@@ -669,6 +676,7 @@ export function CartProvider({ children, catalog, currencyConfig }: CartProvider
     split,
     view.preview,
     view.changes,
+    addOns,
     problem,
     resolved,
     lines,

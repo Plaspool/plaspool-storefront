@@ -28,10 +28,11 @@ import {
 import { itemCount } from "./orders-list";
 import { useCart } from "../cart/cart-context";
 import { getOrder, getOrderEvents } from "../data/orders-api";
-import type { Order, OrderEvent, OrderLine } from "../data/orders-api";
+import type { Order, OrderAddOn, OrderEvent, OrderLine } from "../data/orders-api";
 import type { LineImageIndex } from "../data/catalog";
 import { majorUnits } from "../data/cart-api";
 import { formatNaira } from "../data/money";
+import { addOnRowsFor } from "../checkout/add-ons";
 import { formatStamp } from "./stamp";
 import { AccountShell } from "./account-shell";
 
@@ -108,7 +109,13 @@ export function OrderDetailPage({ lineImages }: { lineImages: LineImageIndex }) 
     | { kind: "loading" }
     | { kind: "not_found" }
     | { kind: "error" }
-    | { kind: "ready"; order: Order; lines: OrderLine[]; events: OrderEvent[] }
+    | {
+        kind: "ready";
+        order: Order;
+        lines: OrderLine[];
+        addOns: OrderAddOn[];
+        events: OrderEvent[];
+      }
   >({ kind: "loading" });
   /* Bumped by the "Try again" button. The effect below re-runs on a change,
      which is the state->effect direction the lint rule wants — the "loading"
@@ -129,6 +136,7 @@ export function OrderDetailPage({ lineImages }: { lineImages: LineImageIndex }) 
           kind: "ready",
           order: orderResult.order,
           lines: orderResult.lines,
+          addOns: orderResult.addOns,
           /* The timeline is secondary to the order itself — a failed
              `/events` call still shows the order with an empty timeline
              rather than blocking the whole page on it. The progress track
@@ -209,10 +217,19 @@ export function OrderDetail({
   isGuest,
   token = null,
   lineImages,
+  addOns = [],
 }: {
   order: Order;
   lines: OrderLine[];
   events: OrderEvent[];
+  /**
+   * The add-ons on this order, as `getOrder` lists them beside the lines.
+   * DEFAULTED TO NONE, because that is every order placed before add-ons
+   * existed, every caller that builds the props by hand (the bench, the
+   * suite), and every server that predates the feature — and all of those
+   * must render exactly as they always did.
+   */
+  addOns?: OrderAddOn[];
   isGuest: boolean;
   /**
    * The guest's signed link, when this visitor arrived on one.
@@ -240,6 +257,10 @@ export function OrderDetail({
 }) {
   const naira = (minorUnits: number) =>
     formatNaira(majorUnits({ amount: minorUnits, currency: order.currency }));
+  /* The review step's rule, applied to the order's own record: the title
+     verbatim beside what was charged, or `Included` for one the rules put on
+     the order at no cost. Empty for every old order. */
+  const addOnRows = addOnRowsFor(addOns, order.currency);
   const address = readAddress(order.shippingAddress);
   const headline = headlineFor(order, events);
   const cancelled = order.cancelledAt !== null || order.status === "cancelled";
@@ -401,6 +422,25 @@ export function OrderDetail({
             </li>
           ))}
         </ul>
+        {/* ═══ THE ADD-ONS, AFTER THE LINES AND BEFORE THE MONEY ═══
+            Things on the order that are not goods: the packaging the shopper
+            said yes to, or the packaging the rules put there. No picture —
+            the order's record of an add-on carries none, and a stand-in box
+            would claim one. No quantity either; an add-on is on the order or
+            it is not. The heading above counts ITEMS and these are not
+            counted in it, for the same reason. Absent on every old order. */}
+        {addOnRows.length > 0 && (
+          <ul aria-label="Add-ons" className="divide-y divide-brand-line border-b border-brand-line">
+            {addOnRows.map((row) => (
+              <li key={row.key} className="flex items-center justify-between gap-4 py-2.5">
+                <span className="min-w-0 truncate text-sm text-foreground">{row.label}</span>
+                <span className="shrink-0 font-mono text-sm tabular-nums text-foreground">
+                  {row.value}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       {/* ═══ 4. WHAT DID I PAY, AND WHERE IS IT GOING ═══
@@ -416,6 +456,14 @@ export function OrderDetail({
           </h2>
           <dl className="mt-3">
             <TotalRow label="Subtotal" value={naira(order.subtotal)} />
+            {/* ONLY WHEN SOMETHING WAS CHARGED. `addOnTotal` is `0` on every
+                old order and absent from an older server, and a "₦0" row
+                under the subtotal would be the page inventing a line for a
+                thing that did not happen. The per-add-on rows above already
+                say what was included for free. */}
+            {(order.addOnTotal ?? 0) > 0 && (
+              <TotalRow label="Add-ons" value={naira(order.addOnTotal ?? 0)} />
+            )}
             <TotalRow label="Delivery" value={naira(order.shippingTotal)} />
             {order.taxTotal > 0 && <TotalRow label="Tax" value={naira(order.taxTotal)} />}
             {/* ═══ THE BOLDEST NUMBER ON THE PAGE HAS TO BE TRUE ═══

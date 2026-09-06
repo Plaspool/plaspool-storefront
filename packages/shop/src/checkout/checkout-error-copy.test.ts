@@ -302,3 +302,24 @@ describe("being refused for stock, in the numbers the refusal carried", () => {
     expect(body).toContain("adjust the quantity");
   });
 });
+
+/**
+ * The one refusal the add-on step introduces. It may not fall to the generic
+ * "That didn't go through. Try again." — the flow answers it with a silent
+ * re-read of the offers, so this copy is the fallback for a call site that
+ * shows it as a banner.
+ */
+describe("an answer to an add-on the shop is no longer offering", () => {
+  it("says the offer changed and that the order is otherwise fine", () => {
+    const copy = errorCopy({ code: "add_on_not_offered" });
+    expect(copy.title).toBe("That extra is no longer offered");
+    expect(copy.body).toMatch(/otherwise ready|carry on/i);
+    expect(`${copy.title} ${copy.body}`).not.toMatch(/try again/i);
+  });
+
+  it("is not the generic unknown either", () => {
+    expect(errorCopy({ code: "add_on_not_offered" })).not.toEqual(
+      errorCopy({ code: "unknown", status: 409, requestId: null }),
+    );
+  });
+});
