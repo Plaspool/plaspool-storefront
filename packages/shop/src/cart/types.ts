@@ -1,3 +1,4 @@
+import type { AddOnOffer } from "../data/cart-api";
 import type { BulkTier, Colour, SizeOption } from "../data/types";
 import type { CartCatalogEntry } from "./cart-context";
 import type { UnsellableLine } from "./sellable";
@@ -71,6 +72,20 @@ export interface ResolvedLine {
    */
   total: number;
   tier: BulkTier | null;
+  /**
+   * The most this row may be ordered in — the stepper's `max`, already decided.
+   *
+   * ═══ COMPUTED HERE SO EVERY BASKET SURFACE GETS THE SAME ANSWER ═══
+   * The drawer and `/cart` each render their own stepper, and the rule needs
+   * two inputs from two places: the LINE's live `inStock` and the CATALOGUE's
+   * `backorderable`. Left to the call sites, that is the same decision written
+   * twice — which is precisely how `resolved` and `itemCount` drifted apart and
+   * produced a badge counting rows the drawer could not draw (see `sellable.ts`).
+   *
+   * Always a number. "No ceiling" is `MAX_LINE_QTY`, never null — see
+   * `maxQtyFor`.
+   */
+  maxQty: number;
 }
 
 /** The cart's whole public surface. `hydrated` gates anything derived from
@@ -106,6 +121,21 @@ export interface CartApi {
    */
   pending: boolean;
   /**
+   * WHICH row is being written, as its `ResolvedLine.key`, or null.
+   *
+   * ═══ `pending` ALONE COULD NOT DRIVE FEEDBACK, ONLY DISABLING ═══
+   * Pressing plus used to do nothing visible at all: the figure a stepper shows
+   * is the SERVER's `qty`, so it cannot move until the round trip lands, and
+   * nothing on the row said a round trip was happening. The button looked
+   * broken, so shoppers pressed it again.
+   *
+   * A single boolean cannot fix that, because the honest response — replace the
+   * figure with a placeholder — has to happen on ONE row. Driving it from
+   * `pending` would blank every figure in the basket over an edit to one of
+   * them, which trades a dead control for a flickering cart.
+   */
+  pendingKey: string | null;
+  /**
    * What the SERVER changed without being asked: a line dropped because its
    * variant vanished, a quantity clamped to what is left. Surfaced because a
    * basket that silently edits itself is the failure this exists to prevent.
@@ -121,6 +151,16 @@ export interface CartApi {
    * a Remove button that did nothing and said nothing.
    */
   problem: string | null;
+  /**
+   * The checkout add-ons this cart is offered or given, as the server last
+   * described them — re-evaluated on every read and every write.
+   *
+   * FOR THE DRAWER'S ONE QUIET LINE ("Gift box included") AND NOTHING ELSE.
+   * The checkout does not read these: it re-reads the cart at the moment the
+   * shopper continues, because the rules are the API's and this copy is as
+   * old as the last write. Empty on every server without the feature.
+   */
+  addOns: AddOnOffer[];
   add(key: CartLineKey, qty?: number): void;
   /**
    * Add several lines at once, BY VARIANT ID rather than by the (product,

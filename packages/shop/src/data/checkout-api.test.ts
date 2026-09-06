@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   cancelCheckout,
+  previewCheckout,
+  setAddOnChoice,
   setCheckoutAddress,
   startCheckout,
   type Address,
+  type AddOnOffer,
 } from "./checkout-api";
 
 /**
@@ -386,5 +389,151 @@ describe("cancelling a frozen checkout so the shopper can edit it again", () => 
     const result = await cancelCheckout();
 
     expect(result).toEqual({ ok: false, error: { code: "gone" } });
+  });
+});
+
+/**
+ * ═══ THE ADD-ON ROUTES ═══
+ * The operator can attach add-ons to the checkout with rules that ASK the
+ * shopper. The preview names the offers, the add-on route records an answer,
+ * and the one refusal of its own — `add_on_not_offered` — must not fall
+ * through to "That didn't go through. Try again.": there is nothing for the
+ * shopper to retry, only offers for the flow to read again.
+ */
+const OFFER: AddOnOffer = {
+  id: "ado_pouch",
+  title: "Velvet pouch",
+  description: null,
+  imageUrl: null,
+  price: { amount: 150000, currency: "NGN" },
+  amount: { amount: 150000, currency: "NGN" },
+  mode: "ask",
+  choice: null,
+};
+
+describe("recording an answer to an add-on", () => {
+  const CART = { id: "cart_1", status: "open", revision: 8, currency: "NGN" };
+
+  it("PUTs exactly { choice, baseRevision } to the add-on's own route, with the cookie", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(respond(200, { cart: CART, addOns: [] }));
+    global.fetch = fetchMock;
+
+    await setAddOnChoice("ado_pouch", "accepted", 7);
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toMatch(/\/api\/shop\/checkout\/add-ons\/ado_pouch$/);
+    expect(init.method).toBe("PUT");
+    expect(init.credentials).toBe("include");
+    /* STRICT on the server: any other key is a 400. */
+    expect(JSON.parse(init.body)).toEqual({ choice: "accepted", baseRevision: 7 });
+  });
+
+  it("escapes the id in the path", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(respond(200, { cart: CART, addOns: [] }));
+    global.fetch = fetchMock;
+
+    await setAddOnChoice("ado/odd id", "declined", 7);
+
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/checkout\/add-ons\/ado%2Fodd%20id$/);
+  });
+
+  it("answers the re-evaluated offers, so nothing needs to read the cart again", async () => {
+    const answered = { ...OFFER, choice: "accepted" as const };
+    global.fetch = vi.fn().mockResolvedValue(respond(200, { cart: CART, addOns: [answered] }));
+
+    const result = await setAddOnChoice("ado_pouch", "accepted", 7);
+
+    expect(result).toEqual({ ok: true, data: { cart: CART, addOns: [answered] } });
+  });
+
+  it("reads add_on_not_offered as its own code, for a silent re-read rather than a banner", async () => {
+    global.fetch = vi.fn().mockResolvedValue(respond(409, { error: "add_on_not_offered" }));
+
+    const result = await setAddOnChoice("ado_pouch", "accepted", 7);
+
+    expect(result).toEqual({ ok: false, error: { code: "add_on_not_offered" } });
+  });
+
+  it("reads the route's stale_write as the stale revision it is", async () => {
+    /* `/checkout/addresses` spells this `400 baseRevision`; the add-on route
+       spells it `409 stale_write`. One meaning, one code, one screenful of
+       copy — "The cart changed elsewhere" — rather than "try again". */
+    global.fetch = vi.fn().mockResolvedValue(respond(409, { error: "stale_write" }));
+
+    const result = await setAddOnChoice("ado_pouch", "accepted", 7);
+
+    expect(result).toEqual({ ok: false, error: { code: "bad_revision" } });
+  });
+
+  it("reads a 404 as gone — no such add-on", async () => {
+    global.fetch = vi.fn().mockResolvedValue(respond(404, { error: "gone" }));
+
+    const result = await setAddOnChoice("ado_gone", "accepted", 7);
+
+    expect(result).toEqual({ ok: false, error: { code: "gone" } });
+  });
+});
+
+describe("previewing the checkout to learn the offers", () => {
+  const TOTALS = {
+    currency: "NGN",
+    lines: [],
+    shipping: null,
+    adjustments: [],
+    subtotal: { amount: 2300000, currency: "NGN" },
+    adjustmentTotal: { amount: 0, currency: "NGN" },
+    shippingTotal: { amount: 300000, currency: "NGN" },
+    taxTotal: { amount: 0, currency: "NGN" },
+    grandTotal: { amount: 2600000, currency: "NGN" },
+  };
+
+  it("POSTs an empty body to the preview route, with the cookie", async () => {
+    /* The route's body is the freeze's minus its revision, every key
+       optional and the schema strict. `{}` is what the admin's own tests
+       post; this client has no points figure worth previewing. */
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(respond(200, { totals: TOTALS, redemption: null, addOns: [OFFER] }));
+    global.fetch = fetchMock;
+
+    await previewCheckout();
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toMatch(/\/api\/shop\/checkout\/preview$/);
+    expect(init.method).toBe("POST");
+    expect(init.credentials).toBe("include");
+    expect(JSON.parse(init.body)).toEqual({});
+  });
+
+  it("answers the offers the API evaluated against the checkout as it stands", async () => {
+    global.fetch = vi
+      .fn()
+      .mockResolvedValue(respond(200, { totals: TOTALS, redemption: null, addOns: [OFFER] }));
+
+    const result = await previewCheckout();
+
+    expect(result.ok && result.data.addOns).toEqual([OFFER]);
+  });
+
+  it("is the same preview, minus the offers, from an admin that predates them", async () => {
+    /* The seam's other half: the field is simply absent, and `addOnsOf` reads
+       that as no offers. A storefront that crashed here would break every
+       checkout until the admin deploy. */
+    global.fetch = vi.fn().mockResolvedValue(respond(200, { totals: TOTALS, redemption: null }));
+
+    const result = await previewCheckout();
+
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.data.addOns).toBeUndefined();
+  });
+
+  it("reads the freeze's refusals the freeze's way, because it shares them", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      respond(409, { error: "precondition_failed", reason: "no_shipping_address" }),
+    );
+
+    const result = await previewCheckout();
+
+    expect(result).toEqual({ ok: false, error: { code: "no_shipping_address" } });
   });
 });

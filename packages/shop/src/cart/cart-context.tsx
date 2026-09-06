@@ -6,6 +6,7 @@ import { isSwitchable, type CurrencyCode, type CurrencyConfig } from "../data/cu
 import { resolveCurrency, storedCurrency } from "../data/currency-preference";
 import {
   addLine,
+  addOnsOf,
   bulkOf,
   createCart,
   majorUnits,
@@ -17,10 +18,11 @@ import {
 import { lineKey } from "./line-key";
 import { EMPTY_VIEW as EMPTY, outcomeOfRead } from "./read-outcome";
 import { partitionLines } from "./sellable";
+import { maxQtyForLine, stockOf } from "./stock";
 import type { VariantMatch } from "./sellable";
 import type { ApiCartView, CartResult } from "../data/cart-api";
 import type { CartApi, CartLine, CartLineKey, ResolvedLine } from "./types";
-import type { BulkTier, Colour, SizeOption } from "../data/types";
+import type { BulkTier, Colour, SizeOption, VariantStock } from "../data/types";
 
 /**
  * The cart's state, now held by the SERVER.
@@ -73,6 +75,15 @@ export interface CartCatalogEntry {
   bulkTiers: BulkTier[];
   /** `"<colourId>:<sizeId>"` → variant id, priced and active only. */
   variantIds: Record<string, string>;
+  /**
+   * `"<colourId>:<sizeId>"` → the shelf, keyed identically to `variantIds`.
+   *
+   * READ FOR `backorderable` AND NOTHING ELSE on a cart row. The count here
+   * came from an ISR-cached catalogue response and can be an hour old; the
+   * line's own `inStock` is re-quoted on every cart read. `maxQtyForLine` in
+   * `stock.ts` is where the two are combined, and its header says why.
+   */
+  variantStock: Record<string, VariantStock>;
   /** The product's own photograph, for a basket row whose colour has none. */
   coverImageUrl: string | null;
 }
@@ -104,6 +115,17 @@ export function CartProvider({ children, catalog, currencyConfig }: CartProvider
   /** A write is in flight. The drawer disables its steppers rather than letting
    *  two edits race and land in the order the network chose. */
   const [pending, setPending] = React.useState(false);
+  /**
+   * WHICH ROW is being written, as its `ResolvedLine.key`, or null.
+   *
+   * `pending` alone says only that SOME write is in flight, which is enough to
+   * stop two edits racing and not enough to tell a shopper anything: pressing
+   * plus on one row would have to blank every row's figure, or none of them.
+   * Keyed on the triple rather than the server line id because that is what
+   * `resolved` rows carry and what the drawer already renders against — see
+   * `ResolvedLine.key`.
+   */
+  const [pendingKey, setPendingKey] = React.useState<string | null>(null);
 
   /**
    * The currency any cart minted here is created in.
@@ -285,13 +307,19 @@ export function CartProvider({ children, catalog, currencyConfig }: CartProvider
    *               way; anything else at least stops the UI from lying.
    * ═══════════════════════════════════════════════════════════════════════════
    */
-  const mutate = React.useCallback(async (run: () => Promise<CartResult>) => {
+  const mutate = React.useCallback(async (
+    run: () => Promise<CartResult>,
+    /** The row this write belongs to, for per-row feedback. Absent for writes
+     *  that are not about one row — creating the cart, emptying it. */
+    key?: string,
+  ) => {
     /* A WRITE SUPERSEDES ANY READ STILL IN THE AIR. Every mutation answers with
        the whole new cart, so a `load` issued before this one started is stale
        the moment this runs — and letting it land afterwards would undo the
        edit on screen. Same rule as `readSeq` itself: issue order wins. */
     readSeq.current += 1;
     setPending(true);
+    setPendingKey(key ?? null);
     setProblem(null);
     try {
       const result = await run();
@@ -324,6 +352,7 @@ export function CartProvider({ children, catalog, currencyConfig }: CartProvider
       return result;
     } finally {
       setPending(false);
+      setPendingKey(null);
     }
   }, []);
 
@@ -354,7 +383,16 @@ export function CartProvider({ children, catalog, currencyConfig }: CartProvider
           if (created.ok) return addLine(variantId, amount);
         }
         return added;
-      });
+      /* ═══ THE ROW THIS ADD IS FOR, SO THE DRAWER CAN SAY IT IS COMING ═══
+         `add` opens the drawer and posts in the same breath, so for the whole
+         round trip the sheet was showing the basket as it was a moment ago: on
+         a first add, "Your cart is empty" — a claim already false — and on a
+         later one, the existing rows with the new row and its divider popping
+         in out of nowhere. Naming the row here is what lets the drawer draw a
+         placeholder for it, and it costs nothing: a key that turns out to
+         MERGE into an existing row drives that row's stepper instead, which is
+         the right feedback for what actually happened. */
+      }, lineKey(key));
     },
     [variantFor, open, mutate, view.cart, cartCurrency],
   );
@@ -423,19 +461,38 @@ export function CartProvider({ children, catalog, currencyConfig }: CartProvider
       /* Below one reads as "take it out" rather than an invalid state to
          refuse — the same rule the local cart followed. */
       if (qty < 1) {
-        void mutate(() => removeLine(lineId));
+        void mutate(() => removeLine(lineId), lineKey(key));
         return;
       }
-      void mutate(() => setLineQty(lineId, Math.trunc(qty)));
+      /* ═══ THE CEILING IS ENFORCED HERE TOO, NOT ONLY IN THE STEPPER ═══
+         A `max` on the control is a courtesy to the shopper; this is the rule.
+         `setQty` is the whole cart's write path and it is reachable without
+         touching a stepper at all — the drawer and `/cart` both call it
+         directly, and a row whose stock fell while the basket sat open is
+         holding a value no control clamped when it was rendered. Sending the
+         over-quantity anyway is how the shopper gets all the way to the freeze
+         and is refused there, which is the bug this change exists to end. */
+      const line = view.lines.find((l) => l.id === lineId);
+      const entry = bySlug.get(key.productSlug);
+      /* Rebuilt from `view.lines` and `bySlug` rather than read off `resolved`,
+         which is declared BELOW this callback — and deliberately not hoisted or
+         stuffed into a ref to get at it. Both halves of the rule are already in
+         scope here, and it is the same pair `resolved` itself feeds to
+         `maxQtyForLine`. */
+      const cap = maxQtyForLine(
+        line?.inStock ?? null,
+        entry ? stockOf(entry, key.colourId, key.sizeId) : null,
+      );
+      void mutate(() => setLineQty(lineId, Math.min(Math.trunc(qty), cap)), lineKey(key));
     },
-    [lineIdFor, mutate],
+    [lineIdFor, mutate, view.lines, bySlug],
   );
 
   const remove = React.useCallback(
     (key: CartLineKey) => {
       const lineId = lineIdFor(key);
       if (!lineId) return;
-      void mutate(() => removeLine(lineId));
+      void mutate(() => removeLine(lineId), lineKey(key));
     },
     [lineIdFor, mutate],
   );
@@ -536,6 +593,11 @@ export function CartProvider({ children, catalog, currencyConfig }: CartProvider
              constant with nothing behind it in the API, so the cart could not
              claim one the till will not honour. */
           tier: null,
+          /* THE LINE'S COUNT, THE CATALOGUE'S FLAG. `line.inStock` is re-quoted
+             on every cart read; `entry.variantStock` rode in on a catalogue
+             response that may be an hour old. Feeding the stale number here
+             would cap a shopper against stock that has since been restocked. */
+          maxQty: maxQtyForLine(line.inStock, stockOf(entry, colour.id, size.id)),
         };
       });
   }, [split, view.preview]);
@@ -550,6 +612,11 @@ export function CartProvider({ children, catalog, currencyConfig }: CartProvider
       })),
     [resolved],
   );
+
+  /* Through the seam, so a server that sends no `addOns` is an empty list
+     here rather than `undefined` reaching the drawer — and a STABLE empty
+     list, so the memo below does not re-run on every render for it. */
+  const addOns = addOnsOf(view);
 
   const value = React.useMemo<CartApi>(() => {
     /* SELLABLE UNITS ONLY. The badge is a promise that there are things in the
@@ -590,8 +657,10 @@ export function CartProvider({ children, catalog, currencyConfig }: CartProvider
       savings: Math.max(0, list - subtotal),
       hydrated,
       pending,
+      pendingKey,
       changes: view.changes,
       problem,
+      addOns,
       add,
       addVariants,
       setQty,
@@ -607,11 +676,13 @@ export function CartProvider({ children, catalog, currencyConfig }: CartProvider
     split,
     view.preview,
     view.changes,
+    addOns,
     problem,
     resolved,
     lines,
     hydrated,
     pending,
+    pendingKey,
     add,
     addVariants,
     setQty,

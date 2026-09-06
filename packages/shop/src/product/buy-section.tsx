@@ -6,6 +6,7 @@ import { cn } from "@plaspool/ui";
 import type { Product } from "../data/types";
 import type { ReviewAggregate } from "../data/reviews";
 import { firstInStockColour, cheapestSize } from "../data/money";
+import { maxQtyFor, stockOf } from "../cart/stock";
 import { Gallery } from "./gallery";
 import { BuyBox } from "./buy-box";
 import { StickyBuyBar } from "./sticky-buy-bar";
@@ -34,10 +35,31 @@ export function ProductBuySection({
 }: ProductBuySectionProps) {
   const [colourId, setColourId] = React.useState(() => firstInStockColour(product).id);
   const [sizeId, setSizeId] = React.useState(() => cheapestSize(product).id);
-  const [quantity, setQuantity] = React.useState(1);
+  const [chosenQuantity, setQuantity] = React.useState(1);
 
   const colour = product.colours.find((c) => c.id === colourId) ?? product.colours[0];
   const size = product.sizes.find((s) => s.id === sizeId) ?? product.sizes[0];
+
+  /**
+   * ═══ STOCK IS A PROPERTY OF THE VARIANT, SO IT MOVES WHEN THE PICKER DOES ═══
+   * `colour.inStock` is a boolean ROLLED UP ACROSS SIZES — a colour reads as in
+   * stock if any one of its weights is — so it can say nothing about how many of
+   * THIS weight in THIS colour there are. `variantStock` is keyed on the pair,
+   * which is the only key that can answer.
+   */
+  const maxQty = maxQtyFor(stockOf(product, colour.id, size.id));
+
+  /**
+   * DERIVED, NOT AN EFFECT THAT WRITES BACK.
+   *
+   * The quantity outlives the picker: choose 9 of a colour with plenty, switch
+   * to one with 2 left, and the state still says 9. Clamping in an effect would
+   * render the wrong number for a frame and then correct it — and would fight
+   * the shopper's own typing on the way back up. Deriving it means the control
+   * is never able to show a quantity this variant cannot supply, and the raw
+   * choice is remembered for when they switch back to something that has it.
+   */
+  const quantity = Math.min(chosenQuantity, maxQty);
 
   /* The IntersectionObserver that used to gate the sticky bar is gone (#10):
      the bar is pinned for the whole scroll now, so there is nothing to
@@ -79,6 +101,7 @@ export function ProductBuySection({
             onColourChange={setColourId}
             onSizeChange={setSizeId}
             onQuantityChange={setQuantity}
+            maxQty={maxQty}
           />
         </div>
       </div>
@@ -89,6 +112,7 @@ export function ProductBuySection({
         size={size}
         quantity={quantity}
         onQuantityChange={setQuantity}
+        maxQty={maxQty}
       />
     </div>
   );

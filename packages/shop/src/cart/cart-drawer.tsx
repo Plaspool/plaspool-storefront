@@ -13,6 +13,9 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
+  Skeleton,
+  SkeletonRegion,
+  TextSkeleton,
 } from "@plaspool/ui";
 
 import { EmptyState } from "../components/empty-state";
@@ -20,8 +23,10 @@ import { Price } from "../components/price";
 import { QuantityStepper } from "../components/quantity-stepper";
 import { ProductPhoto } from "../components/product-photo";
 import { formatNaira } from "../data/money";
+import { addOnAmountLabel, includedAddOns } from "../checkout/add-ons";
 import { BulkLinePrice } from "./bulk-line-price";
 import { useCart } from "./cart-context";
+import { stockWarning } from "./stock";
 import { UnsellableNotice } from "./unsellable-notice";
 import type { CartLineKey, ResolvedLine } from "./types";
 import { lineDescriptor, variantDescriptor } from "./line-descriptor";
@@ -45,14 +50,21 @@ function CartLineRow({
   line,
   onQtyChange,
   onRemove,
+  pending = false,
 }: {
   line: ResolvedLine;
   onQtyChange: (qty: number) => void;
   onRemove: () => void;
+  /** A write for THIS row is in flight. */
+  pending?: boolean;
 }) {
   const { product, colour, size, qty, unitPrice, effectiveUnitPrice, bulkPercentBps, bulkQty, total } =
     line;
   const descriptor = lineDescriptor(product.name, colour.name, size.label);
+  /* Null unless the shopper has actually reached a SHELF limit — never at the
+     stepper's own sanity ceiling, which is not an inventory claim. See
+     `stockWarning`. */
+  const left = stockWarning(qty, line.maxQty);
 
   return (
     <li className="flex gap-3 py-4">
@@ -70,16 +82,29 @@ function CartLineRow({
       />
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div className="flex min-w-0 items-start justify-between gap-3">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <SheetClose asChild>
+              {/* ═══ IT WRAPS. IT USED TO BE `truncate`, AND THAT HID THE NAME ═══
+                  `truncate` is `white-space: nowrap` plus an ellipsis, and it
+                  only reads well when the box is genuinely narrower than the
+                  text. Inside the Radix table wrapper it was neither: the row
+                  had 519px in a 384px drawer, so the element took its full
+                  319px, never truncated, and the tail was sliced off by an
+                  ancestor's `overflow: hidden` with no ellipsis to show for it.
+
+                  Wrapping is the right answer even with that fixed. A cart row
+                  is the last place to abbreviate what somebody is about to pay
+                  for, there are only ever a handful of rows, and a second line
+                  costs 20px. `break-words` so a long unbroken token — an SKU, a
+                  URL-ish name — still cannot push the row wide again. */}
               <Link
                 href={`/store/products/${product.slug}`}
-                className="block truncate rounded-sm text-sm font-semibold text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="block break-words rounded-sm text-sm font-semibold text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 {product.name}
               </Link>
             </SheetClose>
-            <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
+            <p className="mt-0.5 break-words font-mono text-xs text-muted-foreground">
               {variantDescriptor(colour.name, size.label)}
             </p>
           </div>
@@ -100,7 +125,16 @@ function CartLineRow({
         </div>
 
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2">
-          <QuantityStepper value={qty} onChange={onQtyChange} label={descriptor} />
+          {/* `max` IS THE WHOLE FIX ON THIS SURFACE. Without it the stepper
+              offered 99 of a variant the shop had four of, and the refusal
+              arrived at the checkout freeze — after the address. */}
+          <QuantityStepper
+            value={qty}
+            onChange={onQtyChange}
+            max={line.maxQty}
+            pending={pending}
+            label={descriptor}
+          />
           <BulkLinePrice
             unitPrice={unitPrice}
             effectiveUnitPrice={effectiveUnitPrice}
@@ -110,11 +144,22 @@ function CartLineRow({
           />
         </div>
 
+        {/* WHY THE PLUS BUTTON STOPPED. A disabled control with no explanation
+            reads as a broken one; the number is what makes it an answer. Not
+            `role="alert"` — nothing has gone wrong, and the shopper caused this
+            by pressing the button they are looking at. */}
+        {left !== null && (
+          <p className="font-mono text-xs font-medium text-muted-foreground">
+            {`Only ${left} left`}
+          </p>
+        )}
+
         <Button
           type="button"
           variant="ghost"
           size="sm"
           onClick={onRemove}
+          disabled={pending}
           aria-label={`Remove ${descriptor} from cart`}
           className="h-auto w-fit gap-1.5 px-2 py-1 text-xs text-muted-foreground focus-visible:ring-brand focus-visible:ring-offset-background"
         >
@@ -126,8 +171,119 @@ function CartLineRow({
   );
 }
 
+/**
+ * The basket's shape, while the basket is still on its way.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE DRAWER USED TO OPEN ONTO NOTHING AT ALL.
+ *
+ * Every block below `hydrated` is gated on it, so until the client's first read
+ * lands the sheet was a title and dead space — and that wait is a real network
+ * round trip to the commerce API, on a cookie, at the moment the shopper has
+ * just clicked. The empty state could not fill it either: "Your cart is empty"
+ * is a CLAIM, and it is the one thing we do not yet know. Showing it and then
+ * replacing it with three rows is worse than showing nothing.
+ *
+ * So: the layout, drawn as itself. Per `CLAUDE.md` ("Loading states") — once a
+ * section's shape is known, the loading state renders that shape.
+ *
+ * ═══ IT MIRRORS `CartLineRow`'S BOX, CLASS FOR CLASS ═══
+ * Same `flex gap-3 py-4` row, same `w-16` square photograph, same two-line
+ * head, same stepper-height block. A skeleton that reflows when the data lands
+ * moves the text under the shopper's eye exactly as they start reading it,
+ * which is the failure this is supposed to prevent rather than cause.
+ *
+ * THREE ROWS because a basket the shopper is opening has at least one thing in
+ * it and a median cart is small; three is enough to read as a list without
+ * promising a fuller basket than arrives.
+ *
+ * EXPORTED SO A TEST CAN SEE IT. The drawer itself is unreachable from this
+ * suite twice over — `useCart` needs a provider that does not run under
+ * `react-dom/server`, and the sheet renders behind a Radix portal. `CLAUDE.md`
+ * names the way out and `returns/return-intro.tsx` is its worked example: pull
+ * the presentational half into its own component and assert THAT. This one is
+ * pure markup with no props, no hooks and no context, so it costs nothing.
+ */
+export function CartSkeleton({ rows = 3, label = "Loading your cart" }: { rows?: number; label?: string } = {}) {
+  return (
+    <SkeletonRegion label={label} className="min-h-0 flex-1">
+      <ul className="divide-y divide-brand-line px-6">
+        {Array.from({ length: rows }, (_, row) => (
+          <CartRowSkeleton key={row} />
+        ))}
+      </ul>
+    </SkeletonRegion>
+  );
+}
+
+/**
+ * ONE row's shape — the unit both the opening skeleton and an arriving item are
+ * built from.
+ *
+ * ═══ WHY AN ARRIVING ITEM NEEDS ONE AT ALL ═══
+ * "Add to cart" opens the drawer and posts in the same breath, so for the whole
+ * round trip the sheet showed the basket as it was a moment ago: on the first
+ * add, "Your cart is empty" — a claim that is already false — and on the
+ * second, the one existing row, with the new row and its divider POPPING IN
+ * later out of nowhere. Nothing on screen said anything was on its way.
+ *
+ * `key` is deliberately not needed here: the caller decides how many.
+ */
+export function CartRowSkeleton() {
+  return (
+          <li className="flex gap-3 py-4">
+            {/* `self-start` IS LOAD-BEARING, and measurement is the only way to
+                see it. A flex child defaults to `align-self: stretch`, which
+                hands this a definite height — the row's — and a definite height
+                beats `aspect-ratio`. Measured at 375px it rendered 64×106: a
+                filled grey PORTRAIT block standing in for what reads on screen
+                as a square thumbnail, because the real `ProductPhoto` is an
+                `object-contain` image that letterboxes inside the same tall box
+                and so LOOKS 64×64. Opting out of the stretch makes the
+                placeholder the size the photograph appears to be.
+
+                It cannot change the row's height: the column beside it is
+                106px of content and is what drives the row either way. */}
+            <Skeleton className="aspect-square w-16 shrink-0 self-start rounded-md" />
+            <div className="flex min-w-0 flex-1 flex-col gap-2">
+              <div className="flex min-w-0 items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <TextSkeleton className="w-3/5 text-sm font-semibold" />
+                  <TextSkeleton className="mt-0.5 w-2/5 font-mono text-xs" />
+                </div>
+                <TextSkeleton className="w-16 shrink-0 text-sm" />
+              </div>
+              {/* The stepper is a fixed 36px control (`h-9`), so this is a
+                  height rather than a line box — the one place in this row
+                  where a `TextSkeleton` would be the wrong tool. */}
+              <Skeleton className="h-9 w-28 rounded-lg" />
+              <TextSkeleton className="w-20 text-xs" />
+            </div>
+          </li>
+  );
+}
+
 export function CartDrawer() {
   const cart = useCart();
+
+  /**
+   * A write is in flight for a row THAT IS NOT ON SCREEN YET — an add of
+   * something new, rather than an edit to something already listed.
+   *
+   * ═══ THIS IS THE "IT JUST POPS OUT OF NOWHERE" BUG ═══
+   * `add()` opens the drawer and posts in the same breath, so for the length of
+   * that round trip the sheet showed the basket as it was a moment ago. On a
+   * first add that meant "Your cart is empty" — a sentence already false when
+   * it rendered — and on a later one, the existing rows, with the new row and
+   * its divider appearing later with no warning.
+   *
+   * A key that MERGES into an existing row is deliberately not `incoming`: the
+   * row is already drawn, nothing new is arriving, and the honest feedback is
+   * that row's own stepper going to a placeholder — which `pendingKey` already
+   * drives. So this is only ever true when a row really is about to appear.
+   */
+  const incoming =
+    cart.pendingKey !== null && !cart.resolved.some((line) => line.key === cart.pendingKey);
 
   return (
     <Sheet open={cart.isOpen} onOpenChange={(open) => (open ? cart.open() : cart.close())}>
@@ -170,6 +326,12 @@ export function CartDrawer() {
             otherwise this would flash an empty cart before the real one
             loads from the server. See cart-context.tsx. */}
 
+        {/* `!cart.problem` FOR THE SAME REASON THE EMPTY STATE CARRIES IT. A
+            read that failed is not a read still running, and a basket shape
+            drawn over "We couldn't load your cart" promises rows that are
+            never coming. The notice is the whole answer in that case. */}
+        {!cart.hydrated && !cart.problem && <CartSkeleton />}
+
         {/* `!cart.problem`: an empty basket and an unreadable one are different
             claims, and only one of them is ours to make. Without this the
             drawer stacked "We couldn't load your cart" directly on top of "Your
@@ -179,12 +341,16 @@ export function CartDrawer() {
             is not empty — it is stuck, and those are opposite instructions.
             Saying "empty" over the notice that names the blocking row would be
             the drawer contradicting itself in adjacent paragraphs. */}
-        {cart.hydrated && cart.resolved.length === 0 && cart.unsellable.length === 0 && !cart.problem && (
+        {/* `!incoming` TOO, and for the same reason as `!cart.problem` beside
+            it: "Your cart is empty" is a CLAIM, and it is false the moment the
+            shopper has pressed Add to cart. It used to render anyway for the
+            whole round trip, then be replaced by the row — which is the flash
+            this whole block exists to avoid. */}
+        {cart.hydrated && cart.resolved.length === 0 && cart.unsellable.length === 0 && !cart.problem && !incoming && (
           <div className="flex flex-1 items-center justify-center">
             <EmptyState
               icon={<ShoppingCart aria-hidden="true" />}
               title="Your cart is empty"
-              body="Browse PLA, PETG and TPU by the spool or by the box."
               action={
                 <SheetClose asChild>
                   <Button
@@ -200,6 +366,13 @@ export function CartDrawer() {
           </div>
         )}
 
+        {/* AN ADD INTO AN EMPTY BASKET. There are no rows to list yet and the
+            empty state has stood down, so without this the sheet is blank for
+            the round trip. One row, because `add()` adds one. */}
+        {cart.hydrated && cart.resolved.length === 0 && incoming && (
+          <CartSkeleton rows={1} label="Adding to your cart" />
+        )}
+
         {cart.hydrated && cart.resolved.length > 0 && (
           <>
             <ScrollArea className="min-h-0 flex-1">
@@ -210,8 +383,13 @@ export function CartDrawer() {
                     line={line}
                     onQtyChange={(qty) => cart.setQty(toKey(line), qty)}
                     onRemove={() => cart.remove(toKey(line))}
+                    pending={cart.pendingKey === line.key}
                   />
                 ))}
+                {/* The row that is on its way, in the list, in its place — so
+                    the divider and the item arrive together instead of the
+                    item appearing under a divider that was already there. */}
+                {incoming && <CartRowSkeleton />}
               </ul>
             </ScrollArea>
 
@@ -231,6 +409,23 @@ export function CartDrawer() {
                   </span>
                 </div>
               )}
+
+              {/* ═══ ONE QUIET LINE PER ADD-ON THE RULES PUT ON THE ORDER ═══
+                  An `include` add-on is never asked about, so the first a
+                  shopper would otherwise hear of it is a row on the review
+                  step. Said here, in passing, so the total on that step has
+                  no surprise in it: "Gift box · ₦1,500 included". The TITLE
+                  and the AMOUNT are the API's — `amount` is what the rule
+                  charges, and a free one is just "Gift box included" — and
+                  the word "included" is ours. Nothing renders on a server
+                  without the feature. */}
+              {includedAddOns(cart.addOns).map((addOn) => (
+                <p key={addOn.id} className="text-xs text-muted-foreground">
+                  {addOn.amount.amount > 0
+                    ? `${addOn.title} · ${addOnAmountLabel(addOn.amount)} included`
+                    : `${addOn.title} included`}
+                </p>
+              ))}
 
               {/* NOT A LINK WHILE SOMETHING UNBUYABLE IS IN THE BASKET.
                   `/checkout` answers `unresolved_lines` for exactly this cart

@@ -283,3 +283,32 @@ describe("earnedSince", () => {
     expect(earnedSince([skewed], SNAPSHOT.startedAt)).toBe(139);
   });
 });
+
+/**
+ * The add-on rows, which are optional on the snapshot for the same reason
+ * they are optional on the frozen totals: a receipt written before add-ons
+ * existed has none, and that is the truth about that order rather than a
+ * version to migrate away from.
+ */
+describe("a snapshot's add-ons", () => {
+  it("reads back a snapshot written before add-ons existed, at the same version", () => {
+    const decoded = decodeSnapshot(encodeSnapshot(SNAPSHOT), SNAPSHOT.intentId);
+    expect(decoded).not.toBeNull();
+    expect(decoded?.totals.addOns).toBeUndefined();
+  });
+
+  it("carries the rows across the hand-off unchanged", () => {
+    const withAddOns: ReceiptSnapshot = {
+      ...SNAPSHOT,
+      totals: {
+        ...SNAPSHOT.totals,
+        addOns: [
+          { title: "Velvet pouch", mode: "chosen", amount: 150_000 },
+          { title: "Padded packing", mode: "included", amount: 0 },
+        ],
+      },
+    };
+    const decoded = decodeSnapshot(encodeSnapshot(withAddOns), SNAPSHOT.intentId);
+    expect(decoded?.totals.addOns).toEqual(withAddOns.totals.addOns);
+  });
+});

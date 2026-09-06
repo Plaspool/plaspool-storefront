@@ -200,6 +200,51 @@ export interface Product {
    * combination that is not for sale — `add()` refuses rather than guessing.
    */
   variantIds: Record<string, string>;
+  /**
+   * `"<colourId>:<sizeId>"` → what the shelf holds for that variant.
+   *
+   * ═══ THE COUNT USED TO DIE HERE, AND THE SHOP OVERSOLD BECAUSE OF IT ═══
+   * `ApiVariant.available` is a NUMBER, and the API has been sending real ones
+   * all along. The catalogue mapping reduced it to `Colour.inStock`, a boolean,
+   * ROLLED UP ACROSS SIZES — a colour counted as in stock if any one of its
+   * weights was. By the time a buy box rendered, "four left of the 1kg black"
+   * had become "black: true", so the stepper offered 99 and the shopper found
+   * out at the checkout freeze.
+   *
+   * Kept as a SIBLING MAP rather than folded into `Colour` or `SizeOption`
+   * because stock is a property of the variant — the (colour, size) pair — and
+   * neither axis alone can hold it without lying about the other. That is the
+   * same reason `variantIds` is shaped this way, and the two are keyed
+   * identically on purpose: `variantIdsFrom` and `variantStockFrom` walk the
+   * same variants and build the same keys, so a pair that can be bought always
+   * has a shelf, and one that cannot has neither.
+   */
+  variantStock: Record<string, VariantStock>;
+}
+
+/**
+ * What the catalogue knows about one variant's shelf.
+ *
+ * Lives here rather than beside the rule that reads it (`cart/stock.ts`) so the
+ * data layer does not import from the cart to describe its own response.
+ */
+export interface VariantStock {
+  /**
+   * Units on the shelf, or NULL when nothing tracks this variant.
+   *
+   * NULL IS NOT ZERO — the same distinction `ApiVariant.available` draws, and
+   * for the same reason: an untracked product read as "none left" would be
+   * capped at one unit per order across the whole shop.
+   */
+  available: number | null;
+  /**
+   * Sold past zero on purpose, so no stock ceiling applies at all.
+   *
+   * Its `available` goes NEGATIVE to record an oversell, which is honest data
+   * and not corruption — `server/shop/admin/inventory.ts` in the admin repo
+   * says so at length.
+   */
+  backorderable: boolean;
 }
 
 export interface Category {

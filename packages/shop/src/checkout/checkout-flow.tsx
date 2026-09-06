@@ -3,7 +3,18 @@
 import * as React from "react";
 import { Link } from "../components/link";
 import { AlertTriangle, ArrowLeft, LifeBuoy, Loader2, ShieldAlert } from "lucide-react";
-import { Button, Input, Skeleton, SkeletonRegion, cn } from "@plaspool/ui";
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Skeleton,
+  SkeletonRegion,
+  cn,
+} from "@plaspool/ui";
 
 import { EmptyState } from "../components/empty-state";
 import { formatNaira } from "../data/money";
@@ -43,21 +54,28 @@ import type { PointsBalance } from "../data/points-api";
 import { PointsOffer } from "./points-offer";
 import { STEP_LABELS, stepsFor, type Step } from "./checkout-steps";
 import { DiscountCodeField } from "./discount-code-field";
+import { AddOnOfferList, AddOnPendingSummary, type AddOnChoice } from "./add-on-offer-card";
+import { AddOnReviewControl, AddOnTotalRows } from "./add-on-review-control";
+import { addOnRowsFor, askedAddOns, pendingAddOns } from "./add-ons";
 import { majorUnits } from "../data/cart-api";
 import { useCart } from "../cart/cart-context";
 import {
   REDEMPTION_ADJUSTMENT_CODE,
+  addOnsOf,
   createPaymentIntent,
   currentCartRevision,
   cancelCheckout,
   applyDiscountCode,
   freezeCheckout,
+  previewCheckout,
   removeDiscountCode,
+  setAddOnChoice,
   setCheckoutAddress,
   setCheckoutShipping,
   startCheckout,
 } from "../data/checkout-api";
 import type {
+  AddOnOffer,
   Address,
   CheckoutError,
   FrozenTotals,
@@ -171,6 +189,28 @@ const FIELD_IDS: Record<FieldKey, string> = {
   district: "co-district",
   postalCode: "co-postal",
 };
+
+/**
+ * Whether the extras step should open as a bottom sheet.
+ *
+ * ═══ READ AT EVENT TIME, NEVER AT RENDER ═══
+ * `matchMedia` cannot answer during the server render, and a render that read
+ * it would make the first client paint disagree with the server's —
+ * `dialog.tsx`'s own header is the note on why the sheet is CSS below `sm`
+ * rather than a JS switch. So the DRAWING is CSS: the cards sit on the page
+ * above `sm` and `DialogContent mobile="sheet"` re-seats itself below it,
+ * and nothing about either is decided by JavaScript. The one question CSS
+ * cannot answer is whether to OPEN the dialog at all — a dialog open on a
+ * desktop is a focus trap over a page that already shows the cards — and
+ * that is asked here, only ever from the click that continues past the
+ * previous step, in the browser. Matches Tailwind's `sm` (640px) exactly,
+ * because the sheet re-seats itself below that same width.
+ */
+const NARROW_VIEWPORT = "(max-width: 639.98px)";
+
+function narrowViewport(): boolean {
+  return typeof window !== "undefined" && window.matchMedia(NARROW_VIEWPORT).matches;
+}
 
 /* The country and state controls, and the `Field` frame they share, live in
    `country-field.tsx`, `region-field.tsx` and `address-field.tsx` — split out
@@ -442,6 +482,36 @@ export function CheckoutFlow() {
    * computed with the code in hand.
    */
   const [appliedDiscount, setAppliedDiscount] = React.useState<string | null>(null);
+
+  /**
+   * The add-on offers as the server last described them for this cart.
+   *
+   * ═══ THE API DECIDES, THIS ONLY REMEMBERS ITS LAST ANSWER ═══
+   * The operator's rules say, per cart, whether an add-on is ASKED about or
+   * INCLUDED, and the checkout preview evaluates them against the address
+   * and the delivery option as they stand. This is filled from that preview
+   * at the moment the shopper continues past the step before
+   * (`continueToTotal`), and from every answer's response. The extras step
+   * draws `pendingAddOns(offers)`; the review step draws a control for
+   * `askedAddOns(offers)`. Nothing here decides whether an add-on applies,
+   * and nothing here prices one.
+   */
+  const [offers, setOffers] = React.useState<AddOnOffer[]>([]);
+  /**
+   * How many add-ons the extras step is asking about, for "Step N of M".
+   *
+   * ZERO UNTIL THE STEP IS ENTERED, AND STICKY AFTER — the same shape as
+   * `shippingOptions`, which is also unknown until the address is in. Not
+   * re-derived from `offers` on every read: once every question is answered
+   * nothing is pending, and a header that dropped from "3 of 3" to "2 of 2"
+   * the moment the shopper changed a discount code on the review step would
+   * be the count lying in the other direction. Reset only by a fresh pass
+   * through the details step.
+   */
+  const [askCount, setAskCount] = React.useState(0);
+  /** Whether the extras step is currently drawn as a bottom sheet. Only ever
+   *  true below `sm` — see `narrowViewport`. */
+  const [sheetOpen, setSheetOpen] = React.useState(false);
 
   const [totals, setTotals] = React.useState<FrozenTotals | null>(null);
   const [checkoutId, setCheckoutId] = React.useState<string | null>(null);
@@ -741,8 +811,16 @@ export function CheckoutFlow() {
   const countryServed = isCountryServed(config, address.countryCode);
 
   /* The steps this checkout actually has — two, unless the server offered a
-     real delivery choice. See `stepsFor`. */
-  const steps = React.useMemo(() => stepsFor(shippingOptions.length), [shippingOptions.length]);
+     real delivery choice or is asking about an add-on. See `stepsFor`. */
+  const steps = React.useMemo(
+    () => stepsFor(shippingOptions.length, askCount),
+    [shippingOptions.length, askCount],
+  );
+
+  /* What the extras step has to ask about right now. Derived, never stored:
+     an answer's response replaces `offers` whole, and the step is finished
+     the render this becomes empty. */
+  const pendingOffers = pendingAddOns(offers);
 
   /**
    * One configured field as a control.
@@ -892,6 +970,9 @@ export function CheckoutFlow() {
     }
     setBusy(true);
     setError(null);
+    /* A fresh pass through the flow. Whether the extras step exists is
+       decided again on the way to the total — see `askCount`. */
+    setAskCount(0);
     try {
       const rev = await currentCartRevision();
       if (!rev) {
@@ -946,7 +1027,7 @@ export function CheckoutFlow() {
             return;
           }
         }
-        await freezeAndReview();
+        await continueToTotal();
         return;
       }
 
@@ -972,9 +1053,10 @@ export function CheckoutFlow() {
         applyError(result.error);
         return;
       }
-      /* STRAIGHT TO THE TOTAL. This used to hand off to a contact step that
+      /* STRAIGHT TO THE TOTAL — by way of the extras step if the preview
+         raises a question. This used to hand off to a contact step that
          asked for an email already collected on step one. */
-      await freezeAndReview();
+      await continueToTotal();
     } finally {
       setBusy(false);
     }
@@ -1019,6 +1101,105 @@ export function CheckoutFlow() {
   }
 
   /**
+   * From the last details/delivery step to the total — by way of the extras
+   * step when there is a question to ask.
+   *
+   * ═══ THE OFFERS THAT DECIDE THE STEP COME FROM THE PREVIEW ═══
+   * Some rules read the delivery address or the delivery option, so an offer
+   * can appear only once those are written. `POST /checkout/preview`
+   * evaluates the rules against the checkout as it stands — which is why it
+   * is asked HERE, after the address and the option are in, and not off
+   * `GET /cart`, whose offers are for the drawer. A pending `ask` add-on is a
+   * question the shop said it would ask; the freeze would price it as
+   * declined without a word, so the asking has to happen before it.
+   *
+   * A REFUSED PREVIEW IS SHOWN, NOT SWALLOWED. It refuses exactly what the
+   * freeze would refuse, through the admin's same function — so a banner
+   * here is the banner the freeze was about to raise, one round trip
+   * earlier, and the submit that got here is the retry. What is NOT a
+   * refusal is an older admin answering the preview without `addOns` at all:
+   * that is an empty list, no question, and straight to the total — the
+   * checkout exactly as it was before add-ons existed.
+   */
+  async function continueToTotal() {
+    const preview = await previewCheckout();
+    if (!preview.ok) {
+      applyError(preview.error);
+      return;
+    }
+    const current = addOnsOf(preview.data);
+    setOffers(current);
+    const pending = pendingAddOns(current);
+    if (pending.length > 0) {
+      askAboutAddOns(pending);
+      return;
+    }
+    await freezeAndReview();
+  }
+
+  /**
+   * Send the shopper to the extras step — as a page above `sm`, as a bottom
+   * sheet below it. The step counts in "N of M" either way: the sheet is how
+   * it is drawn on a phone, not a different flow.
+   */
+  function askAboutAddOns(pending: AddOnOffer[]) {
+    setAskCount(pending.length);
+    setStep("extras");
+    setSheetOpen(narrowViewport());
+  }
+
+  /**
+   * Record one answer on the extras step, and move on when nothing is left
+   * to ask.
+   *
+   * ═══ THE CART IS OPEN HERE, SO THERE IS NOTHING TO THAW ═══
+   * The step sits before the freeze, and the last answer given here is what
+   * reaches it. The review step's control is the one that has to thaw first,
+   * and it goes through `reprice`.
+   *
+   * ═══ `add_on_not_offered` IS A RE-READ, NOT A BANNER ═══
+   * The cart changed, or the rules did, between the offer and the click. The
+   * shopper did nothing wrong and has nothing to retry, so the offers are
+   * previewed again and the step redraws from them — and if that leaves
+   * nothing pending, the flow carries on to the total exactly as if the
+   * question had never been asked.
+   */
+  async function chooseAddOn(addOnId: string, choice: AddOnChoice) {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const rev = await currentCartRevision();
+      if (!rev) {
+        setError({ code: "gone" });
+        setSheetOpen(false);
+        return;
+      }
+      const result = await setAddOnChoice(addOnId, choice, rev.revision);
+      let next: AddOnOffer[];
+      if (result.ok) {
+        next = result.data.addOns;
+      } else if (result.error.code === "add_on_not_offered") {
+        const again = await previewCheckout();
+        next = again.ok ? addOnsOf(again.data) : [];
+      } else {
+        applyError(result.error);
+        /* On a phone the banner is on the page UNDER the sheet, so the sheet
+           closes to show it; the page's Continue re-opens the question. */
+        setSheetOpen(false);
+        return;
+      }
+      setOffers(next);
+      if (pendingAddOns(next).length === 0) {
+        setSheetOpen(false);
+        await freezeAndReview();
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
    * Re-price the frozen checkout after the shopper changes something on the
    * review step.
    *
@@ -1045,14 +1226,24 @@ export function CheckoutFlow() {
    * the one thing that must never happen here.
    * ═══════════════════════════════════════════════════════════════════════════
    */
-  async function reprice(change: { redeem?: number; discount?: () => Promise<boolean> }) {
+  async function reprice(change: { redeem?: number; mutate?: () => Promise<unknown> }) {
     if (busy) return;
     setBusy(true);
     setError(null);
     try {
       const thawed = await thawCheckout();
       if (!thawed) return;
-      if (change.discount && !(await change.discount())) return;
+      /* ═══ RE-FROZEN WHETHER OR NOT THE MUTATION LANDED ═══
+         The thaw has already voided the total on screen. This used to return
+         here when the mutation was refused — a code the shop will not take —
+         which left the review step with a banner and NOTHING under it: no
+         total, no Pay button, and no control that re-freezes. The banner's
+         own copy says "carry on without it — your order is otherwise ready",
+         so the order has to be on screen to carry on with. The mutation
+         reports its refusal through `applyError`; the freeze below puts the
+         total back, and `freezeAndReview` does not clear the banner on its
+         way. */
+      if (change.mutate) await change.mutate();
       await freezeAndReview(change.redeem ?? redeemPoints);
     } finally {
       setBusy(false);
@@ -1140,6 +1331,15 @@ export function CheckoutFlow() {
             code: adjustment.code,
             label: adjustment.label,
             amount: adjustment.amount.amount,
+          })),
+          /* The freeze's own record of what went on the order — `chosen` by
+             the shopper or `included` by the rules — with what was CHARGED
+             for each. Absent from a total frozen before add-ons existed, and
+             then nothing is drawn. */
+          addOns: (totals?.addOns ?? []).map((addOn) => ({
+            title: addOn.title,
+            mode: addOn.mode,
+            amount: addOn.amount.amount,
           })),
         },
       });
@@ -1504,6 +1704,48 @@ export function CheckoutFlow() {
           </form>
         )}
 
+        {step === "extras" && (
+          <div className="flex flex-col gap-4">
+            {/* ═══ ONE STEP, TWO DRAWINGS, DECIDED BY CSS ═══
+                Above `sm` the cards are the page. Below it the page shows the
+                offers named with their prices and one Continue, and the cards
+                live in the sheet — which `askAboutAddOns` opened on the way
+                in, and which Continue re-opens if it was closed without an
+                answer. Both blocks are always in the tree; the viewport picks
+                one, so the server render and the first paint agree, which is
+                the rule `dialog.tsx` sets out. The step counts in "N of M"
+                either way. */}
+            <div className="max-sm:hidden">
+              <AddOnOfferList
+                offers={pendingOffers}
+                disabled={busy || rateLimited}
+                onChoose={chooseAddOn}
+              />
+            </div>
+            <AddOnPendingSummary
+              className="sm:hidden"
+              offers={pendingOffers}
+              disabled={busy || rateLimited}
+              onContinue={() => setSheetOpen(true)}
+            />
+            <Dialog open={sheetOpen} onOpenChange={setSheetOpen}>
+              <DialogContent mobile="sheet">
+                <DialogHeader>
+                  <DialogTitle>{STEP_LABELS.extras}</DialogTitle>
+                  <DialogDescription className="sr-only">
+                    Choose whether to add these to your order.
+                  </DialogDescription>
+                </DialogHeader>
+                <AddOnOfferList
+                  offers={pendingOffers}
+                  disabled={busy || rateLimited}
+                  onChoose={chooseAddOn}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
+        )}
+
         {step === "review" && (
           <div className="flex flex-col gap-4">
             {busy && !totals && (
@@ -1595,6 +1837,22 @@ export function CheckoutFlow() {
                       {formatNaira(majorUnits(totals.shippingTotal))}
                     </span>
                   </div>
+                  {/* THE ADD-ONS, AFTER DELIVERY AND BEFORE THE TAX. The
+                      title is the operator's; the value is what the freeze
+                      CHARGED, or `Included` for one the rules put on the
+                      order for free — `addOnRowsFor` owns that rule. Absent
+                      from every total frozen before add-ons existed. */}
+                  <AddOnTotalRows
+                    rows={addOnRowsFor(
+                      (totals.addOns ?? []).map((addOn) => ({
+                        id: addOn.id,
+                        title: addOn.title,
+                        mode: addOn.mode,
+                        amount: addOn.amount.amount,
+                      })),
+                      totals.currency,
+                    )}
+                  />
                   {totals.taxTotal.amount > 0 && (
                     <div className="flex items-center justify-between py-1">
                       {/* The API's own label ("VAT") — the customer is told
@@ -1680,31 +1938,68 @@ export function CheckoutFlow() {
                     disabled={busy || redirecting}
                     onApply={(code) =>
                       reprice({
-                        discount: async () => {
+                        mutate: async () => {
                           const result = await applyDiscountCode(code);
                           if (!result.ok) {
                             applyError(result.error);
-                            return false;
+                            return;
                           }
                           setAppliedDiscount(code);
-                          return true;
                         },
                       })
                     }
                     onRemove={() =>
                       reprice({
-                        discount: async () => {
+                        mutate: async () => {
                           const result = await removeDiscountCode();
                           if (!result.ok) {
                             applyError(result.error);
-                            return false;
+                            return;
                           }
                           setAppliedDiscount(null);
-                          return true;
                         },
                       })
                     }
                   />
+                  {/* ═══ EVERY ADD-ON THE SHOP ASKED ABOUT, CHANGEABLE HERE ═══
+                      An answer given on the extras step is a line in the
+                      frozen total, and this is the last place a correction
+                      has to be one click away — including an `ask` offer the
+                      rules raised only once the address was in, which arrives
+                      here unanswered and off the order. Same journey as a
+                      code: thaw, record the answer, re-freeze.
+                      `add_on_not_offered` is a silent re-read of the offers
+                      — the cart is thawed by then, so the preview answers —
+                      and never a banner. */}
+                  {askedAddOns(offers).map((offer) => (
+                    <AddOnReviewControl
+                      key={offer.id}
+                      offer={offer}
+                      disabled={busy || redirecting}
+                      onChange={(choice) =>
+                        reprice({
+                          mutate: async () => {
+                            const rev = await currentCartRevision();
+                            if (!rev) {
+                              setError({ code: "gone" });
+                              return;
+                            }
+                            const result = await setAddOnChoice(offer.id, choice, rev.revision);
+                            if (result.ok) {
+                              setOffers(result.data.addOns);
+                              return;
+                            }
+                            if (result.error.code === "add_on_not_offered") {
+                              const again = await previewCheckout();
+                              if (again.ok) setOffers(addOnsOf(again.data));
+                              return;
+                            }
+                            applyError(result.error);
+                          },
+                        })
+                      }
+                    />
+                  ))}
                 </div>
 
                 <Button
