@@ -1,4 +1,32 @@
 import type { NextConfig } from "next";
+import { ENVIRONMENTS, resolveTarget } from "@plaspool/brand/environment";
+
+/**
+ * WHICH DEPLOYMENT THIS BUILD IS. Resolved exactly once, here, in Node — where
+ * `WORKERS_CI_BRANCH` is visible — and handed to the rest of the app by the
+ * assignment below. `packages/brand/src/environment.ts` carries the full
+ * argument for why it is derived rather than written down, and for why the
+ * client must be told the answer instead of computing it.
+ */
+const TARGET = resolveTarget();
+const ENV = ENVIRONMENTS[TARGET];
+
+/**
+ * ⚠  ASSIGNED BEFORE THE BUILD READS IT. THIS IS WHAT REACHES THE BROWSER.
+ *
+ * `next.config.ts` is evaluated in Node before compilation starts, so mutating
+ * `process.env` here is visible to the bundler when it inlines
+ * `NEXT_PUBLIC_*` — which is how `packages/brand/src/environment.ts` gets a
+ * literal instead of a lookup. Setting it here rather than in the environment
+ * keeps the promise that nobody configures this: the branch decides, and this
+ * line carries the decision across the server/client boundary.
+ *
+ * DO NOT REPLACE THIS WITH THE `env` CONFIG KEY. That is what was here first,
+ * and it does not inline into the client bundle under Turbopack — which this
+ * app builds with. The result was a development site whose browser called the
+ * production API; the long note in `environment.ts` has the compiled evidence.
+ */
+process.env.NEXT_PUBLIC_PLASPOOL_TARGET = TARGET;
 
 /**
  * Third-party origins the storefront actually talks to. Named here rather than
@@ -13,11 +41,15 @@ import type { NextConfig } from "next";
  * account all talk to this origin FROM THE BROWSER with `credentials:
  * "include"`, so a stale value here does not merely break blog covers — it
  * blocks every credentialed call in `connect-src` and the shop reports
- * "We couldn't load your cart" with nothing saying why. Change it here,
- * `packages/blog/src/data/config.ts` and `packages/shop/src/data/config.ts`
- * together, or not at all.
+ * "We couldn't load your cart" with nothing saying why.
+ *
+ * IT USED TO SAY "change it here, `packages/blog/src/data/config.ts` and
+ * `packages/shop/src/data/config.ts` together, or not at all" — three copies
+ * kept in step by hand. All three now read one table
+ * (`packages/brand/src/environment.ts`), so there is one place to change and
+ * the three cannot drift apart.
  */
-const BLOG_API = "https://admin.plaspool.com";
+const BLOG_API = ENV.api;
 /** Cover images 302 from the blog API to a presigned account-scoped R2 host. */
 const R2 = "https://*.r2.cloudflarestorage.com";
 const WAITLISTER = "https://waitlister.me";
@@ -49,6 +81,13 @@ const CLERK_IMG = "https://img.clerk.com";
  * cannot be completed — with nothing in the console pointing at the frame.
  */
 const TURNSTILE = "https://challenges.cloudflare.com";
+/**
+ * OpenStreetMap's geocoder, which the checkout's "Fill in from my location"
+ * button calls FROM THE BROWSER with the device's fix — `connect-src` only.
+ * `packages/shop/src/checkout/address-autofill.ts` carries the usage policy
+ * that call keeps to.
+ */
+const NOMINATIM = "https://nominatim.openstreetmap.org";
 
 /**
  * Content-Security-Policy — REPORT-ONLY for now.
@@ -87,7 +126,7 @@ const CSP = [
   `img-src 'self' data: blob: ${BLOG_API} ${R2} ${GTM} ${GA[0]} ${CLERK_IMG}`,
   // next/font self-hosts Inter at build time, so no external font origin.
   "font-src 'self' data:",
-  `connect-src 'self' ${BLOG_API} ${R2} ${WAITLISTER} ${GTM} ${GA.join(" ")} ${VERCEL_INSIGHTS} ${CLERK}`,
+  `connect-src 'self' ${BLOG_API} ${R2} ${WAITLISTER} ${GTM} ${GA.join(" ")} ${VERCEL_INSIGHTS} ${CLERK} ${NOMINATIM}`,
   // The /shop waitlist is an iframe embed; Turnstile is Clerk's bot challenge.
   `frame-src 'self' ${WAITLISTER} ${TURNSTILE}`,
   /*
@@ -115,7 +154,14 @@ const SECURITY_HEADERS = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  /**
+   * `geolocation=(self)`, NOT `()`. The checkout asks for the device's
+   * position — the address fill, and the rider's spot when the config offers
+   * it — and `()` refuses the call to this origin's own scripts, not only to
+   * frames; the button then fails as if the shopper had said no. Camera and
+   * microphone stay closed: nothing here asks.
+   */
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self)" },
   /**
    * A year, now that logins are live.
    *
@@ -132,6 +178,23 @@ const SECURITY_HEADERS = [
    */
   { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
   { key: "Content-Security-Policy-Report-Only", value: CSP },
+  /**
+   * ⚠  THE HALF OF THE NOINDEX PAIR THAT ACTUALLY PREVENTS INDEXING.
+   *
+   * `app/robots.ts` serves `Disallow: /` on every non-production deployment,
+   * and that stops a crawler FETCHING a page — it does not stop the URL being
+   * indexed from a link elsewhere, which Google does routinely, listing the
+   * bare URL with no snippet. `noindex` is the directive that removes it.
+   *
+   * The two only work together: `noindex` alone would be invisible to a
+   * crawler that robots.txt kept away from the page carrying it, and
+   * `Disallow` alone leaves the URL indexable. Change one, change the other.
+   *
+   * Spread rather than pushed so the array stays a flat list of decisions.
+   */
+  ...(ENV.indexable
+    ? []
+    : [{ key: "X-Robots-Tag", value: "noindex, nofollow" }]),
 ];
 
 const nextConfig: NextConfig = {
@@ -156,7 +219,19 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
   },
+  /**
+   * PRODUCTION ONLY, and the reason is `permanent: true`.
+   *
+   * A 308 is cached by the browser more or less forever. The rule is inert on
+   * `dev.plaspool.com` today — nothing resolves `www.plaspool.com` to the
+   * development Worker — but shipping a permanent redirect to the production
+   * origin from a build that is not production is a loaded gun: the day
+   * anything points a `www.` host at this Worker, every visitor is bounced to
+   * production and pinned there by their own cache.
+   */
   async redirects() {
+    if (TARGET !== "production") return [];
+
     return [
       {
         source: "/:path*",

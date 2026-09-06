@@ -57,5 +57,106 @@
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
+  },
+  /*
+   * ═══════════════════════════════════════════════════════════════════════════
+   * THE DEVELOPMENT ENVIRONMENT — `dev.plaspool.com`, against
+   * `admin.dev.plaspool.com`.
+   *
+   * ⚠  BINDINGS ARE **NOT** INHERITED BY A NAMED ENVIRONMENT. Wrangler treats
+   * `kv_namespaces`, `services` and `vars` as non-inheritable, so everything
+   * below is restated rather than duplicated by mistake. `main`,
+   * `compatibility_date`, `compatibility_flags` and `assets` ARE inherited and
+   * are deliberately absent.
+   *
+   * THE OMISSION THAT WOULD HURT MOST IS SILENT: leave `kv_namespaces` out
+   * entirely and the environment does not fall back to the production
+   * namespaces — it gets NO cache binding, which is the exact condition that
+   * caused Error 1102 (#9), a full server render on every request against a
+   * 10ms CPU budget. Absent bindings degrade to a no-op cache, not to an error.
+   * ═══════════════════════════════════════════════════════════════════════════
+   */
+  "env": {
+    "dev": {
+      "name": "plaspool-storefront-dev",
+      /*
+       * The hostname, declared here rather than clicked into the dashboard so
+       * that what serves `dev.plaspool.com` is recorded in the repository.
+       *
+       * `custom_domain: true` is the difference between a route and a domain.
+       * A plain route pattern attaches this Worker to a hostname the zone
+       * already resolves; a custom domain makes Cloudflare CREATE the DNS
+       * record and issue the certificate for it. `dev.plaspool.com` does not
+       * exist yet, so it has to be the latter — a route alone would deploy
+       * cleanly and then answer nothing, because nothing resolves.
+       *
+       * ⚠  PRODUCTION IS DELIBERATELY NOT DECLARED THE SAME WAY. `plaspool.com`
+       * is already attached to the production Worker and is serving; adding it
+       * here would hand Wrangler ownership of a live hostname's DNS and
+       * certificate on the next deploy, which is not a change to make from a
+       * config edit nobody is watching. Leave it where it is.
+       */
+      "routes": [
+        {
+          "pattern": "dev.plaspool.com",
+          "custom_domain": true
+        }
+      ],
+      /*
+       * ⚠  ITS OWN NAMESPACES, AND THIS IS THE ONE THING HERE THAT CAN DAMAGE
+       * PRODUCTION.
+       *
+       * The incremental cache is keyed by route, not by origin. Point the
+       * development Worker at the production namespace and its renders — built
+       * from the DEVELOPMENT database, with development prices and a
+       * development catalogue — are written under the keys the live shop reads
+       * back. A deploy to dev would then quietly serve wrong prices on
+       * plaspool.com, with `stale-while-revalidate` holding them there for up
+       * to 30 days.
+       *
+       * Created with, and note the `--env dev` and the working directory —
+       * there is no Wrangler config at the repository root, so running these
+       * from there reports "No environment found in configuration with name
+       * dev" and then creates the namespace in the wrong place:
+       *
+       *   cd apps/storefront
+       *   npx wrangler kv namespace create NEXT_INC_CACHE_KV --env dev
+       *   npx wrangler kv namespace create NEXT_TAG_CACHE_KV --env dev
+       *
+       * Wrangler titles them `dev-NEXT_INC_CACHE_KV` and `dev-NEXT_TAG_CACHE_KV`
+       * in the dashboard, which is how to tell them apart from production's at
+       * a glance.
+       */
+      "kv_namespaces": [
+        {
+          "binding": "NEXT_INC_CACHE_KV",
+          "id": "b18ec42ebde0488dbf9881e627d409d8"
+        },
+        {
+          "binding": "NEXT_TAG_CACHE_KV",
+          "id": "988206958ebe4e478f2af24a1cddec66"
+        }
+      ],
+      /*
+       * ⚠  POINTS AT ITSELF, NOT AT PRODUCTION.
+       *
+       * This binding is how the memory queue re-renders a stale ISR page: the
+       * Worker calls itself. Copied from the block above unchanged it would
+       * name `plaspool-storefront`, so every stale page on the DEVELOPMENT site
+       * would be revalidated by asking PRODUCTION to render it — burning
+       * production invocations and writing production's answer into
+       * development's cache.
+       */
+      "services": [
+        {
+          "binding": "WORKER_SELF_REFERENCE",
+          "service": "plaspool-storefront-dev"
+        }
+      ],
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 1
+      }
+    }
   }
 }

@@ -1,13 +1,20 @@
+import { ENV } from "@plaspool/brand/environment";
+
 /**
- * Hardcoded on purpose — the storefront has no env file.
+ * In the repository on purpose — the storefront has no env file.
  *
  * A SUBDOMAIN OF THE SITE ITSELF, not the deployment's `*.vercel.app` name.
  * The blog's own reads are server-side and would not care, but this is the
  * same host `COMMERCE_API_BASE` uses, and the cart's credentialed calls very
  * much do — see the long note there for what being on a different registrable
- * domain cost. One host, changed in both places together.
+ * domain cost.
+ *
+ * IT WAS A LITERAL HERE UNTIL THE DEVELOPMENT ENVIRONMENT LANDED, with a note
+ * saying to change it and `packages/shop/src/data/config.ts` "together, or not
+ * at all". Both now read one table, so the two cannot drift and neither has to
+ * be remembered.
  */
-export const BLOG_API_BASE = "https://admin.plaspool.com";
+export const BLOG_API_BASE = ENV.api;
 export const BLOG_API = `${BLOG_API_BASE}/api/public`;
 
 export const POSTS_PER_PAGE = 9;

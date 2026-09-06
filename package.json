@@ -15,6 +15,7 @@
     "typecheck": "node scripts/typecheck.mjs",
     "preview": "npm run preview -w @plaspool/storefront",
     "deploy": "npm run deploy -w @plaspool/storefront",
+    "deploy:dev": "npm run deploy:dev -w @plaspool/storefront",
     "upload": "npm run upload -w @plaspool/storefront",
     "test": "vitest run",
     "test:watch": "vitest"
