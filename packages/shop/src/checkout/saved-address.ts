@@ -1,5 +1,6 @@
 import type { Address } from "../data/checkout-api";
 import type { SavedAddress } from "../data/orders-api";
+import { NIGERIA } from "../data/nigerian-states";
 
 /**
  * Reading an address the shop has already shipped to, for the checkout's
@@ -10,9 +11,10 @@ import type { SavedAddress } from "../data/orders-api";
  * one of them is about not trusting the input.
  */
 
-/** This shop ships from and mostly to Nigeria; the country field is not asked
- *  for, so every address defaults here. */
-export const NIGERIA = "NG";
+/** This shop ships from and mostly to Nigeria, so every address defaults
+ *  here. The constant lives with the states list now; re-exported so nothing
+ *  that reads it from here had to move. */
+export { NIGERIA };
 
 /** The radio value for "not one of my saved ones". */
 export const NEW_ADDRESS = "new";

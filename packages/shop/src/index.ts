@@ -12,6 +12,10 @@ export * from "./data/checkout-api";
 /* A signed-in customer's points balance and history (admin#2). The checkout's
    offer and the account summary both read it; neither spells a points noun. */
 export * from "./data/points-api";
+/* Where the connection seems to be. `detectGeoHint` is what the app's
+   `/api/geo` route answers with; the checkout reads it back to preselect the
+   delivery country. */
+export * from "./data/geo-hint";
 
 // Presentational primitives. Every later surface — cards, listings, the
 // product page, the cart — composes from these.

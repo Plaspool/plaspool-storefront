@@ -1,3 +1,5 @@
+import { commerceApiBase } from "@plaspool/brand/environment";
+
 /*
  * `SHOW_FIXTURE_REVIEWS` USED TO LIVE HERE AND IS DELETED.
  *
@@ -39,9 +41,30 @@
  * CORS STILL APPLIES. Same site is not same origin, so the admin must still
  * allow-list `https://plaspool.com` in `APP_ORIGINS` and answer credentialed
  * preflights. See `plaspool-admin/server/shop/cart/cors.ts`.
+ *
+ * ⚠  AND THE DEVELOPMENT ENVIRONMENT NEEDS ITS OWN ENTRY IN THAT LIST.
+ * `admin.dev.plaspool.com` must allow-list `https://dev.plaspool.com`
+ * separately — the pair is same-site for the same reason the production pair
+ * is, but an origin missing from `APP_ORIGINS` fails exactly the way
+ * `localhost` does today: `fetch` rejects, `cart-api.ts` maps it to `offline`,
+ * and every cart surface reports "We couldn't load your cart" with nothing
+ * anywhere naming CORS as the cause.
  * ═══════════════════════════════════════════════════════════════════════════
  */
-export const COMMERCE_API_BASE = "https://admin.plaspool.com";
+/**
+ * ⚠  RESOLVED FROM THE HOSTNAME IN THE BROWSER, from the build on the server.
+ *
+ * See the long note at the foot of `packages/brand/src/environment.ts`. The
+ * short version: every call made through this constant from the browser carries
+ * credentials, and a build-time value that inlined wrongly once already sent
+ * `dev.plaspool.com`'s cart to the production API without erroring. The page
+ * knows what host it is on; that answer cannot drift from reality the way an
+ * inlined literal can.
+ *
+ * Server-side there is no `window`, so this is the build's answer — which is
+ * also the only answer available while prerendering.
+ */
+export const COMMERCE_API_BASE = commerceApiBase();
 
 /**
  * Catalogue cache windows, matching the blog's two-tier shape next door

@@ -1,6 +1,7 @@
 import type { Address } from "../data/checkout-api";
 import type { DeliveryConfig, DeliveryField, FieldKey } from "../data/delivery-config";
 import type { ServiceArea } from "../data/returns-api";
+import { matchNigerianState, nigerianStateName } from "../data/nigerian-states";
 
 /**
  * What the address step renders, and what it submits.
@@ -25,12 +26,28 @@ import type { ServiceArea } from "../data/returns-api";
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-/** Case- and space-insensitive: the State field is free text, and "lagos"
- *  must find the areas filed under "Lagos". */
+/** Case- and space-insensitive: "lagos" must find the areas filed under
+ *  "Lagos". Foreign states, and the odd Nigerian one nothing recognises, are
+ *  compared this way. */
 const normRegion = (value: string) => value.trim().toLowerCase();
 
 /**
- * The districts filed under the typed State — the picker's options.
+ * Whether two region strings name the same place.
+ *
+ * BY STATE WHERE BOTH ARE NIGERIAN STATES, so "FCT", "Abuja" and "Federal
+ * Capital Territory" are one region however the areas list or a saved address
+ * spells it; by folded text otherwise. The select stores the canonical name,
+ * but a snapshot from before it existed does not.
+ */
+function sameRegion(a: string, b: string): boolean {
+  const stateA = matchNigerianState(a);
+  const stateB = matchNigerianState(b);
+  if (stateA && stateB) return stateA.code === stateB.code;
+  return normRegion(a) === normRegion(b);
+}
+
+/**
+ * The districts filed under the State — the picker's options.
  *
  * An area with no `key` is dropped: the key is the handle a rename does not
  * move and the only thing the checkout may submit, so an area without one
@@ -42,9 +59,24 @@ export function districtChoicesFor(
   areas: ServiceArea[],
   region: string | null | undefined,
 ): ServiceArea[] {
-  const target = normRegion(region ?? "");
-  if (!target) return [];
-  return areas.filter((area) => area.key && normRegion(area.region) === target);
+  const target = region ?? "";
+  if (!normRegion(target)) return [];
+  return areas.filter((area) => area.key && sameRegion(area.region, target));
+}
+
+/**
+ * The state as the body carries it.
+ *
+ * THE CANONICAL NAME FOR A NIGERIAN ADDRESS — what the select shows — and the
+ * text as typed anywhere else, where the field is free text. The server's
+ * `zoneFor` and `servesRegion` compare folded strings, so "Lagos State" from
+ * an old snapshot would miss a zone named "Lagos"; the select never produces
+ * that, and this makes sure a snapshot cannot either.
+ */
+export function canonicalRegion(address: Address, config: DeliveryConfig): string | null {
+  const region = address.region ?? null;
+  if (!region) return region;
+  return districtsApply(address, config) ? (nigerianStateName(region) ?? region) : region;
 }
 
 /**
@@ -206,7 +238,7 @@ export function submittedAddress(
 
   if (shown.has("phone")) body.phone = address.phone ?? null;
   if (shown.has("line2")) body.line2 = address.line2 ?? null;
-  if (shown.has("region")) body.region = address.region ?? null;
+  if (shown.has("region")) body.region = canonicalRegion(address, config);
   if (shown.has("postalCode")) body.postalCode = address.postalCode ?? null;
   /* ═══ OMITTED, NOT SENT AS `null`, WHEN THE COUNTRY IS NOT NIGERIA ═══
      The field is not on screen for such an address (see `fieldRows`), and the
