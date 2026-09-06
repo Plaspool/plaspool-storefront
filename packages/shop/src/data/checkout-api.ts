@@ -1,5 +1,5 @@
 import { COMMERCE_API_BASE } from "./config";
-import type { ApiMoney, TotalsLine } from "./cart-api";
+import type { AddOnOffer, ApiMoney, TotalsLine } from "./cart-api";
 
 /**
  * The checkout client — the storefront's half of the commerce API's checkout
@@ -98,6 +98,12 @@ export interface ShippingOption {
    have meant either a duplicate definition or a cycle. */
 export { bulkOf } from "./cart-api";
 export type { TotalsLine } from "./cart-api";
+/* `AddOnOffer` and `addOnsOf` live there for the same reason: the offer is a
+   field of the cart view first, and the checkout's preview and add-on route
+   carry the identical shape. Re-exported so a checkout caller imports them
+   from the module whose routes speak them. */
+export { addOnsOf } from "./cart-api";
+export type { AddOnOffer } from "./cart-api";
 
 /**
  * A line that moves the total and must appear on the invoice. Today the only
@@ -136,6 +142,24 @@ export interface Adjustment {
  */
 export const REDEMPTION_ADJUSTMENT_CODE = "points_redemption";
 
+/**
+ * One add-on as the freeze recorded it on the order.
+ *
+ * `mode` IS HOW IT GOT THERE — `chosen` by the shopper on the extras step,
+ * or `included` by the operator's rules — and `amount` is what was CHARGED
+ * for it, which is zero when the rule made it free. `listPrice` is what it
+ * was worth at the time, so a row can say "Included" over a real figure
+ * rather than over nothing. Add-ons are not taxed and discount codes do not
+ * touch them; points come off the whole bill after tax, as today.
+ */
+export interface FrozenAddOn {
+  id: string;
+  title: string;
+  mode: "chosen" | "included";
+  amount: ApiMoney;
+  listPrice: ApiMoney;
+}
+
 export interface FrozenTotals {
   currency: string;
   lines: TotalsLine[];
@@ -150,6 +174,17 @@ export interface FrozenTotals {
    * verbatim like an adjustment's.
    */
   tax?: { zone: string; label: string; rateBps: number } | null;
+  /**
+   * ═══ BOTH OPTIONAL, BECAUSE EVERY ORDER FROZEN BEFORE ADD-ONS SHIPPED
+   * LACKS THEM, PERMANENTLY ═══
+   * A frozen total is the record of what was charged, and there is no
+   * backfill. Read `totals.addOns ?? []` and `totals.addOnTotal ?? { amount:
+   * 0, currency }` — the way `bulkOf` defaults — or the order history crashes
+   * on its own history. `grandTotal` already contains `addOnTotal`; nothing
+   * here is to be added to anything.
+   */
+  addOns?: FrozenAddOn[];
+  addOnTotal?: ApiMoney;
   subtotal: ApiMoney;
   adjustmentTotal: ApiMoney;
   shippingTotal: ApiMoney;
@@ -236,6 +271,14 @@ export type CheckoutError =
    * it was typed.
    */
   | { code: "discount_rejected"; reason: string }
+  /**
+   * An answer for an add-on that is no longer an `ask` offer on this cart —
+   * the cart changed, or the rules did, between the offer and the click.
+   * Answered by RE-READING the offers and re-rendering, never by a banner:
+   * the shopper did nothing wrong and there is nothing for them to retry.
+   * Its `errorCopy` exists only so no call site can fall to "try again".
+   */
+  | { code: "add_on_not_offered" }
   | { code: "unresolved_lines"; variantIds: string[] }
   | { code: "currency_mismatch" }
   | { code: "gone" }
@@ -311,6 +354,16 @@ function classify(status: number, body: Record<string, unknown> | null): Checkou
       reason: typeof body?.reason === "string" ? body.reason : "rejected",
     };
   }
+  /* `409 { error: "add_on_not_offered" }` — an answer for an add-on the cart
+     is no longer offered. Its own code, because the remedy is a silent
+     re-read of the offers and not a sentence. */
+  if (errorCode === "add_on_not_offered") return { code: "add_on_not_offered" };
+  /* `409 { error: "stale_write" }` is the add-on route's spelling of the
+     stale-revision refusal that `/checkout/addresses` spells `400
+     baseRevision`. Same meaning — read the revision again — so it is the
+     same code and the same copy, rather than a fall-through to "try again"
+     that cannot say what to try. */
+  if (errorCode === "stale_write") return { code: "bad_revision" };
   if (errorCode === "precondition_failed") {
     /*
      * ═══ `operation` CARRIES TWO DIFFERENT THINGS, AND THAT COST A BUG ═══
@@ -379,6 +432,40 @@ export async function currentCartRevision(): Promise<{ cartId: string; revision:
   const res = await request<{ cart: { id: string; revision: number } | null }>("/cart");
   if (!res.ok || !res.data.cart) return null;
   return { cartId: res.data.cart.id, revision: res.data.cart.revision };
+}
+
+/**
+ * What the freeze WILL do, without doing it.
+ *
+ * ═══ THE READ THAT DECIDES THE EXTRAS STEP ═══
+ * `POST /checkout/preview` prices the checkout as it stands — the freeze's
+ * own arithmetic, minus the write — and, since add-ons shipped, names the
+ * add-on offers evaluated against it. That is the list the extras step is
+ * built from, and NOT the one on `GET /cart`: some rules read the delivery
+ * address or the delivery option, so an offer can appear only once those are
+ * written, and the cart view has no checkout to evaluate them against. The
+ * cart's own offers are for the drawer.
+ *
+ * THE BODY IS THE FREEZE'S MINUS ITS REVISION — there is no race for a read to
+ * lose — and this client sends an empty object: the totals it answers are
+ * not rendered here (the freeze's are the ones a shopper pays against), so
+ * there is no points figure worth previewing. A pending `ask` add-on is
+ * priced as DECLINED, exactly as the freeze would price it; the preview never
+ * refuses because of one.
+ *
+ * `addOns` IS OPTIONAL because an admin that predates the feature answers the
+ * same preview without it. Read it through `addOnsOf`, the one seam.
+ */
+export interface CheckoutPreview {
+  totals: FrozenTotals;
+  /** The points quote the freeze would grant, or null. Not read here — the
+   *  freeze's own `adjustments` are what the review step shows. */
+  redemption: unknown;
+  addOns?: AddOnOffer[];
+}
+
+export function previewCheckout(): Promise<CheckoutResult<CheckoutPreview>> {
+  return request("/checkout/preview", { method: "POST", body: JSON.stringify({}) });
 }
 
 /** Reserve stock for the cart's current lines. Holds for 15 minutes, with one
@@ -543,6 +630,43 @@ export function applyDiscountCode(code: string): Promise<CheckoutResult<unknown>
  *  `request` reports as a success carrying null — there is nothing to read. */
 export function removeDiscountCode(): Promise<CheckoutResult<unknown>> {
   return request("/checkout/discount", { method: "DELETE" });
+}
+
+/**
+ * Record the shopper's answer to an `ask` add-on.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE BODY IS `{ choice, baseRevision }` AND THE ROUTE IS STRICT — no other
+ * key. `baseRevision` is the cart's CURRENT revision, read fresh from
+ * `GET /cart` immediately before (`currentCartRevision()`), exactly as
+ * `/checkout/addresses` requires. A stale one is `409 stale_write`, which
+ * `classify` reads as `bad_revision`.
+ *
+ * ═══ OPEN CARTS ONLY ═══
+ * On a frozen (`converting`) cart it answers `409 precondition_failed` with
+ * `operation: "add_on_choice"`. Thaw first with `cancelCheckout()`, the way a
+ * discount code is applied on the review step — `reprice` in
+ * `checkout-flow.tsx` does exactly that. The extras step never needs to: it
+ * sits before the freeze.
+ *
+ * `409 add_on_not_offered` means this add-on is not currently an `ask` offer
+ * for this cart — the cart changed, or the rules did. Re-read the offers and
+ * re-render; no banner. `404 gone` is no such add-on at all. A second PUT
+ * overwrites the first, which is how the review step changes an answer.
+ *
+ * THE RESPONSE CARRIES THE RE-EVALUATED OFFERS, so the caller learns what is
+ * still pending without reading the cart again.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function setAddOnChoice(
+  addOnId: string,
+  choice: "accepted" | "declined",
+  baseRevision: number,
+): Promise<CheckoutResult<{ cart: ReopenedCart; addOns: AddOnOffer[] }>> {
+  return request(`/checkout/add-ons/${encodeURIComponent(addOnId)}`, {
+    method: "PUT",
+    body: JSON.stringify({ choice, baseRevision }),
+  });
 }
 
 /** Re-read the frozen totals, e.g. after a reload of the review step. Answers

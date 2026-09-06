@@ -23,11 +23,19 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-export type Step = "details" | "delivery" | "review";
+export type Step = "details" | "delivery" | "extras" | "review";
 
+/**
+ * THE ONLY PLACE A STEP IS NAMED. `extras` is where the shop asks about the
+ * add-ons the operator set up — "Gift box, ₦1,500, yes or no?" — and it is
+ * called that rather than "One more thing" because two offers can stack on
+ * the one page, and a heading that promises one thing over two cards is the
+ * "1 Spool Points" mistake in a different font.
+ */
 export const STEP_LABELS: Record<Step, string> = {
   details: "Your details",
   delivery: "Delivery option",
+  extras: "Extras",
   review: "Review and pay",
 };
 
@@ -44,8 +52,24 @@ export const STEP_LABELS: Record<Step, string> = {
  * there is nothing to pick, and an address the shop cannot reach was already
  * refused by `PUT /checkout/addresses` before this is asked.
  */
-export function stepsFor(optionCount: number): Step[] {
-  return optionCount > 1 ? ["details", "delivery", "review"] : ["details", "review"];
+/**
+ * `askCount` IS HOW MANY ADD-ONS THE SHOP IS ASKING ABOUT, and zero is the
+ * ordinary value: a server without the feature offers nothing, and so does a
+ * cart the rules matched with `include` alone (that packaging is on the
+ * order without a question, and shows up on the review step). The step exists
+ * for `> 0` and sits between the last details/delivery step and `review`, so
+ * the total is settled only after the last question is answered.
+ *
+ * The count is decided at the moment the shopper continues past the step
+ * before it — the same moment `optionCount` becomes known — which is why both
+ * are arguments rather than state this module could read.
+ */
+export function stepsFor(optionCount: number, askCount = 0): Step[] {
+  const steps: Step[] = ["details"];
+  if (optionCount > 1) steps.push("delivery");
+  if (askCount > 0) steps.push("extras");
+  steps.push("review");
+  return steps;
 }
 
 /** One-based position for the "Step N of M" line, or 0 when the step is not

@@ -105,6 +105,17 @@ export interface ReceiptTotals {
   /** Almost always empty. A points redemption is the one that shows up, and
    *  its `amount` is already negative. */
   adjustments: Array<{ code: string; label: string; amount: number }>;
+  /**
+   * The add-ons the freeze put on the order — `chosen` by the shopper on the
+   * extras step, or `included` by the operator's rules — with what was
+   * CHARGED for each (minor units, like the rest of this object; zero for an
+   * included-free one). The title is the operator's, verbatim.
+   *
+   * OPTIONAL, and that needs no `v` bump by this file's own rule: a snapshot
+   * written before add-ons existed simply has no rows to draw, which is the
+   * truth about that order. Read it `?? []`.
+   */
+  addOns?: Array<{ title: string; mode: "chosen" | "included"; amount: number }>;
 }
 
 export interface ReceiptSnapshot {

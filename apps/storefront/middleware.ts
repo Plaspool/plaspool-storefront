@@ -1,4 +1,8 @@
 import { clerkMiddleware } from '@clerk/nextjs/server';
+/* RELATIVE, not `@/lib/auth/publishable`: the suite that pins this file runs
+   under Vitest, which resolves no `@/` alias, and a middleware nothing can
+   import is a middleware nothing can test. */
+import { CLERK_PUBLISHABLE_KEY } from './lib/auth/publishable';
 
 /**
  * Clerk's request middleware.
@@ -70,11 +74,39 @@ import { clerkMiddleware } from '@clerk/nextjs/server';
  * Read at module scope deliberately: the value cannot change between requests
  * within a Worker isolate, and re-reading it per request would put an env
  * lookup on the hot path of every asset.
+ *
+ * ═══ AND THE PUBLISHABLE KEY IS HANDED OVER EXPLICITLY — THE GUARD'S TWIN ═══
+ * `clerkMiddleware()` with no options reads its publishable key from
+ * `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, which Next inlines into THIS bundle at
+ * BUILD time. The committed key in `lib/auth/publishable.ts` reached the
+ * provider in `app/layout.tsx` but never this file, so the value here was
+ * whatever the build environment held: Workers Builds sets the variable for
+ * the production branch only, and every pull-request preview, every
+ * `npm run deploy` from a laptop, and every `deploy:dev` built WITHOUT it.
+ *
+ * That is invisible while the secret is absent — the branch above never mounts
+ * Clerk — and fatal the moment it is present: Clerk throws
+ *
+ *     @clerk/nextjs: Missing publishableKey
+ *
+ * on every matched route, which is every route that is not a static file.
+ * On 2026-09-06 a branch deployed by hand took the whole shop to a plain
+ * "Internal Server Error" for two and a half minutes, while `master`, built by
+ * Workers Builds with the variable, kept working — so the failure read as the
+ * branch's fault and was not. The route the matcher excludes,
+ * `/manifest.webmanifest`, answering 200 beside a 500 on `/robots.txt` is what
+ * isolated it, and `wrangler dev` with a dummy `CLERK_SECRET_KEY` in
+ * `.dev.vars` is what named it.
+ *
+ * Passing the constant makes the build environment irrelevant: the same key
+ * the provider already ships reaches the middleware from source, and a build
+ * from anywhere behaves like the one Workers Builds makes. The environment
+ * still wins where it is set, because the constant itself is env-first.
  */
 const CLERK_CONFIGURED = Boolean(process.env.CLERK_SECRET_KEY);
 
 export default CLERK_CONFIGURED
-  ? clerkMiddleware()
+  ? clerkMiddleware({ publishableKey: CLERK_PUBLISHABLE_KEY })
   : /* Pass through untouched. Returning nothing is how a Next proxy says
        "carry on"; `auth()` then reports a signed-out visitor everywhere. */
     () => undefined;

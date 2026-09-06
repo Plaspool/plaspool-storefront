@@ -24,6 +24,7 @@ import type { LineImageIndex } from "../data/catalog";
 import { majorUnits } from "../data/cart-api";
 import { formatNaira } from "../data/money";
 import { useCart } from "../cart/cart-context";
+import { addOnRowsFor } from "./add-ons";
 import { basketIsSpent } from "./basket-spent";
 import {
   clearReceiptSnapshot,
@@ -801,6 +802,14 @@ function SummarySection({
           <TotalRow label={totals.shippingLabel ?? "Delivery"} value={naira(totals.shippingTotal)} />
         )}
         {totals.shippingTotal === 0 && <TotalRow label="Delivery" value="Free" />}
+
+        {/* THE ADD-ONS, AFTER DELIVERY AND BEFORE THE TAX — the review step's
+            order, and its rule: the title verbatim beside what was charged,
+            or `Included` for one the rules put on the order at no cost. A
+            snapshot from before add-ons existed has no rows here at all. */}
+        {addOnRowsFor(totals.addOns ?? [], currency).map((row) => (
+          <TotalRow key={row.key} label={row.label} value={row.value} />
+        ))}
 
         {totals.taxTotal > 0 && totals.taxLabel && (
           <TotalRow

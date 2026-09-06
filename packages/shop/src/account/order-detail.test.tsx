@@ -397,3 +397,97 @@ describe("the picture block, as rendered", () => {
     expect(detail([])).not.toMatch(/style="height:64px"/);
   });
 });
+
+/**
+ * ═══ THE ADD-ONS ON AN ORDER, AND THE ORDERS THAT HAVE NONE ═══
+ * The extras step can put packaging on an order — chosen by the shopper, or
+ * included by the operator's rules — and the detail route lists it beside the
+ * lines. Every order placed before that existed has no such list and a zero
+ * `addOnTotal` (or, from an older server, no field at all), and the load-
+ * bearing assertions here are the ones that say those orders render exactly
+ * as they always did.
+ */
+describe("the add-ons on an order", () => {
+  function withAddOns(
+    addOns: React.ComponentProps<typeof OrderDetail>["addOns"],
+    over: Partial<Order> = {},
+  ) {
+    const ls = lines(1);
+    return markup(
+      <OrderDetail
+        order={order(over)}
+        lines={ls}
+        addOns={addOns}
+        events={EVENTS}
+        isGuest={false}
+        lineImages={images(ls)}
+      />,
+    );
+  }
+
+  it("draws nothing extra for an old order — no rows, no total row", () => {
+    const html = detail(lines(2));
+    expect(html).not.toContain("Add-ons");
+    expect(html).not.toContain("Included");
+    /* And the same for a server that sends the field as zero. */
+    expect(withAddOns(undefined, { addOnTotal: 0 })).not.toContain("Add-ons");
+  });
+
+  it("lists a chosen add-on by its title, with what was charged", () => {
+    const html = withAddOns(
+      [
+        {
+          id: "ado_1",
+          title: "Velvet pouch",
+          mode: "chosen",
+          amount: 150_000,
+          listPrice: 150_000,
+          currency: "NGN",
+        },
+      ],
+      { addOnTotal: 150_000 },
+    );
+    expect(html).toContain("Velvet pouch");
+    expect(html).toContain("₦1,500");
+    /* And a total row, because something was charged. */
+    expect(html).toMatch(/<dt[^>]*>Add-ons<\/dt>/);
+  });
+
+  it("says Included for one the rules put on the order for free, and adds no total row", () => {
+    const html = withAddOns(
+      [
+        {
+          id: "ado_2",
+          title: "Padded packing",
+          mode: "included",
+          amount: 0,
+          listPrice: 80_000,
+          currency: "NGN",
+        },
+      ],
+      { addOnTotal: 0 },
+    );
+    expect(html).toContain("Padded packing");
+    expect(html).toContain("Included");
+    expect(html).not.toContain("₦0");
+    expect(html).not.toMatch(/<dt[^>]*>Add-ons<\/dt>/);
+  });
+
+  it("keeps the add-ons out of the item count", () => {
+    /* The heading counts units of GOODS; packaging is not a unit. */
+    const html = withAddOns(
+      [
+        {
+          id: "ado_1",
+          title: "Velvet pouch",
+          mode: "chosen",
+          amount: 150_000,
+          listPrice: 150_000,
+          currency: "NGN",
+        },
+      ],
+      { addOnTotal: 150_000 },
+    );
+    expect(html).toContain(">1 item<");
+  });
+});

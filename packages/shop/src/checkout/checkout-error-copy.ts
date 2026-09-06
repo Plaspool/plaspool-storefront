@@ -120,6 +120,15 @@ export function errorCopy(
             title: "We don't deliver to that address yet",
             body: "Check the state and town are right. If they are, we don't reach there yet — contact us and we'll see what we can do.",
           };
+    case "add_on_not_offered":
+      /* The cart changed, or the rules did, between the offer and the answer.
+         The flow re-reads the offers and re-renders without a banner — the
+         brief is explicit — so this too is a fallback. It blames nobody, and
+         it says the order is otherwise fine, because it is. */
+      return {
+        title: "That extra is no longer offered",
+        body: "The offer changed while you were deciding. Your order is otherwise ready — carry on without it.",
+      };
     case "outside_service_region":
       /* THE `simple`-MODE REFUSAL, AND IT NEEDS ITS OWN SENTENCE. The admin
          gave this a different code from `outside_delivery_area` precisely

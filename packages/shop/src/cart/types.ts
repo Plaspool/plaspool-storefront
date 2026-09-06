@@ -1,3 +1,4 @@
+import type { AddOnOffer } from "../data/cart-api";
 import type { BulkTier, Colour, SizeOption } from "../data/types";
 import type { CartCatalogEntry } from "./cart-context";
 import type { UnsellableLine } from "./sellable";
@@ -150,6 +151,16 @@ export interface CartApi {
    * a Remove button that did nothing and said nothing.
    */
   problem: string | null;
+  /**
+   * The checkout add-ons this cart is offered or given, as the server last
+   * described them — re-evaluated on every read and every write.
+   *
+   * FOR THE DRAWER'S ONE QUIET LINE ("Gift box included") AND NOTHING ELSE.
+   * The checkout does not read these: it re-reads the cart at the moment the
+   * shopper continues, because the rules are the API's and this copy is as
+   * old as the last write. Empty on every server without the feature.
+   */
+  addOns: AddOnOffer[];
   add(key: CartLineKey, qty?: number): void;
   /**
    * Add several lines at once, BY VARIANT ID rather than by the (product,
