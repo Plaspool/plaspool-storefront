@@ -77,11 +77,31 @@ import { TARGET, type Target } from '@plaspool/brand/environment';
 const BRIDGE_KEYS: Record<Target, string> = {
   production: 'Uzk6_5BRdq3kZe4Sc8Q3yLGJYvsPhNEGWRxFWwrbmFY',
   /*
-   * Generated for the development environment and not yet installed on the
-   * development admin. Until `admin.dev.plaspool.com` carries this exact value
-   * as its `SHOP_AUTH_BRIDGE_SECRET`, sign-in on `dev.plaspool.com` will
-   * refuse every attempt with `400 {detail: 'assertion'}` — which is the
-   * correct behaviour for a key nobody has agreed to yet, not a bug.
+   * INSTALLED ON `admin.dev.plaspool.com` AND CONFIRMED AGAINST IT. This note
+   * used to say the opposite — that the development admin had not been given
+   * its half yet, so every sign-in there would answer `400 {detail:
+   * 'assertion'}`. That was true when the key was generated and is no longer,
+   * and a stale warning here is expensive: it names a plausible cause for a
+   * broken sign-in that is not the actual one, and the real fault the day this
+   * was corrected lay somewhere else entirely (`CLERK_SECRET_KEY` missing on
+   * the development Worker, which answers `501 not_implemented` instead).
+   *
+   * ═══ HOW TO RE-CHECK IT WITHOUT MINTING A SESSION ═══
+   * The obvious test — sign in and see — needs a browser and a Clerk account,
+   * and a working assertion IS an account takeover for the email it names, so
+   * it is not something to generate casually.
+   *
+   * There is a safe discriminator. The admin's `verifyAssertion`
+   * (`server/shop/cart/identity/bridge.ts`) checks the MAC BEFORE it checks
+   * expiry, so sign a payload whose `exp` is already in the past and POST it to
+   * `/api/shop/customer/session/exchange`. It cannot create anything, and the
+   * rejection says which half failed:
+   *
+   *   400 {detail: 'assertion_expired'}  -> the MAC verified. Keys MATCH.
+   *   400 {detail: 'assertion'}          -> the MAC failed.  Keys DIFFER.
+   *
+   * Send `Origin: https://dev.plaspool.com` with it, or the origin guard
+   * answers 403 first and both cases look identical.
    */
   development: 'ZOeinw-rmsZG7mRLm8oq6qY9vWS5MlrX-byrEeFLF24',
 };
