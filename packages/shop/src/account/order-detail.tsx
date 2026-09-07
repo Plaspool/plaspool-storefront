@@ -32,7 +32,7 @@ import type { Order, OrderAddOn, OrderEvent, OrderLine } from "../data/orders-ap
 import type { LineImageIndex } from "../data/catalog";
 import { majorUnits } from "../data/cart-api";
 import { formatNaira } from "../data/money";
-import { addOnRowsFor } from "../checkout/add-ons";
+import { addOnRowsFor, savingLabel } from "../checkout/add-ons";
 import { formatStamp } from "./stamp";
 import { AccountShell } from "./account-shell";
 
@@ -261,6 +261,9 @@ export function OrderDetail({
      verbatim beside what was charged, or `Included` for one the rules put on
      the order at no cost. Empty for every old order. */
   const addOnRows = addOnRowsFor(addOns, order.currency);
+  /* Absent on an older server, `0` on every order placed before add-ons
+     existed, and NEGATIVE once an `opt_out` add-on has been taken back out. */
+  const addOnTotal = order.addOnTotal ?? 0;
   const address = readAddress(order.shippingAddress);
   const headline = headlineFor(order, events);
   const cancelled = order.cancelledAt !== null || order.status === "cancelled";
@@ -456,13 +459,30 @@ export function OrderDetail({
           </h2>
           <dl className="mt-3">
             <TotalRow label="Subtotal" value={naira(order.subtotal)} />
-            {/* ONLY WHEN SOMETHING WAS CHARGED. `addOnTotal` is `0` on every
-                old order and absent from an older server, and a "₦0" row
-                under the subtotal would be the page inventing a line for a
-                thing that did not happen. The per-add-on rows above already
-                say what was included for free. */}
-            {(order.addOnTotal ?? 0) > 0 && (
-              <TotalRow label="Add-ons" value={naira(order.addOnTotal ?? 0)} />
+            {/* ONLY WHEN SOMETHING MOVED — IN EITHER DIRECTION. `addOnTotal`
+                is `0` on every old order and absent from an older server, and
+                a "₦0" row under the subtotal would be the page inventing a
+                line for a thing that did not happen. The per-add-on rows above
+                already say what was included for free.
+
+                ═══ `!== 0` RATHER THAN `> 0`, WHICH IS THE WHOLE POINT ═══
+                This gate was written when an add-on could only ever ADD money.
+                An `opt_out` add-on the shopper took back out makes the total
+                NEGATIVE, and `> 0` then hid the one row that explains why the
+                figure below is smaller than subtotal + delivery + tax. The
+                column silently stopped adding up, with the missing ₦2,000
+                accounted for nowhere on the page — the per-add-on row above
+                does say "Packaging — Removed", but that is a different
+                section, and this is the arithmetic.
+
+                Through `savingLabel` for the reason every other negative
+                amount is: `naira()` spells it `-₦2,000`, a charge wearing a
+                minus sign, where this is money coming off. */}
+            {addOnTotal !== 0 && (
+              <TotalRow
+                label="Add-ons"
+                value={addOnTotal < 0 ? savingLabel(addOnTotal) : naira(addOnTotal)}
+              />
             )}
             <TotalRow label="Delivery" value={naira(order.shippingTotal)} />
             {order.taxTotal > 0 && <TotalRow label="Tax" value={naira(order.taxTotal)} />}

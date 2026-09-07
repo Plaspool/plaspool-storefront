@@ -53,6 +53,17 @@ export interface AddToCartButtonProps {
   srLabel?: string;
   /** Confirmation text, for the same width reason. Defaults to "Added to cart". */
   addedLabel?: string;
+  /**
+   * Fired straight after the add is DISPATCHED — not after it lands.
+   *
+   * `cart.add` is deliberately fire-and-forget (see its `void mutate(...)`),
+   * so there is no completion to hand back here and this callback must not be
+   * read as one. The product page's add-on intent uses it as a STARTING GUN
+   * and then watches `cart.addOns` for the offer to appear, which is the only
+   * signal that survives a line merging into an existing row, a `gone` retry,
+   * or a rule that declines to offer anything once the real basket is counted.
+   */
+  onAdded?: () => void;
   className?: string;
 }
 
@@ -64,6 +75,7 @@ export function AddToCartButton({
   label = "Add to cart",
   srLabel,
   addedLabel = "Added to cart",
+  onAdded,
   className,
 }: AddToCartButtonProps) {
   const name = srLabel ?? label;
@@ -99,6 +111,7 @@ export function AddToCartButton({
 
   function handleClick() {
     cart.add(line, qty);
+    onAdded?.();
     setJustAdded(true);
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => setJustAdded(false), CONFIRM_MS);

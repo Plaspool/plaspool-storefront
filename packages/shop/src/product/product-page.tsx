@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { getCategory, getProduct, productPaths } from "../data/catalog";
 import { getReviewAggregate, listReviews } from "../data/reviews";
+import { getProductAddOns } from "../data/add-ons-api";
 import { Breadcrumb } from "../components/breadcrumb";
 import { ProductBuySection } from "./buy-section";
 import { ProductTabs } from "./product-tabs";
@@ -77,9 +78,17 @@ export async function ProductPage({
      the page's most persuasive content. Both calls are cached (see
      `REVIEWS_REVALIDATE`) and neither can throw, so a review service having
      a bad day cannot take a product page down with it. */
-  const [reviewAggregate, reviewPage] = await Promise.all([
+  /* The add-ons join the same parallel read, AT QUANTITY ONE — the quantity
+     the stepper starts on. Reading them here rather than from the browser is
+     what puts the "leave out the packaging" control in the first paint instead
+     of popping it in after hydration; the buy section re-asks as the stepper
+     moves. Like the review calls it cannot throw, and `null` means "draw no
+     control", so an add-on service having a bad day cannot take a product page
+     down either. */
+  const [reviewAggregate, reviewPage, addOns] = await Promise.all([
     getReviewAggregate(product.slug),
     listReviews(product.slug),
+    getProductAddOns(product.slug, 1),
   ]);
 
   return (
@@ -102,6 +111,7 @@ export async function ProductPage({
       <ProductBuySection
         product={product}
         reviewAggregate={reviewAggregate}
+        initialAddOns={addOns?.offers ?? []}
         className="mt-6"
       />
 

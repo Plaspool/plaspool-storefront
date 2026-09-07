@@ -6,7 +6,7 @@ import { BrandLogo } from "@plaspool/brand";
 import { Button, cn } from "@plaspool/ui";
 
 import type { AddOnOffer } from "../data/cart-api";
-import { addOnImageSrc, addOnPriceLabel } from "./add-ons";
+import { addOnImageSrc, addOnPriceLabel, addOnUnitLabel, potentialSavingOf, savingAmountLabel } from "./add-ons";
 
 /**
  * The extras step's pieces: one offer card, the stack of them, and the short
@@ -53,6 +53,12 @@ export interface AddOnOfferCardProps {
 export function AddOnOfferCard({ offer, disabled = false, onChoose }: AddOnOfferCardProps) {
   const titleId = React.useId();
   const src = addOnImageSrc(offer.imageUrl);
+  /* "Already in the price", and the money that comes back for taking it out.
+     `potentialSavingOf` reads `unitAmount × units` rather than `amount`,
+     because `amount` is 0 for as long as the box is being kept. */
+  const optOut = offer.mode === "opt_out";
+  const saving = optOut ? potentialSavingOf(offer) : 0;
+  const unitLabel = addOnUnitLabel(offer);
 
   return (
     <article
@@ -68,18 +74,44 @@ export function AddOnOfferCard({ offer, disabled = false, onChoose }: AddOnOffer
         {offer.description && (
           <p className="mt-1 text-sm leading-5 text-muted-foreground">{offer.description}</p>
         )}
-        {/* Mono and tabular, like every figure in the shop. The "+" says
-            this is on top of a total the shopper has been looking at since
-            the cart, and it is `addOnPriceLabel`'s to spell — from `amount`,
-            what the rule will charge, never `price`. */}
-        <p className="mt-2 font-mono text-sm tabular-nums text-foreground">
-          {addOnPriceLabel(offer.amount)}
-        </p>
+        {/* ═══ TWO QUESTIONS WEARING THE SAME CARD ═══
+            An `ask` is "shall we add this?", and its figure is a charge on top
+            of a total the shopper has been looking at since the cart — the "+"
+            says so, and `addOnPriceLabel` spells it from `amount`, what the
+            rule will charge, never `price`.
 
-        {/* ACCEPT FIRST IN THE DOM AND ON THE LEFT, because it is the answer
-            the offer exists to invite — but the decline is a full button of
-            the same height, not a text link: "No thanks" has to be as easy
-            to press as "Add it", or the card is a nag rather than a question. */}
+            An `opt_out` is "shall we take this out?", and its figure is not a
+            charge at all: `amount` is 0 because the box was bought inside the
+            product price. Printing "Free" there would read as a gift being
+            offered. What belongs on the card is what it is worth per unit and
+            the fact that it is already paid for — the SAVING lives on the
+            button that grants it. */}
+        {optOut ? (
+          <p className="mt-2 text-sm text-muted-foreground">
+            {unitLabel ? (
+              <span className="font-mono tabular-nums text-foreground">{unitLabel}</span>
+            ) : null}
+            {unitLabel ? " · " : null}
+            Already in the price.
+          </p>
+        ) : (
+          <p className="mt-2 font-mono text-sm tabular-nums text-foreground">
+            {addOnPriceLabel(offer.amount)}
+          </p>
+        )}
+
+        {/* `accepted` FIRST IN THE DOM AND ON THE LEFT, because it is the
+            answer the offer exists to invite — but the other is a full button
+            of the same height, not a text link: declining has to be as easy to
+            press as accepting, or the card is a nag rather than a question.
+
+            ═══ THE SAME TWO ANSWERS MEAN OPPOSITE THINGS ═══
+            For an `ask`, `accepted` adds something and `declined` costs
+            nothing. For an `opt_out` it is the other way round: `accepted`
+            KEEPS what is already paid for and `declined` is what pays money
+            back. So the labels come off the mode, and the saving is printed on
+            the button that grants it — a shopper should never have to work out
+            which way round this particular question runs. */}
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
           <Button
             type="button"
@@ -89,7 +121,7 @@ export function AddOnOfferCard({ offer, disabled = false, onChoose }: AddOnOffer
             className="h-11 sm:min-w-32"
           >
             {disabled && <Loader2 aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" />}
-            Add it
+            {optOut ? "Keep it" : "Add it"}
           </Button>
           <Button
             type="button"
@@ -98,7 +130,7 @@ export function AddOnOfferCard({ offer, disabled = false, onChoose }: AddOnOffer
             onClick={() => onChoose("declined")}
             className="h-11 sm:min-w-32"
           >
-            No thanks
+            {optOut && saving > 0 ? `Send it without — save ${savingAmountLabel(saving)}` : "No thanks"}
           </Button>
         </div>
       </div>

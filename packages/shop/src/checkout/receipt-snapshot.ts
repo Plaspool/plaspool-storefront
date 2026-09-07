@@ -115,7 +115,18 @@ export interface ReceiptTotals {
    * written before add-ons existed simply has no rows to draw, which is the
    * truth about that order. Read it `?? []`.
    */
-  addOns?: Array<{ title: string; mode: "chosen" | "included"; amount: number }>;
+  addOns?: Array<{
+    title: string;
+    /** `removed` is the shopper's opt-out, and carries a NEGATIVE `amount`.
+     *  See `FrozenAddOn.mode`. */
+    mode: "chosen" | "included" | "removed";
+    amount: number;
+    /** Carried so a receipt can print "4 × ₦500 = − ₦2,000". Optional, because
+     *  a snapshot written before per-item pricing has neither. */
+    unitAmount?: number;
+    units?: number;
+    basis?: "order" | "item";
+  }>;
 }
 
 export interface ReceiptSnapshot {

@@ -197,7 +197,7 @@ export interface AddOnOffer {
   /** One or two plain sentences, or null. */
   description: string | null;
   imageUrl: string | null;
-  /** The add-on's list price, minor units. */
+  /** The add-on's list price, minor units, PER UNIT. */
   price: ApiMoney;
   /**
    * WHAT WILL BE CHARGED if it is on the order. Usually equals `price`; a
@@ -205,14 +205,67 @@ export interface AddOnOffer {
    * RENDER THIS, NEVER `price`, wherever the shopper is told what it costs —
    * `price` is what it is worth, and only a row saying "Included" over a
    * real figure has any use for that.
+   *
+   * ═══ IT CAN BE NEGATIVE, AND THAT IS THE WHOLE POINT OF `opt_out` ═══
+   * A negative `amount` is money coming OFF the bill: the shopper declined an
+   * add-on whose cost was already inside the product price, so the shop owes
+   * it back. Sum this WITH ITS SIGN and never `Math.abs` it into a charge.
+   * Only `mode === "opt_out" && choice === "declined"` produces one.
+   *
+   * IT IS ALSO NOT `unitAmount × units` IN ONE CASE. The server clamps a
+   * saving so a bill cannot fall below the goods subtotal, so a misconfigured
+   * ₦50,000-per-item refund on a ₦28,000 cart comes back smaller than the
+   * multiplication says. `amount` is the number that moves the bill; the
+   * multiplication is only ever shown as arithmetic beside it.
    */
   amount: ApiMoney;
-  /** `"ask"` — the shopper decides. `"include"` — on the order automatically. */
-  mode: "ask" | "include";
-  /** The shopper's recorded answer for an `ask` add-on. `null` = not asked
-   *  yet. Always `null` for `include`. */
-  choice: "accepted" | "declined" | null;
+  /**
+   * WHAT ONE UNIT COSTS under the rule that fired — SIGNED, so it is negative
+   * exactly when `amount` is. Render "₦500 each" from its MAGNITUDE.
+   *
+   * Optional because a server that predates per-item pricing sends neither
+   * this nor `units` nor `basis`; read it through `addOnUnitAmount()`, which
+   * falls back to `amount` — the shape those servers effectively described.
+   */
+  unitAmount?: ApiMoney;
+  /**
+   * What `unitAmount` is multiplied by: `1` for `"order"`, and the sum of
+   * every line's quantity across the cart for `"item"`. ON THE WIRE SO THE
+   * CLIENT NEVER COUNTS THE CART ITSELF — the server's count is the one the
+   * price was computed from, and a second count here could disagree with it.
+   */
+  units?: number;
+  /** Whether the add-on is charged once per order or once per item. */
+  basis?: AddOnBasis;
+  /**
+   * `"ask"` — not in the price, offer to add it. `"include"` — on the order
+   * automatically, no choice. `"opt_out"` — ALREADY IN THE PRICE, offer to
+   * take it out.
+   */
+  mode: AddOnMode;
+  /**
+   * The shopper's recorded answer. `null` = not answered yet. Always `null`
+   * for `include`.
+   *
+   * ⚠ FOR `opt_out`, `null` AND `"accepted"` MEAN THE SAME THING: the box
+   * stays, and it costs nothing extra because it was paid for inside the
+   * product price. Only `"declined"` does anything, and what it does is give
+   * money back. An unanswered `opt_out` must never render as "not added yet",
+   * and never with a charge beside it.
+   */
+  choice: AddOnChoice | null;
 }
+
+/** `"ask"` offers to add; `"include"` decides for the shopper; `"opt_out"`
+ *  offers to take out something already paid for. */
+export type AddOnMode = "ask" | "include" | "opt_out";
+
+/** Charged once per order, or once for every item in the cart. */
+export type AddOnBasis = "order" | "item";
+
+/** The two answers a shopper can give. What each MEANS depends on `mode` —
+ *  for `opt_out`, `"declined"` is "take it out and pay me back". */
+export type AddOnChoice = "accepted" | "declined";
 
 /**
  * The add-ons on a cart read, or an empty list when the server sent none.

@@ -107,6 +107,22 @@ export interface BuyBoxProps {
    * `max` and whose value came from different variants.
    */
   maxQty: number;
+  /**
+   * The "leave out the packaging" control, or null when nothing is offered.
+   *
+   * A SLOT RATHER THAN A FETCH. The offer depends on the quantity, the choice
+   * has to survive until there is a cart to record it against, and the write
+   * happens after `POST /cart/lines` lands — none of which is the buy box's
+   * business. `ProductBuySection` owns all of it, exactly as it owns colour,
+   * size and quantity, and hands the finished control down. Null renders
+   * nothing at all: `offers: []` is the ordinary answer and deserves no empty
+   * state.
+   */
+  addOnControl?: React.ReactNode;
+  /** Fired when Add to cart is pressed, so the section can record an add-on
+   *  intent against the cart that is about to exist. Dispatch, not
+   *  completion — see `AddToCartButtonProps.onAdded`. */
+  onAdded?: () => void;
   className?: string;
 }
 
@@ -120,6 +136,8 @@ export function BuyBox({
   onSizeChange,
   onQuantityChange,
   maxQty,
+  addOnControl,
+  onAdded,
   className,
 }: BuyBoxProps) {
   /* Real reviews only. This read the invented fixtures behind a feature flag
@@ -302,10 +320,16 @@ export function BuyBox({
         </p>
       )}
 
+      {/* UNDER THE ACTIONS, NOT OVER THEM. The question only matters once the
+          shopper has decided to buy, and a checkbox above the primary button
+          would put a secondary choice in front of the page's whole purpose.
+          Out of stock, there is nothing to opt out of, so it goes too. */}
       <div className="flex flex-wrap gap-3">
-        <AddToCartButton line={line} qty={quantity} disabled={outOfStock} />
+        <AddToCartButton line={line} qty={quantity} disabled={outOfStock} onAdded={onAdded} />
         <BuyNowButton line={line} qty={quantity} disabled={outOfStock} />
       </div>
+
+      {!outOfStock && addOnControl}
     </div>
   );
 }
