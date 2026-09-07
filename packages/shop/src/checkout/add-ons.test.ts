@@ -3,13 +3,20 @@ import { describe, expect, it } from "vitest";
 import {
   INCLUDED,
   addOnAmountLabel,
+  addOnBasisOf,
   addOnImageSrc,
   addOnPriceLabel,
   addOnRowsFor,
+  addOnUnitAmount,
+  addOnUnitLabel,
+  addOnUnits,
   appliedAddOns,
   askedAddOns,
   includedAddOns,
   pendingAddOns,
+  potentialSavingOf,
+  savingAmountLabel,
+  savingLabel,
 } from "./add-ons";
 import type { AddOnOffer } from "../data/cart-api";
 
@@ -125,13 +132,13 @@ describe("what a totals row says about an add-on", () => {
   it("prints the title verbatim and the amount the API froze", () => {
     expect(
       addOnRowsFor([{ id: "ado_1", title: "Velvet pouch", mode: "chosen", amount: 150000 }], "NGN"),
-    ).toEqual([{ key: "ado_1", label: "Velvet pouch", value: "₦1,500" }]);
+    ).toEqual([{ key: "ado_1", label: "Velvet pouch", value: "₦1,500", saving: false }]);
   });
 
   it("says Included, not ₦0, for an included add-on that cost nothing", () => {
     expect(
       addOnRowsFor([{ id: "ado_2", title: "Padded packing", mode: "included", amount: 0 }], "NGN"),
-    ).toEqual([{ key: "ado_2", label: "Padded packing", value: INCLUDED }]);
+    ).toEqual([{ key: "ado_2", label: "Padded packing", value: INCLUDED, saving: false }]);
   });
 
   it("prints the amount for an included add-on the operator chose to charge for", () => {
@@ -139,7 +146,7 @@ describe("what a totals row says about an add-on", () => {
        it is just a row with a number, whatever route put it on the order. */
     expect(
       addOnRowsFor([{ id: "ado_3", title: "Insurance", mode: "included", amount: 50000 }], "NGN"),
-    ).toEqual([{ key: "ado_3", label: "Insurance", value: "₦500" }]);
+    ).toEqual([{ key: "ado_3", label: "Insurance", value: "₦500", saving: false }]);
   });
 
   it("never says Included for a chosen add-on, even a free one", () => {
@@ -181,5 +188,160 @@ describe("where an add-on's picture is fetched from", () => {
 
   it("answers null for null, which draws the placeholder", () => {
     expect(addOnImageSrc(null)).toBeNull();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * PER-ITEM PRICING AND THE ADD-ON THAT PAYS MONEY BACK.
+ *
+ * Two things arrived together on the API and only one of them is visible:
+ * an add-on can be priced PER ITEM, and an add-on can be something already
+ * inside the product price that the shopper takes back out for a refund. The
+ * second makes `amount` NEGATIVE for the first time in this codebase, and
+ * every assumption that an add-on only ever adds money is wrong from that
+ * moment.
+ *
+ * THE TRAP THESE EXIST TO PIN: for `opt_out`, `choice: null` and
+ * `choice: "accepted"` mean the SAME THING — the box stays, and it costs
+ * nothing extra because it was paid for inside the product price. Only
+ * `"declined"` does anything, and what it does is give money back.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+const OPT_OUT_UNANSWERED: AddOnOffer = {
+  id: "ado_box",
+  title: "Packaging",
+  description: null,
+  imageUrl: null,
+  price: { amount: 50000, currency: "NGN" },
+  unitAmount: { amount: 50000, currency: "NGN" },
+  units: 4,
+  basis: "item",
+  amount: { amount: 0, currency: "NGN" },
+  mode: "opt_out",
+  choice: null,
+};
+
+const OPT_OUT_DECLINED: AddOnOffer = {
+  ...OPT_OUT_UNANSWERED,
+  unitAmount: { amount: -50000, currency: "NGN" },
+  amount: { amount: -200000, currency: "NGN" },
+  choice: "declined",
+};
+
+const OPT_OUT_KEPT: AddOnOffer = { ...OPT_OUT_UNANSWERED, choice: "accepted" };
+
+describe("an add-on whose cost is already in the price", () => {
+  it("is a question the checkout must ask — gating on mode === 'ask' hides the whole feature", () => {
+    expect(pendingAddOns([OPT_OUT_UNANSWERED])).toEqual([OPT_OUT_UNANSWERED]);
+    expect(askedAddOns([OPT_OUT_UNANSWERED])).toEqual([OPT_OUT_UNANSWERED]);
+  });
+
+  it("is finished once answered, in EITHER direction, so nobody is asked twice", () => {
+    /* Answers are stored server-side precisely so the product page and the
+       extras step cannot both ask. A shopper who ticked "leave out the
+       packaging" in the buy box arrives at checkout already answered. */
+    expect(pendingAddOns([OPT_OUT_DECLINED])).toEqual([]);
+    expect(pendingAddOns([OPT_OUT_KEPT])).toEqual([]);
+  });
+
+  it("is on the order whatever the shopper said, unlike an unanswered 'ask'", () => {
+    /* Kept, it is applied at 0 and a box still goes in the parcel; declined,
+       it is applied at a negative amount and money comes off. */
+    expect(appliedAddOns([OPT_OUT_UNANSWERED])).toEqual([OPT_OUT_UNANSWERED]);
+    expect(appliedAddOns([OPT_OUT_DECLINED])).toEqual([OPT_OUT_DECLINED]);
+  });
+
+  it("is never the drawer's quiet 'included' line — the shopper has a say over it", () => {
+    expect(includedAddOns([OPT_OUT_UNANSWERED, OPT_OUT_DECLINED])).toEqual([]);
+  });
+
+  it("costs nothing while unanswered, and must not be priced as a charge", () => {
+    expect(addOnAmountLabel(OPT_OUT_UNANSWERED.amount)).toBe("Free");
+    expect(addOnPriceLabel(OPT_OUT_UNANSWERED.amount)).toBe("Free");
+  });
+});
+
+describe("money that comes off the bill", () => {
+  it("reads as a saving, not as a charge wearing a minus sign", () => {
+    /* formatNaira would spell this "-₦2,000". The U+2212 minus and the space
+       are what separate a subtraction from a negative charge at this size. */
+    expect(addOnAmountLabel(OPT_OUT_DECLINED.amount)).toBe("− ₦2,000");
+    expect(addOnPriceLabel(OPT_OUT_DECLINED.amount)).toBe("− ₦2,000");
+    expect(savingLabel(-200000)).toBe("− ₦2,000");
+  });
+
+  it("drops the sign where the sentence already carries the direction", () => {
+    /* "save − ₦2,000" would say the saving twice and read as a negative one. */
+    expect(savingAmountLabel(-200000)).toBe("₦2,000");
+    expect(savingAmountLabel(200000)).toBe("₦2,000");
+  });
+
+  it("is flagged on the totals row, so a panel need not re-read the glyph", () => {
+    const rows = addOnRowsFor(
+      [{ id: "ado_box", title: "Packaging", mode: "removed", amount: -200000 }],
+      "NGN",
+    );
+    expect(rows).toEqual([
+      { key: "ado_box", label: "Packaging — Removed", value: "− ₦2,000", saving: true },
+    ]);
+  });
+
+  it("never reads as Included, which is what a KEPT opt-out reads as", () => {
+    /* Both are boxes in the parcel on the order; only one of them is a refund,
+       and the row has to be able to tell a shopper which. */
+    const kept = addOnRowsFor([{ title: "Packaging", mode: "included", amount: 0 }], "NGN");
+    expect(kept[0]).toMatchObject({ value: INCLUDED, saving: false });
+  });
+});
+
+describe("what one unit costs, and how many of them there are", () => {
+  it("shows the arithmetic for a per-item add-on", () => {
+    expect(addOnUnitLabel(OPT_OUT_UNANSWERED)).toBe("₦500 each × 4");
+  });
+
+  it("uses the magnitude, so a refund does not claim every box is one", () => {
+    expect(addOnUnitLabel(OPT_OUT_DECLINED)).toBe("₦500 each × 4");
+  });
+
+  it("says nothing for an order-basis add-on, whose unit IS the order", () => {
+    expect(addOnUnitLabel({ ...OPT_OUT_UNANSWERED, basis: "order", units: 1 })).toBeNull();
+  });
+
+  it("says nothing for a single item — '₦500 each × 1' is a sum nobody needed", () => {
+    expect(addOnUnitLabel({ ...OPT_OUT_UNANSWERED, units: 1 })).toBeNull();
+  });
+
+  it("quotes the saving from unitAmount × units, because amount is 0 until it is declined", () => {
+    /* THE PRODUCT PAGE'S NUMBER. Before there is a cart there is no charge to
+       read: keeping the box costs nothing, so the offer is only expressible as
+       the multiplication. */
+    expect(potentialSavingOf(OPT_OUT_UNANSWERED)).toBe(200000);
+    expect(potentialSavingOf(OPT_OUT_DECLINED)).toBe(200000);
+  });
+});
+
+describe("an order placed before per-item pricing existed", () => {
+  /* THE FIELDS ARE SIMPLY ABSENT on every historical order. A strict read
+     renders all of them as corrupt, so each has one fallback describing what
+     those servers meant: one unit, charged once, costing the whole amount. */
+  const OLD = {
+    amount: { amount: 150000, currency: "NGN" },
+  } as AddOnOffer;
+
+  it("reads one unit, order basis, and the whole amount as the unit price", () => {
+    expect(addOnUnits(OLD)).toBe(1);
+    expect(addOnBasisOf(OLD)).toBe("order");
+    expect(addOnUnitAmount(OLD)).toEqual({ amount: 150000, currency: "NGN" });
+  });
+
+  it("does not invent arithmetic it was never given", () => {
+    expect(addOnUnitLabel(OLD)).toBeNull();
+  });
+
+  it("survives a units field that is not a number", () => {
+    expect(addOnUnits({ units: Number.NaN })).toBe(1);
+    expect(addOnUnits({ units: undefined })).toBe(1);
   });
 });

@@ -65,9 +65,24 @@ export const STEP_LABELS: Record<Step, string> = {
  * are arguments rather than state this module could read.
  */
 export function stepsFor(optionCount: number, askCount = 0): Step[] {
-  const steps: Step[] = ["details"];
-  if (optionCount > 1) steps.push("delivery");
+  const steps: Step[] = [];
+  /* ═══ EXTRAS IS STEP ONE, NOT THE STEP BEFORE THE TOTAL ═══
+     It used to sit between the last details step and `review`, because the
+     offers were read from `POST /checkout/preview` and that needs an address.
+     `GET /cart` now evaluates the rules against the real cart on every read,
+     so the question can be asked before anything is typed — and it is asked
+     there, because "shall we leave the boxes out?" is a question about the
+     PARCEL, not about the payment. Asked last, it interrupts somebody who has
+     filled in an address and is reaching for their card.
+
+     A LATER OFFER STILL GETS ASKED. The address can change which rules fire,
+     so `continueToTotal` previews again and re-enters this step if something
+     new is pending. The step's POSITION in the list does not move when that
+     happens: it is the same step, and a header that reordered itself mid-flow
+     would be worse than one that shows it early. */
   if (askCount > 0) steps.push("extras");
+  steps.push("details");
+  if (optionCount > 1) steps.push("delivery");
   steps.push("review");
   return steps;
 }

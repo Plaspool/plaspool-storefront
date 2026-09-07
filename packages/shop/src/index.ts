@@ -16,6 +16,12 @@ export * from "./data/points-api";
    `/api/geo` route answers with; the checkout reads it back to preselect the
    delivery country. */
 export * from "./data/geo-hint";
+/* The PRODUCT PAGE's add-on estimate, and the only client in this package the
+   browser cannot call cross-origin — the upstream route sends no
+   Access-Control-Allow-Origin, so the buy box goes through the storefront's
+   own /api/add-ons/for-product/<slug>. The header on the module explains it,
+   and apps/storefront's route is the other half. */
+export * from "./data/add-ons-api";
 
 // Presentational primitives. Every later surface — cards, listings, the
 // product page, the cart — composes from these.
@@ -30,6 +36,9 @@ export * from "./components/quantity-stepper";
 export * from "./components/bulk-tier-table";
 export * from "./components/product-card";
 export * from "./components/product-grid";
+/* The buy box's "leave out the packaging" control. Presentational, so the
+   node-environment suite can render it — the state is in `buy-section.tsx`. */
+export * from "./product/add-on-opt-out";
 
 // The cart. HELD BY THE SERVER, identified by a cookie — `storage.ts` and its
 // localStorage basket are deleted, because a cart in the browser and a cart on

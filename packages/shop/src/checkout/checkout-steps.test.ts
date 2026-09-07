@@ -70,10 +70,13 @@ describe("the position shown in the header", () => {
 
   it("counts the extras step in N of M, on every viewport", () => {
     /* The sheet is how the step is DRAWN on a phone, not a different flow —
-       so the header over a four-step checkout says 3 of 4 on the extras step
-       whether that step is a page or a bottom sheet. */
+       so the header over a four-step checkout counts the extras step whether
+       that step is a page or a bottom sheet. It is FIRST now: the question is
+       about the parcel, not the payment, and asking it last interrupts
+       somebody who has filled in an address and is reaching for their card. */
     const four = stepsFor(2, 1);
-    expect(stepPosition("extras", four)).toBe(3);
+    expect(stepPosition("extras", four)).toBe(1);
+    expect(stepPosition("details", four)).toBe(2);
     expect(stepPosition("review", four)).toBe(4);
   });
 
@@ -101,25 +104,34 @@ describe("the extras step", () => {
     expect(stepsFor(1)).toEqual(["details", "review"]);
   });
 
-  it("sits between the details and the total when one add-on is asked about", () => {
-    expect(stepsFor(1, 1)).toEqual(["details", "extras", "review"]);
+  it("comes first when one add-on is asked about", () => {
+    expect(stepsFor(1, 1)).toEqual(["extras", "details", "review"]);
   });
 
-  it("sits after delivery when there is a delivery choice too", () => {
-    /* The total is the last thing settled, and the delivery option moves it,
-       so the question about extras comes after the question about delivery
-       and before the number. */
-    expect(stepsFor(2, 1)).toEqual(["details", "delivery", "extras", "review"]);
+  it("still comes first when there is a delivery choice too", () => {
+    /* It used to sit after delivery, because the offers came from
+       `POST /checkout/preview` and that needs an address. `GET /cart` now
+       evaluates the rules on every read, so the question can be — and is —
+       asked before anything is typed. The address can still turn up a NEW
+       offer, which re-enters this same step rather than adding another. */
+    expect(stepsFor(2, 1)).toEqual(["extras", "details", "delivery", "review"]);
   });
 
   it("is one step however many add-ons stack on it", () => {
-    expect(stepsFor(1, 3)).toEqual(["details", "extras", "review"]);
+    expect(stepsFor(1, 3)).toEqual(["extras", "details", "review"]);
   });
 
   it("never promises the step for a count of zero or less", () => {
     for (const count of [0, -1]) {
       expect(stepsFor(1, count)).not.toContain("extras");
     }
+  });
+
+  it("leaves details first when there is nothing to ask, so the common checkout is unchanged", () => {
+    /* The reorder must be invisible to a shop with no add-ons wired, which is
+       every deployment until an operator configures one. */
+    expect(stepsFor(1, 0)[0]).toBe("details");
+    expect(stepsFor(2, 0)).toEqual(["details", "delivery", "review"]);
   });
 });
 

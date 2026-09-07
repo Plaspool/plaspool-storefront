@@ -497,6 +497,9 @@ export function CheckoutFlow() {
    * and nothing here prices one.
    */
   const [offers, setOffers] = React.useState<AddOnOffer[]>([]);
+  /** Set once the cart's own offers have been read into `offers`, so the seed
+   *  below cannot re-run over an answer the shopper has since given. */
+  const [seededFromCart, setSeededFromCart] = React.useState(false);
   /**
    * How many add-ons the extras step is asking about, for "Step N of M".
    *
@@ -509,6 +512,17 @@ export function CheckoutFlow() {
    * through the details step.
    */
   const [askCount, setAskCount] = React.useState(0);
+  /**
+   * Where the extras step goes when its last question is answered.
+   *
+   * THE STEP IS REACHED FROM TWO DIRECTIONS AND THEY END DIFFERENTLY. Entered
+   * FIRST, from the cart's own offers, the shopper has typed nothing yet and
+   * the next thing they owe is an address. Entered LATE, from
+   * `continueToTotal`, the address is already in and the only thing left is
+   * the total. One step, two exits — and a single `freezeAndReview()` at the
+   * end of `chooseAddOn` would freeze a checkout with no address in it.
+   */
+  const [afterExtras, setAfterExtras] = React.useState<"details" | "review">("review");
   /** Whether the extras step is currently drawn as a bottom sheet. Only ever
    *  true below `sm` — see `narrowViewport`. */
   const [sheetOpen, setSheetOpen] = React.useState(false);
@@ -821,6 +835,56 @@ export function CheckoutFlow() {
      an answer's response replaces `offers` whole, and the step is finished
      the render this becomes empty. */
   const pendingOffers = pendingAddOns(offers);
+
+  /**
+   * ═══ THE CART'S OWN OFFERS OPEN THE CHECKOUT ═══
+   *
+   * `GET /cart` evaluates the add-on rules against the REAL cart on every
+   * read — real item count, real address, real discount code, real session —
+   * so by the time this component mounts the provider is already holding the
+   * answer. If anything is unanswered, that is step one.
+   *
+   * ═══ WHAT MAKES A QUESTION "UNANSWERED" IS NOT WHAT IT LOOKS LIKE ═══
+   * `pendingAddOns` gates on `mode !== "include" && choice === null`, and the
+   * subtlety is entirely in `opt_out`: for it, `null` and `"accepted"` mean
+   * the same thing — the box stays and costs nothing extra — so an answered
+   * one is genuinely finished and MUST NOT be asked again. Answers are stored
+   * on the cart precisely so the product page and this step cannot ask twice;
+   * a shopper who ticked "leave out the packaging" in the buy box arrives here
+   * with `choice: "declined"` already recorded and never sees this step.
+   *
+   * ═══ ONCE, AND ONLY ONCE ═══
+   * `seededFromCart` latches on the first hydrated read. Without it every
+   * answer's response — which flows back into the provider — would re-enter
+   * the step the shopper just finished. `hydrated` rather than a length check
+   * because an empty `addOns` is a real answer ("nothing applies here") and is
+   * indistinguishable from "not read yet" until the provider says so.
+   */
+  /* ADJUSTED DURING RENDER, NOT IN AN EFFECT — the pattern
+     `add-to-cart.tsx` documents, and for the same reason: React 19's
+     `react-hooks/set-state-in-effect` rule refuses the effect version, and it
+     is right to. An effect would paint the details step once and then replace
+     it with the extras step, so the shopper would see the checkout start and
+     then change its mind. A render-phase update re-renders before the browser
+     paints, so the first thing drawn is already the right step.
+
+     IT CANNOT RUN ON THE SERVER, which is what makes `narrowViewport()` safe
+     here: `cart.hydrated` is false until the provider has read the cart in the
+     browser, so this branch is unreachable during SSR. */
+  if (!seededFromCart && cart.hydrated) {
+    setSeededFromCart(true);
+    const current = cart.addOns;
+    if (current.length > 0) {
+      setOffers(current);
+      const pending = pendingAddOns(current);
+      if (pending.length > 0) {
+        setAfterExtras("details");
+        setAskCount(pending.length);
+        setStep("extras");
+        setSheetOpen(narrowViewport());
+      }
+    }
+  }
 
   /**
    * One configured field as a control.
@@ -1143,6 +1207,11 @@ export function CheckoutFlow() {
    * it is drawn on a phone, not a different flow.
    */
   function askAboutAddOns(pending: AddOnOffer[]) {
+    /* THE LATE ENTRY. The address is in and the preview turned up a question
+       the cart could not have known about — a rule that reads the delivery
+       area, say. The only thing left after it is the total, so this exit is
+       `review` rather than the `details` the mount-time seed sets. */
+    setAfterExtras("review");
     setAskCount(pending.length);
     setStep("extras");
     setSheetOpen(narrowViewport());
@@ -1192,7 +1261,16 @@ export function CheckoutFlow() {
       setOffers(next);
       if (pendingAddOns(next).length === 0) {
         setSheetOpen(false);
-        await freezeAndReview();
+        /* ═══ WHERE THE LAST ANSWER LEADS ═══
+           Asked first, the shopper has typed nothing and owes an address;
+           freezing here would freeze a checkout with no address in it. Asked
+           late, the address is already in and the total is all that is left.
+           See `afterExtras`. */
+        if (afterExtras === "details") {
+          setStep("details");
+        } else {
+          await freezeAndReview();
+        }
       }
     } finally {
       setBusy(false);
