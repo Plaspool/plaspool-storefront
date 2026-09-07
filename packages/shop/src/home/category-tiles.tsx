@@ -5,8 +5,11 @@ import { listCategories } from "../data/catalog";
 import { SpoolImage } from "../components/spool-image";
 
 /**
- * The categories, as the second thing on the page — the fastest route from
- * "I need filament" to a listing.
+ * The categories — the fastest route from "I need filament" to a listing.
+ *
+ * It used to be the second thing on the page, under the hero. The hero is
+ * gone (see `home-page.tsx`), so on the day a second category exists this is
+ * what the store home opens with.
  *
  * A category carrying no products still links. Its listing page is the
  * designed empty state, and an empty category that quietly disappears from
@@ -26,10 +29,14 @@ export async function CategoryTiles() {
 
   /*
    * ONE TILE IS NOT A CHOICE, so there is nothing to shop BY. This section is a
-   * chooser; below two categories it is a heading over a single link that goes
-   * exactly where the hero's primary button above it already goes —
-   * `primaryCategoryLink()` picks the same first category — stacked on top of a
-   * product count that is currently "0 products".
+   * chooser; below two categories it is a heading over a single link, stacked
+   * on top of a product count that is currently "0 products", pointing where
+   * the nav and the featured row's "View all" already point.
+   *
+   * THE HERO USED TO BE THE OTHER HALF OF THIS ARGUMENT — its one CTA called
+   * `primaryCategoryLink()`, so the lone tile repeated the button directly
+   * above it. That hero is gone, and the reasoning survives it: a chooser with
+   * one option is still not a choice.
    *
    * Rendering nothing is the honest state, and it is how three of this page's
    * other sections already behave: `home-page.tsx` is composed so that any of
