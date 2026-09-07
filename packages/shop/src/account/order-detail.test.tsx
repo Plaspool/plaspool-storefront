@@ -473,6 +473,44 @@ describe("the add-ons on an order", () => {
     expect(html).not.toMatch(/<dt[^>]*>Add-ons<\/dt>/);
   });
 
+  /* ═══ THE REGRESSION THAT MADE THE PAYMENT COLUMN STOP ADDING UP ═══
+     `opt_out` add-ons arrived after this page did, and brought the first
+     NEGATIVE `addOnTotal` with them. The gate on the total row read `> 0` —
+     written when an add-on could only ever ADD money — so the row vanished,
+     leaving a Payment column whose subtotal and delivery were ₦2,000 more
+     than its own total, with nothing on screen saying where the money went.
+     The per-add-on row above it said "Removed", but that is a different
+     section; this one is the arithmetic. */
+  it("shows a removed add-on as a saving, and keeps the payment column adding up", () => {
+    const html = withAddOns(
+      [
+        {
+          id: "ado_box",
+          title: "Packaging",
+          mode: "removed",
+          amount: -200_000,
+          listPrice: 200_000,
+          currency: "NGN",
+        },
+      ],
+      /* ₦23,000 goods + ₦3,000 delivery − ₦2,000 back = ₦24,000. */
+      { addOnTotal: -200_000, grandTotal: 2_400_000 },
+    );
+    /* The line beside the goods says what became of it… */
+    expect(html).toContain("Packaging — Removed");
+    /* …and the Payment column carries the row that explains the total. */
+    const at = html.indexOf("Add-ons</dt>");
+    expect(at).toBeGreaterThan(-1);
+    expect(html.slice(at, at + 200)).toContain("− ₦2,000");
+    /* Money coming OFF, not a charge wearing a minus sign: `formatNaira`
+       would emit a hyphen, `savingLabel` emits U+2212 and a space. */
+    expect(html).not.toContain("-₦2,000");
+    /* And the column now reads ₦23,000 − ₦2,000 + ₦3,000 = ₦24,000. */
+    expect(html).toContain("₦23,000");
+    expect(html).toContain("₦3,000");
+    expect(html).toContain("₦24,000");
+  });
+
   it("keeps the add-ons out of the item count", () => {
     /* The heading counts units of GOODS; packaging is not a unit. */
     const html = withAddOns(
