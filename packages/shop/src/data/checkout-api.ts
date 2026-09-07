@@ -1,5 +1,5 @@
 import { COMMERCE_API_BASE } from "./config";
-import type { AddOnOffer, ApiMoney, TotalsLine } from "./cart-api";
+import type { AddOnBasis, AddOnChoice, AddOnOffer, ApiMoney, TotalsLine } from "./cart-api";
 
 /**
  * The checkout client — the storefront's half of the commerce API's checkout
@@ -103,7 +103,7 @@ export type { TotalsLine } from "./cart-api";
    carry the identical shape. Re-exported so a checkout caller imports them
    from the module whose routes speak them. */
 export { addOnsOf } from "./cart-api";
-export type { AddOnOffer } from "./cart-api";
+export type { AddOnBasis, AddOnChoice, AddOnMode, AddOnOffer } from "./cart-api";
 
 /**
  * A line that moves the total and must appear on the invoice. Today the only
@@ -155,9 +155,31 @@ export const REDEMPTION_ADJUSTMENT_CODE = "points_redemption";
 export interface FrozenAddOn {
   id: string;
   title: string;
-  mode: "chosen" | "included";
+  /**
+   * WHAT HAPPENED, not what was offered — a placed order records the outcome,
+   * so these are not the offer's `ask | include | opt_out`.
+   *
+   *   `chosen`   the shopper said yes to an `ask`.
+   *   `included` a rule added it, OR an `opt_out` was KEPT. A box went in the
+   *              parcel either way, and a kept `opt_out` costs `0` because it
+   *              was already paid for inside the product price.
+   *   `removed`  the shopper took it back out. THE ONLY MODE WHOSE `amount`
+   *              IS NEGATIVE, and the one that must read as a refund rather
+   *              than a charge with a minus in front of it.
+   */
+  mode: "chosen" | "included" | "removed";
+  /** MAY BE NEGATIVE — see `mode: "removed"`. Summed WITH ITS SIGN into
+   *  `addOnTotal`, which is why a removed add-on takes money off the grand
+   *  total rather than adding to it. */
   amount: ApiMoney;
   listPrice: ApiMoney;
+  /** Per-unit cost, unit count and what the count is of. ABSENT ON EVERY ORDER
+   *  PLACED BEFORE PER-ITEM PRICING, so read them through `addOnUnitAmount`,
+   *  `addOnUnits` and `addOnBasisOf` — a strict read renders every historical
+   *  order as corrupt. */
+  unitAmount?: ApiMoney;
+  units?: number;
+  basis?: AddOnBasis;
 }
 
 export interface FrozenTotals {
@@ -660,12 +682,30 @@ export function removeDiscountCode(): Promise<CheckoutResult<unknown>> {
  */
 export function setAddOnChoice(
   addOnId: string,
-  choice: "accepted" | "declined",
-  baseRevision: number,
+  choice: AddOnChoice,
+  /**
+   * OPTIONAL, AND OMITTED RATHER THAN GUESSED.
+   *
+   * The checkout always has one: it is holding a revision it just read, and
+   * sending it is what makes a stale write fail loudly instead of quietly
+   * overwriting someone else's. The PRODUCT PAGE has none — it records an
+   * intent moments after `POST /cart/lines`, against a cart whose revision it
+   * never saw — and inventing a number there would either be wrong or would
+   * have to be fetched, which is a round trip bought to enable a check that
+   * has nothing to race against.
+   *
+   * The API treats an absent `baseRevision` as "no opinion", so the field is
+   * dropped from the body rather than sent as `undefined` — JSON.stringify
+   * would omit it either way, and being explicit is what stops the next reader
+   * assuming a default of 0.
+   */
+  baseRevision?: number,
 ): Promise<CheckoutResult<{ cart: ReopenedCart; addOns: AddOnOffer[] }>> {
   return request(`/checkout/add-ons/${encodeURIComponent(addOnId)}`, {
     method: "PUT",
-    body: JSON.stringify({ choice, baseRevision }),
+    body: JSON.stringify(
+      baseRevision === undefined ? { choice } : { choice, baseRevision },
+    ),
   });
 }
 

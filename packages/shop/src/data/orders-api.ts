@@ -99,7 +99,19 @@ export interface OrderLine {
 export interface OrderAddOn {
   id: string;
   title: string;
-  mode: "chosen" | "included";
+  /**
+   * WHAT HAPPENED, not what was offered — a placed order records the outcome,
+   * so these are not the offer's `ask | include | opt_out`.
+   *
+   *   `chosen`   the shopper said yes to an `ask`.
+   *   `included` a rule added it, OR an `opt_out` was KEPT. A box went in the
+   *              parcel either way, and a kept `opt_out` costs `0` because it
+   *              was already paid for inside the product price.
+   *   `removed`  the shopper took it back out. THE ONLY MODE WHOSE `amount`
+   *              IS NEGATIVE, and the one that must read as a refund rather
+   *              than a charge with a minus in front of it.
+   */
+  mode: "chosen" | "included" | "removed";
   amount: number;
   listPrice: number;
   currency: string;
