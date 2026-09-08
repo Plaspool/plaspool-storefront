@@ -163,9 +163,12 @@ export function AddOnTotalRows({ rows }: { rows: AddOnRow[] }) {
   return (
     <>
       {rows.map((row) => (
-        <div key={row.key} className="flex items-center justify-between py-1">
-          <span className="text-sm text-muted-foreground">{row.label}</span>
-          <span className="font-mono text-sm tabular-nums text-foreground">{row.value}</span>
+        <div key={row.key} className="flex items-start justify-between gap-3 py-1">
+          {/* The title is the OPERATOR'S string and can be any length, so the
+              label wraps and the amount never shrinks — the same rule the
+              rest of the totals panel follows. */}
+          <span className="min-w-0 break-words text-sm text-muted-foreground">{row.label}</span>
+          <span className="shrink-0 font-mono text-sm tabular-nums text-foreground">{row.value}</span>
         </div>
       ))}
     </>
