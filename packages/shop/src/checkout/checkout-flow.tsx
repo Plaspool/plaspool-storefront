@@ -1484,7 +1484,13 @@ export function CheckoutFlow() {
 
   return (
     <div className="mx-auto grid max-w-5xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_320px] lg:py-16">
-      <div>
+      {/* ═══ `min-w-0`, OR A LONG WORD WIDENS THE WHOLE PAGE ═══
+          A grid item's min-width is `auto`, so this column refuses to shrink
+          below its longest unbreakable string — an email with no spaces, a
+          mono discount label — and the 1fr track grows past the viewport
+          instead of wrapping. The row's own rules below (`min-w-0` labels,
+          `shrink-0` amounts) only hold once this one does. */}
+      <div className="min-w-0">
         <Link
           href="/cart"
           className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
@@ -1882,7 +1888,7 @@ export function CheckoutFlow() {
                       submitted, but still sitting in state from a saved
                       address — and the review would describe an address the
                       shop was not given. */}
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <p className="mt-1 break-words text-sm text-muted-foreground">
                     {[
                       effectiveAddress.name,
                       effectiveAddress.line1,
@@ -1899,19 +1905,19 @@ export function CheckoutFlow() {
                       .filter(Boolean)
                       .join(", ")}
                   </p>
-                  <p className="mt-2 text-sm text-muted-foreground">{email}</p>
+                  <p className="mt-2 break-all text-sm text-muted-foreground">{email}</p>
                 </div>
 
                 <div className="border-2 border-foreground p-4">
-                  <div className="flex items-center justify-between py-1">
-                    <span className="text-sm text-muted-foreground">Subtotal</span>
-                    <span className="font-mono text-sm tabular-nums text-foreground">
+                  <div className="flex items-start justify-between gap-3 py-1">
+                    <span className="min-w-0 text-sm text-muted-foreground">Subtotal</span>
+                    <span className="shrink-0 font-mono text-sm tabular-nums text-foreground">
                       {formatNaira(majorUnits(totals.subtotal))}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between py-1">
-                    <span className="text-sm text-muted-foreground">Delivery</span>
-                    <span className="font-mono text-sm tabular-nums text-foreground">
+                  <div className="flex items-start justify-between gap-3 py-1">
+                    <span className="min-w-0 text-sm text-muted-foreground">Delivery</span>
+                    <span className="shrink-0 font-mono text-sm tabular-nums text-foreground">
                       {formatNaira(majorUnits(totals.shippingTotal))}
                     </span>
                   </div>
@@ -1932,13 +1938,13 @@ export function CheckoutFlow() {
                     )}
                   />
                   {totals.taxTotal.amount > 0 && (
-                    <div className="flex items-center justify-between py-1">
+                    <div className="flex items-start justify-between gap-3 py-1">
                       {/* The API's own label ("VAT") — the customer is told
                           WHAT the line is, not the generic word for it. */}
-                      <span className="text-sm text-muted-foreground">
+                      <span className="min-w-0 break-words text-sm text-muted-foreground">
                         {totals.tax?.label || "Tax"}
                       </span>
-                      <span className="font-mono text-sm tabular-nums text-foreground">
+                      <span className="shrink-0 font-mono text-sm tabular-nums text-foreground">
                         {formatNaira(majorUnits(totals.taxTotal))}
                       </span>
                     </div>
@@ -1956,21 +1962,21 @@ export function CheckoutFlow() {
                   {totals.adjustments.map((adjustment) => (
                     <div
                       key={adjustment.code}
-                      className="flex items-center justify-between py-1"
+                      className="flex items-start justify-between gap-3 py-1"
                     >
-                      <span className="text-sm text-muted-foreground">
+                      <span className="min-w-0 break-words text-sm text-muted-foreground">
                         {adjustment.label}
                       </span>
-                      <span className="font-mono text-sm tabular-nums text-foreground">
+                      <span className="shrink-0 font-mono text-sm tabular-nums text-foreground">
                         {formatNaira(majorUnits(adjustment.amount))}
                       </span>
                     </div>
                   ))}
-                  <div className="mt-1 flex items-center justify-between border-t border-brand-line pt-2">
-                    <span className="text-base font-semibold text-foreground">
+                  <div className="mt-1 flex items-start justify-between gap-3 border-t border-brand-line pt-2">
+                    <span className="min-w-0 text-base font-semibold text-foreground">
                       Total
                     </span>
-                    <span className="font-mono text-base font-bold tabular-nums text-foreground">
+                    <span className="shrink-0 font-mono text-base font-bold tabular-nums text-foreground">
                       {formatNaira(majorUnits(totals.grandTotal))}
                     </span>
                   </div>
