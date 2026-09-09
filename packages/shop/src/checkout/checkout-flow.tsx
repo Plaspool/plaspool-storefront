@@ -48,6 +48,11 @@ import {
   readDeliveryPlaces,
   type DeliveryPlaces,
 } from "../data/delivery-places";
+import {
+  basketSignature,
+  reconcileShippingSelection,
+  shippingIsStale,
+} from "./shipping-options";
 import { RegionField } from "./region-field";
 import { AddressAutofill } from "./address-autofill-button";
 import { prefillFromGeoHint, suggestDistrict, type GeocodedAddress } from "./address-autofill";
@@ -382,6 +387,16 @@ export function CheckoutFlow() {
   );
 
   const [shippingOptions, setShippingOptions] = React.useState<ShippingOption[]>([]);
+  /**
+   * The basket the options in `shippingOptions` were quoted against, or null
+   * before anything has been quoted.
+   *
+   * DELIVERY PRICE MOVES WITH BASKET WEIGHT NOW — one spool to Wuse is ₦4,000
+   * and five is ₦5,000 — so an option list outlives the basket it was priced
+   * for. Under the old flat zone rates this could not happen and nothing
+   * watched the cart. See `shipping-options.ts`.
+   */
+  const [quotedFor, setQuotedFor] = React.useState<string | null>(null);
   const [selectedShippingId, setSelectedShippingId] = React.useState<string | null>(null);
 
   const [customerEmail, setCustomerEmail] = React.useState<string | null>(null);
@@ -483,6 +498,68 @@ export function CheckoutFlow() {
    *  the district that is actually on screen and never an orphaned key still
    *  sitting in state. */
   const effectiveAddress: Address = submittedAddress(address, config, serviceAreas);
+
+  /* What a delivery quote is only true for. Derived from the resolved lines
+     because weight is per unit, so a swapped variant moves the price exactly
+     as an added spool does. */
+  const basketSig = basketSignature(
+    cart.resolved.map((line) => ({
+      variantId: line.product.variantIds[`${line.colour.id}:${line.size.id}`] ?? "",
+      qty: line.qty,
+    })),
+  );
+
+  /**
+   * RE-READ THE DELIVERY OPTIONS WHEN THE BASKET MOVES.
+   *
+   * The price is a courier quote against the basket's weight, so the list
+   * fetched by `PUT /checkout/addresses` is only true for the lines it was
+   * quoted against. A shopper who adds two spools after the address step and
+   * is still shown the one-spool price does not get charged it — the server
+   * re-derives at freeze — they watch the total jump on the payment step
+   * instead, which is the surprise the freeze exists to prevent.
+   *
+   * ONLY ONCE SOMETHING HAS BEEN QUOTED (`quotedFor !== null`). Before the
+   * address is in there is nothing stale and nothing to ask for.
+   *
+   * RE-PUTTING THE ADDRESS IS HOW OPTIONS ARE RE-READ — there is no
+   * options-only route, and the address is what the quote keys off along with
+   * the weight. The revision is re-read immediately before the call, never
+   * arithmetic on a held one.
+   *
+   * NOT WHILE `busy`. A submit in flight is already re-reading the options as
+   * part of its own sequence, and a second write against the same revision
+   * would lose the race and surface as a `baseRevision` refusal.
+   */
+  React.useEffect(() => {
+    if (!shippingIsStale(quotedFor, basketSig)) return;
+    if (busy) return;
+    if (cart.resolved.length === 0) return;
+
+    let cancelled = false;
+    void (async () => {
+      const rev = await currentCartRevision();
+      if (cancelled || !rev) return;
+      const result = await setCheckoutAddress(effectiveAddress, rev.revision);
+      if (cancelled) return;
+      if (!result.ok) {
+        /* LEFT STALE ON PURPOSE rather than cleared. An empty list renders as
+           "no delivery options reach this address", which is a refusal the
+           shopper would read as final — and this is a failed re-read, not a
+           refused address. The next submit re-reads it anyway, and the server
+           is the one that decides the number at freeze. */
+        return;
+      }
+      const options = result.data.options;
+      setShippingOptions(options);
+      setSelectedShippingId((previous) => reconcileShippingSelection(options, previous));
+      setQuotedFor(basketSig);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [quotedFor, basketSig, busy, cart.resolved.length, effectiveAddress]);
 
   /** For the review step: the district's display name, never its key. */
   const districtName = effectiveDistrict
@@ -1100,7 +1177,8 @@ export function CheckoutFlow() {
       }
       const options = result.data.options;
       setShippingOptions(options);
-      setSelectedShippingId(options[0]?.id ?? null);
+      setSelectedShippingId(reconcileShippingSelection(options, null));
+      setQuotedFor(basketSig);
 
       /* ═══ ONE OPTION IS NOT A CHOICE, SO IT IS NOT A SCREEN ═══
          The shop offers exactly one delivery option today, and the step that
