@@ -14,12 +14,23 @@ import type { ShippingOption } from "../data/checkout-api";
  * wrong charge but a number that jumps on the payment step.
  */
 
-const option = (id: string, amount: number, label = "Delivery"): ShippingOption => ({
+const option = (
+  id: string,
+  amount: number,
+  label = "Delivery",
+  eta?: string,
+): ShippingOption => ({
   id,
   label,
   amount: { amount, currency: "NGN" },
   taxable: true,
+  ...(eta ? { eta } : {}),
 });
+
+/** The two shapes the same option has on the two environments. Production is
+ *  the one that has to look right. */
+const PROD: ShippingOption = option("fez:400000", 400000, "Fez Delivery");
+const DEV: ShippingOption = option("fez:400000", 400000, "Fez Delivery", "2 - 5 day(s)");
 
 describe("basketSignature", () => {
   it("moves when a quantity does — the ₦4,000 to ₦5,000 case", () => {
@@ -117,5 +128,46 @@ describe("reconcileShippingSelection", () => {
     // orderings would win. Neither does: the first option wins.
     const options = [option("fez:500000", 500000), option("fez:400000", 400000)];
     expect(reconcileShippingSelection(options, null)).toBe("fez:500000");
+  });
+});
+
+describe("the eta is optional, and production is the one without it", () => {
+  it("is simply absent in production and present on dev", () => {
+    // Both are normal. A layout that assumes one will look broken on the other.
+    expect(PROD.eta).toBeUndefined();
+    expect("eta" in PROD).toBe(false);
+    expect(DEV.eta).toBe("2 - 5 day(s)");
+  });
+
+  it("is not hidden inside the label any more, on either environment", () => {
+    // It used to be glued in. A regex written against dev's label would match
+    // nothing in production — so assert the label is JUST the courier name.
+    expect(PROD.label).toBe("Fez Delivery");
+    expect(DEV.label).toBe("Fez Delivery");
+    expect(DEV.label).not.toContain("day");
+  });
+
+  it("does not affect which option is selected", () => {
+    // Selection is by id alone; an eta appearing or vanishing between quotes
+    // must not move the shopper off their choice.
+    expect(reconcileShippingSelection([DEV], PROD.id)).toBe("fez:400000");
+    expect(reconcileShippingSelection([PROD], DEV.id)).toBe("fez:400000");
+  });
+});
+
+describe("the id carries the amount but is never the source of it", () => {
+  it("crossing a weight band changes the id, so the held choice is replaced", () => {
+    // 1 spool quotes fez:400000; 5 spools quote fez:500000. The cart is holding
+    // an id the new list no longer offers, so it must be re-sent.
+    const requoted = [option("fez:500000", 500000, "Fez Delivery")];
+    expect(reconcileShippingSelection(requoted, "fez:400000")).toBe("fez:500000");
+  });
+
+  it("takes the price from amount, which need not agree with the id", () => {
+    // The id is opaque: nothing may read 400000 out of `fez:400000`. A flat
+    // zone rate proves it — its id carries no number at all.
+    const flat = option("ship_abuja_standard", 300000, "Standard delivery");
+    expect(flat.amount.amount).toBe(300000);
+    expect(reconcileShippingSelection([flat], null)).toBe("ship_abuja_standard");
   });
 });
