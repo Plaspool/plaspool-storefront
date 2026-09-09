@@ -42,6 +42,12 @@ import {
 import { LocationCapture } from "./location-capture";
 import { Field, NATIVE_SELECT_CLASSES } from "./address-field";
 import { CountryField, isCountryServed, type CountryHint } from "./country-field";
+import {
+  NO_PLACES,
+  offeredStates,
+  readDeliveryPlaces,
+  type DeliveryPlaces,
+} from "../data/delivery-places";
 import { RegionField } from "./region-field";
 import { AddressAutofill } from "./address-autofill-button";
 import { prefillFromGeoHint, suggestDistrict, type GeocodedAddress } from "./address-autofill";
@@ -303,6 +309,35 @@ export function CheckoutFlow() {
       cancelled = true;
     };
   }, [step]);
+
+  /**
+   * The states the active courier accepts — the State select's option list.
+   *
+   * READ FROM THE SERVER because it is a courier setting, not geography: the
+   * shop can be switched between couriers in the admin with no deploy, and a
+   * list spelled in this repo could not follow. `offeredStates()` reconciles
+   * the courier's spelling to this repo's canonical names, so what the select
+   * STORES is unchanged by the switch — see `delivery-places.ts`, which is
+   * where the reason that matters for the delivery price is written down.
+   *
+   * PER COUNTRY, and refetched when the shopper changes it. Every documented
+   * failure — no cached list, unknown country, shipping by hand, and the
+   * `localhost` CORS wall — answers `NO_PLACES`, which offers all 37 states.
+   * An empty list is "no constraint", never an error.
+   */
+  const [places, setPlaces] = React.useState<DeliveryPlaces>(NO_PLACES);
+  const placesCountry = (address.countryCode || config.country.default).toUpperCase();
+  React.useEffect(() => {
+    let cancelled = false;
+    void readDeliveryPlaces(placesCountry).then((next) => {
+      if (!cancelled) setPlaces(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [placesCountry]);
+
+  const offered = React.useMemo(() => offeredStates(places), [places]);
 
   /**
    * The served districts, for the district picker under the State field.
@@ -960,6 +995,7 @@ export function CheckoutFlow() {
             countryCode={address.countryCode || config.country.default}
             value={fieldValue(address, field.key, effectiveDistrict)}
             servedRegions={config.servedRegions}
+            offered={offered}
             describedBy={describedBy}
             onChange={(region) => editAddress(fieldPatch("region", region))}
           />
