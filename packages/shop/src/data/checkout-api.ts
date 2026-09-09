@@ -86,10 +86,36 @@ export interface AddressLocation {
 }
 
 export interface ShippingOption {
+  /**
+   * OPAQUE. It was a zone id (`ship_abuja_standard`) and can now be a courier
+   * one carrying an amount (`fez:400000`). Nothing may parse it, match on it,
+   * or read a price out of it — the price comes from `amount` and only from
+   * `amount`, and a client that sends its own is refused. Compare it for
+   * equality, pass it back verbatim.
+   */
   id: string;
+  /** The courier's name, e.g. "Fez Delivery". Rendered as given. */
   label: string;
   amount: ApiMoney;
   taxable: boolean;
+  /**
+   * The courier's delivery estimate, e.g. "2 - 5 day(s)".
+   *
+   * ═══ OPTIONAL, AND ABSENT IN PRODUCTION RIGHT NOW ═══
+   * Fez's sandbox answers the estimate call and the live API does not, so dev
+   * carries an `eta` and production carries no such key. Both are normal, and
+   * the one that must look right is production: render it CONDITIONALLY, and
+   * never reserve layout for it.
+   *
+   * IT USED TO BE GLUED INTO `label` AND NO LONGER IS. Do not pull it back out
+   * with a regex — that would match on dev and match nothing in production,
+   * which is the worst way for a bug to hide.
+   *
+   * NOT ON FROZEN TOTALS, BY DESIGN. An estimate made at quote time is not a
+   * promise an invoice should carry, so it belongs on the delivery step rather
+   * than on a receipt.
+   */
+  eta?: string;
 }
 
 /* `TotalsLine` and `bulkOf` LIVE IN `cart-api.ts` and are re-exported here.
@@ -504,6 +530,19 @@ export function setCheckoutAddress(
     method: "PUT",
     body: JSON.stringify({ shipping, baseRevision }),
   });
+}
+
+/**
+ * The delivery options for the cart as it stands.
+ *
+ * WHY THIS EXISTS WHEN `PUT /checkout/addresses` ALREADY RETURNS THEM: the
+ * price is a courier quote against the basket's WEIGHT now, so the list goes
+ * stale when the cart changes rather than when the address does. Re-PUTting
+ * the address to get fresh options would rewrite the address, thaw the
+ * checkout and move the revision as side effects of a read. This reads.
+ */
+export function readShippingOptions(): Promise<CheckoutResult<{ options: ShippingOption[] }>> {
+  return request("/checkout/shipping-options", { method: "GET" });
 }
 
 export function setCheckoutShipping(

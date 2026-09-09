@@ -81,6 +81,7 @@ import {
   previewCheckout,
   removeDiscountCode,
   setAddOnChoice,
+  readShippingOptions,
   setCheckoutAddress,
   setCheckoutShipping,
   startCheckout,
@@ -509,6 +510,11 @@ export function CheckoutFlow() {
     })),
   );
 
+  /* The estimate for the option the shopper is on, matched BY ID — the freeze
+     stores no `eta` (an estimate is not a promise an invoice should carry), so
+     the review step can only show one the delivery step is still holding. */
+  const chosenEta = shippingOptions.find((option) => option.id === selectedShippingId)?.eta;
+
   /**
    * RE-READ THE DELIVERY OPTIONS WHEN THE BASKET MOVES.
    *
@@ -538,9 +544,7 @@ export function CheckoutFlow() {
 
     let cancelled = false;
     void (async () => {
-      const rev = await currentCartRevision();
-      if (cancelled || !rev) return;
-      const result = await setCheckoutAddress(effectiveAddress, rev.revision);
+      const result = await readShippingOptions();
       if (cancelled) return;
       if (!result.ok) {
         /* LEFT STALE ON PURPOSE rather than cleared. An empty list renders as
@@ -551,15 +555,31 @@ export function CheckoutFlow() {
         return;
       }
       const options = result.data.options;
+      const next = reconcileShippingSelection(options, selectedShippingId);
       setShippingOptions(options);
-      setSelectedShippingId((previous) => reconcileShippingSelection(options, previous));
+      setSelectedShippingId(next);
       setQuotedFor(basketSig);
+
+      /* ═══ THE CART STORES THE CHOICE, SO A REQUOTE HAS TO RE-SEND IT ═══
+         `PUT /checkout/shipping` is required before freezing even when there
+         is one option: a freeze with none produces `shipping: null` and a
+         total with no delivery in it. The id has changed under a weight band
+         crossing (`fez:400000` becomes `fez:500000`), so the id the cart is
+         holding is no longer one the new list offers. */
+      if (next && next !== selectedShippingId) {
+        const rev = await currentCartRevision();
+        if (cancelled || !rev) return;
+        await setCheckoutShipping(next, rev.revision);
+      }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [quotedFor, basketSig, busy, cart.resolved.length, effectiveAddress]);
+    // `selectedShippingId` is read, not depended on: it changes as a RESULT of
+    // this effect, and listing it would re-run the requote on its own write.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quotedFor, basketSig, busy, cart.resolved.length]);
 
   /** For the review step: the district's display name, never its key. */
   const districtName = effectiveDistrict
@@ -1881,8 +1901,17 @@ export function CheckoutFlow() {
                     onChange={() => setSelectedShippingId(option.id)}
                     className="h-4 w-4 accent-brand"
                   />
-                  <span className="text-sm font-medium text-foreground">
-                    {option.label}
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-foreground">
+                      {option.label}
+                    </span>
+                    {/* CONDITIONAL, AND NO RESERVED SPACE. Live Fez sends no
+                        `eta` and the sandbox does, so production must look
+                        right with this absent — which is why it is a sibling
+                        line rather than a slot held open for it. */}
+                    {option.eta && (
+                      <span className="block text-xs text-muted-foreground">{option.eta}</span>
+                    )}
                   </span>
                 </span>
                 <span className="font-mono text-sm tabular-nums text-foreground">
@@ -2030,7 +2059,23 @@ export function CheckoutFlow() {
                     </span>
                   </div>
                   <div className="flex items-start justify-between gap-3 py-1">
-                    <span className="min-w-0 text-sm text-muted-foreground">Delivery</span>
+                    {/* ═══ THE COURIER'S OWN NAME, NOT THE WORD "DELIVERY" ═══
+                        The freeze carries the option it charged, so the line
+                        says "Fez Delivery" where a courier quoted it and falls
+                        back to "Delivery" for a frozen total that predates the
+                        courier or for the flat zone rate, which has no name
+                        worth showing. `checkout-complete.tsx` already read the
+                        label this way; this step was the one screen still
+                        hardcoding it. */}
+                    <span className="min-w-0 text-sm text-muted-foreground">
+                      {totals.shipping?.label ?? "Delivery"}
+                      {/* The estimate the shopper was quoted, carried from the
+                          delivery step — a freeze deliberately does not store
+                          one, so this comes from the option they chose. */}
+                      {chosenEta && (
+                        <span className="block text-xs text-muted-foreground">{chosenEta}</span>
+                      )}
+                    </span>
                     <span className="shrink-0 font-mono text-sm tabular-nums text-foreground">
                       {formatNaira(majorUnits(totals.shippingTotal))}
                     </span>
