@@ -9,6 +9,7 @@ import {
   NIGERIAN_STATES,
   foldRegion,
   nigerianStateName,
+  type NigerianState,
 } from "../data/nigerian-states";
 import { NATIVE_SELECT_CLASSES } from "./address-field";
 
@@ -24,6 +25,17 @@ import { NATIVE_SELECT_CLASSES } from "./address-field";
  * A saved address whose state matches nothing renders as "Choose a state"
  * rather than as a guess; `required` on the select then stops the form until
  * the shopper picks one.
+ *
+ * ═══ THE OFFERED LIST IS THE SERVER'S TOO ═══
+ * `offered` comes from `delivery-places` — the states the ACTIVE COURIER
+ * accepts, which is a shop setting that changes with no deploy. It defaults
+ * to all 37 for the callers that have no places list and for every documented
+ * "no constraint" answer.
+ *
+ * Its entries are this repo's canonical states, NOT the courier's spelling:
+ * `offeredStates()` has already turned Fez's `"FCT"` into
+ * `"Federal Capital Territory"`, because that is what the areas list and the
+ * delivery zones are keyed by. Never render a courier name here.
  *
  * ═══ THE SERVED LIST IS THE SERVER'S ═══
  * When the config carries `servedRegions`, a state outside it is listed but
@@ -43,6 +55,7 @@ export function RegionField({
   countryCode,
   value,
   servedRegions,
+  offered = NIGERIAN_STATES,
   describedBy,
   onChange,
 }: {
@@ -52,6 +65,9 @@ export function RegionField({
   countryCode: string;
   value: string;
   servedRegions: readonly string[] | null;
+  /** The states the active courier accepts, canonicalised — see the header.
+   *  Defaults to all 37, which is also every "no constraint" answer. */
+  offered?: readonly NigerianState[];
   describedBy?: string;
   onChange: (region: string) => void;
 }) {
@@ -86,7 +102,7 @@ export function RegionField({
       className={NATIVE_SELECT_CLASSES}
     >
       <option value="">{REGION_PLACEHOLDER}</option>
-      {NIGERIAN_STATES.map((state) => {
+      {offered.map((state) => {
         const open = served === null || served.has(foldRegion(state.name));
         return (
           <option key={state.code} value={state.name} disabled={!open}>
