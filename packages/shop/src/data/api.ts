@@ -92,13 +92,14 @@ export interface ApiVariant {
   /** Relative (`/api/public/images/…`); null until this colour is photographed.
    *  Resolved server-side — see `Plaspool/plaspool-admin#39`. */
   imageUrl?: string | null;
-  /** Items in one mystery box; null on an ordinary variant, and on a box
-   *  variant whose pool is not set up. Absent on an older API. */
+  /** Items in one box of this size. MEANINGFUL ONLY ON THE BOX PRODUCT
+   *  (`boxMode !== null`) — ordinary variants may carry a leftover value, which
+   *  `toProduct` drops. Null on a box size not set up yet; absent on older APIs. */
   boxItemCount?: number | null;
   /**
-   * The owner's INTERNAL pool name (`mystery-pla`). DELIBERATELY UNREAD — it
-   * is on the wire only because it is harmless, and it is never shopper copy.
-   * Declared so that is a documented decision rather than an oversight.
+   * DEAD FIELD since admin PR #154: no longer written, null on every new box,
+   * and still set on some ordinary variants from the earlier version.
+   * DELIBERATELY UNREAD and never rendered; declared so that is documented.
    */
   boxPoolTag?: string | null;
 }
@@ -965,7 +966,12 @@ export function toProduct(api: ApiProduct, ctx: AdaptContext): Product | null {
   const active = (api.variants ?? []).filter((v) => v.status === "active");
   const variants = boxMode === null ? active : active.map(asBoxVariant);
   const sizes = boxMode === null
-    ? sizesFrom(variants)
+    /* ═══ BOX-NESS COMES FROM THE PRODUCT ONLY ═══
+       Ordinary variants can carry LEFTOVER `boxItemCount` values from an
+       earlier admin version — four PLA Basic variants on production did on
+       2026-09-15, with `boxMode: null`. The count means nothing off the box
+       product, so it is dropped here rather than trusted downstream. */
+    ? sizesFrom(variants).map((size) => ({ ...size, boxItemCount: null }))
     /* A box size weighs nothing the shopper is buying by; `gramsFrom` would
        otherwise read "3 spools" as 3 g and print it beside the label. */
     : sizesFrom(variants).map((size) => ({ ...size, weightGrams: 0 }));

@@ -35,6 +35,7 @@ export function BoxContents({
   isBox,
   boxes,
   qty,
+  cancelled = false,
   className,
 }: {
   /** From the catalogue — the line's own snapshot carries no box flag. */
@@ -42,11 +43,16 @@ export function BoxContents({
   /** The line's `boxes`, as sent. Absent until delivered. */
   boxes?: OrderBox[] | null;
   qty: number;
+  /** A cancelled order — possibly the shop's automatic cancel-and-refund of a
+   *  box it could not fill. Nothing is on its way, so there is no surprise to
+   *  promise; the order's own cancelled state says the rest. */
+  cancelled?: boolean;
   className?: string;
 }) {
   const revealed = (boxes ?? []).filter((box) => Array.isArray(box?.items));
   if (!isBox && revealed.length === 0) return null;
-  const stillSurprise = revealed.length < Math.max(qty, 1);
+  if (cancelled && revealed.length === 0) return null;
+  const stillSurprise = !cancelled && revealed.length < Math.max(qty, 1);
 
   if (revealed.length === 0) {
     return <p className={cn("mt-1 text-xs text-muted-foreground", className)}>{BOX_SURPRISE_LINE}</p>;

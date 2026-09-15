@@ -422,6 +422,7 @@ export function OrderDetail({
                     isBox={lineImages[line.variantId]?.isBox ?? false}
                     boxes={line.boxes}
                     qty={line.qty}
+                    cancelled={cancelled}
                   />
                 </div>
               </div>
