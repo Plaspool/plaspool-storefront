@@ -1,5 +1,6 @@
 import { COMMERCE_API_BASE } from "./config";
 import { isCurrencyCode, type CurrencyCode } from "./currency-config";
+import { normaliseMysteryBox } from "./mystery-box";
 import type {
   Badge,
   Category,
@@ -169,6 +170,9 @@ export interface ApiProduct {
   variants?: ApiVariant[];
   /** Non-null when this product is a mystery box. Absent on an older API. */
   boxMode?: "pack" | "built" | "auto" | null;
+  /** The box's owner-written size and "How it works"; null on ordinary
+   *  products, absent on an older API. Read through `normaliseMysteryBox`. */
+  mysteryBox?: unknown;
 }
 
 export interface ApiCategory {
@@ -1002,6 +1006,9 @@ export function toProduct(api: ApiProduct, ctx: AdaptContext): Product | null {
     slug: api.slug,
     name: api.title,
     boxMode,
+    /* Only the box has content; a stray value on an ordinary product is not
+       rendered, for the same reason leftover `boxItemCount`s are dropped. */
+    mysteryBox: boxMode === null ? null : normaliseMysteryBox(api.mysteryBox),
     /* The API sends a display NAME; every route in this package is keyed by
        slug. Unknown names fall back to a slugified form so the product still
        has a category page to belong to rather than vanishing from the nav. */

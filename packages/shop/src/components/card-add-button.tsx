@@ -34,7 +34,7 @@ export function CardAddButton({ product }: { product: Product }) {
      only moves the refusal to checkout. For the box, the cheapest SELLABLE size
      is added instead, and the button is disabled when there is none. */
   const isBox = isMysteryBox(product);
-  const availabilityOf = useBoxAvailability(product, colour.id);
+  const { availabilityOf } = useBoxAvailability(product, colour.id);
   const boxSize = isBox ? boxQuickAddSize(product.sizes, availabilityOf) : null;
   const size = boxSize ?? cheapestSize(product);
   const [justAdded, setJustAdded] = React.useState(false);
