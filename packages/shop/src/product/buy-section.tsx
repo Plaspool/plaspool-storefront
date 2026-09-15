@@ -58,13 +58,7 @@ export function ProductBuySection({
 }: ProductBuySectionProps) {
   const [colourId, setColourId] = React.useState(() => firstInStockColour(product).id);
   const isBox = isMysteryBox(product);
-  const [sizeId, setSizeId] = React.useState(() =>
-    /* A box opens on a size that can be sold — one with a pool behind it —
-       rather than the cheapest, which may be a size nobody has set up. */
-    isBox
-      ? (product.sizes.find((s) => boxSizeSellable(s, null)) ?? cheapestSize(product)).id
-      : cheapestSize(product).id,
-  );
+  const [sizeId, setSizeId] = React.useState(() => cheapestSize(product).id);
   const [chosenQuantity, setQuantity] = React.useState(1);
 
   const colour = product.colours.find((c) => c.id === colourId) ?? product.colours[0];
@@ -72,15 +66,8 @@ export function ProductBuySection({
 
   /* The box's live, fillable stock — see `useBoxAvailability`. */
   const availabilityFor = useBoxAvailability(product, colour.id);
-  const boxChoices = isBox
-    ? product.sizes.map((option) => ({
-        size: option,
-        sellable: boxSizeSellable(option, availabilityFor(option.id)),
-      }))
-    : undefined;
-  const soldOut = boxChoices
-    ? !(boxChoices.find((c) => c.size.id === size.id)?.sellable ?? false)
-    : undefined;
+  /* The box has one variant, so one read and one answer. */
+  const soldOut = isBox ? !boxSizeSellable(size, availabilityFor(size.id)) : undefined;
 
   /**
    * ═══ STOCK IS A PROPERTY OF THE VARIANT, SO IT MOVES WHEN THE PICKER DOES ═══
@@ -90,7 +77,7 @@ export function ProductBuySection({
    * which is the only key that can answer.
    */
   const shelf = stockOf(product, colour.id, size.id);
-  const maxQty = maxQtyFor(isBox ? boxStock(shelf, availabilityFor(size.id)) : shelf);
+  const maxQty = maxQtyFor(isBox ? boxStock(availabilityFor(size.id)) : shelf);
   const cart = useCart();
 
   /**
@@ -272,7 +259,7 @@ export function ProductBuySection({
             onSizeChange={setSizeId}
             onQuantityChange={setQuantity}
             maxQty={maxQty}
-            boxChoices={boxChoices}
+            boxSellable={isBox ? !soldOut : undefined}
             onAdded={() => {
               if (leaveOut && optOut) intentRef.current = optOut.id;
             }}

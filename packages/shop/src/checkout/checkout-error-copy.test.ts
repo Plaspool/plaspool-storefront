@@ -335,14 +335,14 @@ describe("a stock refusal on a mystery box", () => {
 
   it("says how many more boxes can be packed", () => {
     expect(refuse("var_box", 1)).toBe(
-      "Only 1 more box like this is available. Go back to the cart and lower the quantity to continue.",
+      "Only 1 more box is available. Go back to the cart and lower the quantity to continue.",
     );
-    expect(refuse("var_box", 3)).toContain("Only 3 more boxes like this are available.");
+    expect(refuse("var_box", 3)).toContain("Only 3 more boxes are available.");
   });
 
   it("says the box has just sold out at zero", () => {
     expect(refuse("var_box", 0)).toBe(
-      "This box has just sold out. Go back to the cart and remove it to continue.",
+      "The mystery box has just sold out. Go back to the cart and remove it to continue.",
     );
   });
 
