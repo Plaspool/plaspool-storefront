@@ -16,8 +16,7 @@ import { RatingStars } from "../components/rating-stars";
 import { QuantityStepper } from "../components/quantity-stepper";
 import { BulkTierTable } from "../components/bulk-tier-table";
 import { NextTierHint } from "./next-tier-hint";
-import { BoxHowItWorks, BoxSizePicker, MysteryBoxLabel } from "./mystery-box";
-import type { BoxSizeChoice } from "./mystery-box";
+import { BoxHowItWorks, BoxItemCountLine, BoxSoldOutNotice, MysteryBoxLabel } from "./mystery-box";
 import { AddToCartButton } from "../cart/add-to-cart";
 import type { CartLineKey } from "../cart/types";
 import { useCart } from "../cart/cart-context";
@@ -126,11 +125,11 @@ export interface BuyBoxProps {
    *  completion — see `AddToCartButtonProps.onAdded`. */
   onAdded?: () => void;
   /**
-   * PRESENT ONLY FOR A MYSTERY BOX: every box size with whether it can be
-   * bought right now. Its presence is what switches the box layout on — the
-   * section above decides box-ness once, through `isMysteryBox`.
+   * PRESENT ONLY FOR THE MYSTERY BOX: whether it can be filled right now. Its
+   * presence is what switches the box layout on; the section above decides
+   * box-ness once, through `isMysteryBox`.
    */
-  boxChoices?: BoxSizeChoice[];
+  boxSellable?: boolean;
   className?: string;
 }
 
@@ -146,10 +145,10 @@ export function BuyBox({
   maxQty,
   addOnControl,
   onAdded,
-  boxChoices,
+  boxSellable,
   className,
 }: BuyBoxProps) {
-  const isBox = boxChoices !== undefined;
+  const isBox = boxSellable !== undefined;
   /* Real reviews only. This read the invented fixtures behind a feature flag
      until there was an API to ask; a product nobody has reviewed now shows no
      stars rather than a manufactured score. */
@@ -171,11 +170,10 @@ export function BuyBox({
     colourId: colour.id,
     sizeId: size.id,
   };
-  /* A BOX IS SOLD OUT BY ITS POOL, which the colour flag cannot know — see
-     `boxSizeSellable`. `allBoxesOut` is what turns the button into "Sold out". */
-  const selectedBoxSellable = boxChoices?.find((c) => c.size.id === size.id)?.sellable ?? false;
-  const allBoxesOut = isBox && !boxChoices.some((c) => c.sellable);
-  const outOfStock = isBox ? !selectedBoxSellable : !colour.inStock;
+  /* THE BOX IS SOLD OUT WHEN IT CANNOT BE FILLED, which the colour flag cannot
+     know. See `boxSizeSellable`. */
+  const boxSoldOut = boxSellable === false;
+  const outOfStock = isBox ? boxSoldOut : !colour.inStock;
 
   /* A single-size product still renders the control, disabled: an absent
      control reads as an unanswered question about what you are buying. */
@@ -235,9 +233,8 @@ export function BuyBox({
       </div>
       )}
 
-      {isBox && (
-        <BoxSizePicker choices={boxChoices} selectedId={size.id} onSelect={onSizeChange} />
-      )}
+      {/* ONE BOX, ONE PRICE: no option picker. The count is the promise. */}
+      {isBox && <BoxItemCountLine size={size} />}
 
       {!isBox && showSizes && (
         <div>
@@ -342,13 +339,7 @@ export function BuyBox({
           {colour.name} is out of stock. Pick another colour.
         </p>
       )}
-      {outOfStock && isBox && (
-        <p className="text-sm text-foreground">
-          {allBoxesOut
-            ? "Every box size is sold out right now."
-            : "This box size is sold out. Pick another size."}
-        </p>
-      )}
+      {boxSoldOut && <BoxSoldOutNotice />}
 
       {/* UNDER THE ACTIONS, NOT OVER THEM. The question only matters once the
           shopper has decided to buy, and a checkbox above the primary button
@@ -360,8 +351,8 @@ export function BuyBox({
           qty={quantity}
           disabled={outOfStock}
           onAdded={onAdded}
-          label={allBoxesOut ? "Sold out" : undefined}
-          srLabel={allBoxesOut ? "Add to cart" : undefined}
+          label={boxSoldOut ? "Sold out" : undefined}
+          srLabel={boxSoldOut ? "Add to cart" : undefined}
         />
         <BuyNowButton line={line} qty={quantity} disabled={outOfStock} />
       </div>

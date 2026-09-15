@@ -919,7 +919,17 @@ function asBoxVariant(variant: ApiVariant): ApiVariant {
     .map((v) => (typeof v === "string" ? v.trim() : ""))
     .filter(Boolean)
     .join(" · ");
-  return { ...variant, colorHex: null, optionValues: { Colour: BOX_COLOUR, Size: label } };
+  return {
+    ...variant,
+    colorHex: null,
+    optionValues: { Colour: BOX_COLOUR, Size: label },
+    /* THE BOX KEEPS NO STOCK OF ITS OWN: it sits at 0 or below with backorders
+       on. Carried through, that would badge the card "Low stock" and set the
+       stepper's ceiling from a meaningless number. Untracked instead; `canFill`
+       from the availability route is the real count. */
+    available: null,
+    backorderable: false,
+  };
 }
 
 /** The one "colour" a box has. `idOf` leaves it unchanged, so it is also the id. */
@@ -982,7 +992,10 @@ export function toProduct(api: ApiProduct, ctx: AdaptContext): Product | null {
      it and reads "PLA · 3 spools" rather than "default · PLA · 3 spools". */
   const colours = boxMode === null
     ? coloursFrom(variants)
-    : coloursFrom(variants).map((colour) => ({ ...colour, name: "" }));
+    /* IN STOCK AS FAR AS THE CATALOGUE CAN SAY. With its stock untracked,
+       `coloursFrom` would call the box out of stock and the in-stock filter
+       would hide it; whether it can be FILLED is a live read, not this. */
+    : coloursFrom(variants).map((colour) => ({ ...colour, name: "", inStock: true }));
   const description = docToBlocks(api.description);
 
   return {
