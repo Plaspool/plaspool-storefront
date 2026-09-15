@@ -4,6 +4,7 @@ import { cn } from "@plaspool/ui";
 
 import type { SizeOption } from "../data/types";
 import { boxCountLine } from "../data/mystery-box";
+import type { BoxCue } from "../data/mystery-box";
 
 /**
  * The mystery-box pieces of the product page, PRESENTATIONAL AND PROP-DRIVEN.
@@ -32,28 +33,52 @@ export function MysteryBoxLabel({ className }: { className?: string }) {
   );
 }
 
-/** Three plain sentences, no numbered markers. */
-export const BOX_HOW_IT_WORKS = [
-  /* True for all three of the owner's filling modes — hand-packed, packed
-     ahead, or picked automatically — so it says neither who packs nor when. */
-  "Every box is made up of items we have in stock.",
-  "You won't know what's inside until it arrives.",
-  "Once it's delivered, your order page lists everything that was in the box.",
-] as const;
-
-export function BoxHowItWorks({ className }: { className?: string }) {
+/**
+ * "How it works", in the owner's words from Settings → Mystery box.
+ *
+ * THE STOREFRONT OWNS NONE OF THESE SENTENCES. The hard-coded copy this
+ * replaced still told shoppers to "pick a size" after the box lost its sizes;
+ * the admin is where the words live now. No steps renders nothing at all.
+ */
+export function BoxHowItWorks({
+  title,
+  steps,
+  className,
+}: {
+  title: string;
+  steps: readonly string[];
+  className?: string;
+}) {
   const headingId = React.useId();
+  if (steps.length === 0) return null;
   return (
     <section aria-labelledby={headingId} className={cn("border-t border-brand-line pt-5", className)}>
       <h2 id={headingId} className="text-sm font-semibold text-foreground">
-        How it works
+        {title}
       </h2>
       <div className="mt-2 flex flex-col gap-1 text-sm leading-6 text-muted-foreground">
-        {BOX_HOW_IT_WORKS.map((sentence) => (
-          <p key={sentence}>{sentence}</p>
+        {steps.map((step, index) => (
+          <p key={index}>{step}</p>
         ))}
       </div>
     </section>
+  );
+}
+
+/**
+ * The box's size, from `mysteryBox.size`. One pill, never a picker: there is
+ * only ever one box. No size renders NOTHING, not a heading over an empty pill,
+ * which is what shoppers saw when the size came from a blank option value.
+ */
+export function BoxSize({ size, className }: { size: string | null; className?: string }) {
+  if (size === null) return null;
+  return (
+    <div className={className}>
+      <p className="text-sm font-semibold text-foreground">Size</p>
+      <p className="mt-2 inline-flex rounded-lg border border-brand bg-brand-soft px-3 py-2 text-sm text-foreground">
+        {size}
+      </p>
+    </div>
   );
 }
 
@@ -74,9 +99,43 @@ export function BoxItemCountLine({
   return <p className={cn("text-sm font-medium text-foreground", className)}>{line}</p>;
 }
 
-/** The sentence beside the disabled button, when the box cannot be filled. */
-export function BoxSoldOutNotice({ className }: { className?: string }) {
+/**
+ * Cues the admin resolved, printed as sent and in the order sent.
+ *
+ * THE STOREFRONT OWNS NO CUE LOGIC: no thresholds, no "N left" arithmetic, no
+ * time formatting. `kind` picks a style and nothing else, and an unknown kind
+ * from a newer API is a plain line, never dropped. No cues renders nothing, not
+ * an empty container.
+ */
+export function BoxCues({ cues, className }: { cues: readonly BoxCue[]; className?: string }) {
+  if (cues.length === 0) return null;
   return (
-    <p className={cn("text-sm text-foreground", className)}>The mystery box is sold out right now.</p>
+    <ul className={cn("flex flex-col gap-1", className)}>
+      {cues.map((cue, index) => (
+        <li key={index} data-cue={cue.kind || "other"} className={CUE_STYLE[cue.kind] ?? CUE_PLAIN}>
+          {cue.text}
+        </li>
+      ))}
+    </ul>
   );
+}
+
+const CUE_PLAIN = "text-sm text-muted-foreground";
+
+/** Styling by kind. `low_stock` is the most urgent of the lines under the price. */
+const CUE_STYLE: Record<string, string> = {
+  just_dropped:
+    "inline-flex w-fit border border-foreground px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-foreground",
+  low_stock: "text-sm font-semibold text-foreground",
+  selling_fast: "text-sm font-medium text-foreground",
+  sold_out: "text-sm text-foreground",
+};
+
+/** Which cues go where on the buy box. Order within each place is kept. */
+export function placeBoxCues(cues: readonly BoxCue[]): { badge: BoxCue[]; price: BoxCue[]; soldOut: BoxCue[] } {
+  return {
+    badge: cues.filter((cue) => cue.kind === "just_dropped"),
+    soldOut: cues.filter((cue) => cue.kind === "sold_out"),
+    price: cues.filter((cue) => cue.kind !== "just_dropped" && cue.kind !== "sold_out"),
+  };
 }

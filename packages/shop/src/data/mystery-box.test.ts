@@ -3,11 +3,14 @@ import { describe, expect, it } from "vitest";
 import { lineImagesFrom, toProduct, type AdaptContext, type ApiProduct, type ApiVariant } from "./api";
 import {
   boxCountLine,
+  boxCuesOf,
   boxItemCountOf,
   boxQuickAddSize,
   boxSizeSellable,
   boxStock,
   isMysteryBox,
+  mysteryBoxOf,
+  normaliseMysteryBox,
   parseAvailability,
   proxiedAvailabilityPath,
 } from "./mystery-box";
@@ -164,7 +167,7 @@ describe("availability", () => {
     parseAvailability({ variantId: "var_box", available: 5, backorderable: true, canFill: 5, ...over });
 
   it("parses the live shape, and an older one with no canFill", () => {
-    expect(read({})).toEqual({ variantId: "var_box", available: 5, backorderable: true, canFill: 5 });
+    expect(read({})).toEqual({ variantId: "var_box", available: 5, backorderable: true, canFill: 5, box: null });
     expect(parseAvailability({ variantId: "var_a", available: 0, backorderable: false })?.canFill).toBeNull();
     expect(parseAvailability(null)).toBeNull();
     expect(parseAvailability({ available: 1 })).toBeNull();
@@ -204,5 +207,85 @@ describe("availability", () => {
 
   it("asks the same-origin proxy", () => {
     expect(proxiedAvailabilityPath("var_box")).toBe("/api/variants/var_box/availability");
+  });
+});
+
+describe("the box's admin-written content", () => {
+  const CONTENT = {
+    size: "Large",
+    itemCount: 3,
+    howItWorks: { title: "How it works", steps: ["One.", "Two."] },
+  };
+
+  it("is carried onto the box product", () => {
+    expect(toProduct(box({ mysteryBox: CONTENT }), ctx)!.mysteryBox).toEqual(CONTENT);
+    expect(mysteryBoxOf(toProduct(box({ mysteryBox: CONTENT }), ctx)!)?.size).toBe("Large");
+  });
+
+  it("is null on an ordinary product, even if a stray value arrives", () => {
+    expect(toProduct(box({ boxMode: null, mysteryBox: null }), ctx)!.mysteryBox).toBeNull();
+    expect(toProduct(box({ boxMode: null, mysteryBox: CONTENT }), ctx)!.mysteryBox).toBeNull();
+    expect(mysteryBoxOf({ boxMode: null, mysteryBox: CONTENT })).toBeNull();
+  });
+
+  it("is null when an older API sends none", () => {
+    expect(toProduct(box(), ctx)!.mysteryBox).toBeNull();
+    expect(normaliseMysteryBox(undefined)).toBeNull();
+  });
+
+  it("defaults a missing title, missing steps and a blank size", () => {
+    expect(normaliseMysteryBox({ size: "  ", howItWorks: {} })).toEqual({
+      size: null,
+      itemCount: null,
+      howItWorks: { title: "How it works", steps: [] },
+    });
+    expect(normaliseMysteryBox({ size: null, howItWorks: { title: "Custom", steps: ["a", "", 3, " b "] } })?.howItWorks).toEqual({
+      title: "Custom",
+      steps: ["a", "b"],
+    });
+  });
+
+  it("labels the cart line with the size the variant carries", () => {
+    const product = toProduct(
+      box({ mysteryBox: CONTENT, variants: [{ ...BOX_VARIANT, optionValues: { Size: "Large" } }] }),
+      ctx,
+    )!;
+    expect(product.sizes[0].label).toBe("Large");
+  });
+});
+
+describe("the box's live cues", () => {
+  it("parses cues in order, keeps unknown kinds, drops textless ones", () => {
+    const parsed = parseAvailability({
+      variantId: "var_box",
+      available: 5,
+      backorderable: true,
+      canFill: 5,
+      box: {
+        onSaleSince: 1789400000000,
+        cues: [
+          { kind: "low_stock", text: "Only 22 left" },
+          { kind: "future_kind", text: "Something new" },
+          { kind: "selling_fast", text: "" },
+          { text: "No kind" },
+        ],
+      },
+    });
+    expect(parsed?.box?.onSaleSince).toBe(1789400000000);
+    expect(boxCuesOf(parsed)).toEqual([
+      { kind: "low_stock", text: "Only 22 left" },
+      { kind: "future_kind", text: "Something new" },
+      { kind: "", text: "No kind" },
+    ]);
+  });
+
+  it("has no cues before a read, for an ordinary variant, and on an older API", () => {
+    expect(boxCuesOf(null)).toEqual([]);
+    expect(boxCuesOf(parseAvailability({ variantId: "v", available: 1, backorderable: false, canFill: null, box: null }))).toEqual([]);
+    expect(boxCuesOf(parseAvailability({ variantId: "v", available: 1, backorderable: false }))).toEqual([]);
+    expect(parseAvailability({ variantId: "v", available: 1, backorderable: false, box: { cues: "nope" } })?.box).toEqual({
+      onSaleSince: null,
+      cues: [],
+    });
   });
 });

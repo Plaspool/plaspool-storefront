@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, Truck } from "lucide-react";
+import { Truck } from "lucide-react";
 import { Button, cn } from "@plaspool/ui";
 
 import type { Colour, Product, SizeOption } from "../data/types";
@@ -16,7 +16,10 @@ import { RatingStars } from "../components/rating-stars";
 import { QuantityStepper } from "../components/quantity-stepper";
 import { BulkTierTable } from "../components/bulk-tier-table";
 import { NextTierHint } from "./next-tier-hint";
-import { BoxHowItWorks, BoxItemCountLine, BoxSoldOutNotice, MysteryBoxLabel } from "./mystery-box";
+import { BoxCues, BoxHowItWorks, BoxItemCountLine, BoxSize, MysteryBoxLabel, placeBoxCues } from "./mystery-box";
+import { FeatureList } from "./feature-list";
+import { mysteryBoxOf } from "../data/mystery-box";
+import type { BoxCue } from "../data/mystery-box";
 import { AddToCartButton } from "../cart/add-to-cart";
 import type { CartLineKey } from "../cart/types";
 import { useCart } from "../cart/cart-context";
@@ -130,6 +133,8 @@ export interface BuyBoxProps {
    * box-ness once, through `isMysteryBox`.
    */
   boxSellable?: boolean;
+  /** The box's live cues, as the admin resolved them; empty until the first read. */
+  boxCues?: BoxCue[];
   className?: string;
 }
 
@@ -146,9 +151,12 @@ export function BuyBox({
   addOnControl,
   onAdded,
   boxSellable,
+  boxCues,
   className,
 }: BuyBoxProps) {
   const isBox = boxSellable !== undefined;
+  const boxContent = isBox ? mysteryBoxOf(product) : null;
+  const cues = placeBoxCues(boxCues ?? []);
   /* Real reviews only. This read the invented fixtures behind a feature flag
      until there was an API to ask; a product nobody has reviewed now shows no
      stars rather than a manufactured score. */
@@ -191,7 +199,12 @@ export function BuyBox({
   return (
     <div className={cn("flex w-full min-w-0 flex-col gap-5", className)}>
       <div>
-        {isBox && <MysteryBoxLabel className="mb-3" />}
+        {isBox && (
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <MysteryBoxLabel />
+            <BoxCues cues={cues.badge} />
+          </div>
+        )}
         <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
           {product.name}
         </h1>
@@ -233,8 +246,13 @@ export function BuyBox({
       </div>
       )}
 
-      {/* ONE BOX, ONE PRICE: no option picker. The count is the promise. */}
-      {isBox && <BoxItemCountLine size={size} />}
+      {/* ONE BOX, ONE PRICE: no option picker. The count is the promise, then
+          the urgency lines — replaced by the sold-out words when it is out. */}
+      {isBox && (
+        <BoxItemCountLine size={{ boxItemCount: boxContent?.itemCount ?? size.boxItemCount }} />
+      )}
+      {isBox && !boxSoldOut && <BoxCues cues={cues.price} />}
+      {isBox && <BoxSize size={boxContent?.size ?? null} />}
 
       {!isBox && showSizes && (
         <div>
@@ -296,7 +314,8 @@ export function BuyBox({
         {/* WHY THE PLUS BUTTON STOPPED, in the number that lets them decide
             what to do about it. Silent above the sanity ceiling, which is not
             an inventory claim — see `stockWarning`. */}
-        {stockWarning(quantity, maxQty) !== null && (
+        {/* Not on the box: its "Only N left" is the admin's cue, not ours. */}
+        {!isBox && stockWarning(quantity, maxQty) !== null && (
           <p className="mt-2 font-mono text-xs font-medium text-muted-foreground">
             {`Only ${maxQty} left`}
           </p>
@@ -313,16 +332,11 @@ export function BuyBox({
         quantity={quantity}
       />
 
-      <ul className="flex flex-col gap-2 border-t border-brand-line pt-5">
-        {product.features.map((feature) => (
-          <li key={feature} className="flex gap-2 text-sm leading-6 text-muted-foreground">
-            <Check aria-hidden="true" className="mt-1 h-4 w-4 shrink-0 text-brand" />
-            <span>{feature}</span>
-          </li>
-        ))}
-      </ul>
+      <FeatureList features={product.features} />
 
-      {isBox && <BoxHowItWorks />}
+      {boxContent && (
+        <BoxHowItWorks title={boxContent.howItWorks.title} steps={boxContent.howItWorks.steps} />
+      )}
 
       {/* Delivery certainty is a live objection in this market, not a
           footnote at the bottom of the page. */}
@@ -339,7 +353,9 @@ export function BuyBox({
           {colour.name} is out of stock. Pick another colour.
         </p>
       )}
-      {boxSoldOut && <BoxSoldOutNotice />}
+      {/* The owner's words for sold out, if they left the cue on. Whether it IS
+          sold out is still the numbers' call — see `boxSizeSellable`. */}
+      {boxSoldOut && <BoxCues cues={cues.soldOut} />}
 
       {/* UNDER THE ACTIONS, NOT OVER THEM. The question only matters once the
           shopper has decided to buy, and a checkbox above the primary button

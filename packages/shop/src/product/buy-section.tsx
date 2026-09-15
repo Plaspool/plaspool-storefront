@@ -11,7 +11,7 @@ import { fetchProductAddOns } from "../data/add-ons-api";
 import { setAddOnChoice } from "../data/checkout-api";
 import { useCart } from "../cart/cart-context";
 import { maxQtyFor, stockOf } from "../cart/stock";
-import { boxSizeSellable, boxStock, isMysteryBox } from "../data/mystery-box";
+import { boxCuesOf, boxSizeSellable, boxStock, isMysteryBox } from "../data/mystery-box";
 import { useBoxAvailability } from "../components/use-box-availability";
 import { Gallery } from "./gallery";
 import { BuyBox } from "./buy-box";
@@ -65,7 +65,7 @@ export function ProductBuySection({
   const size = product.sizes.find((s) => s.id === sizeId) ?? product.sizes[0];
 
   /* The box's live, fillable stock — see `useBoxAvailability`. */
-  const availabilityFor = useBoxAvailability(product, colour.id);
+  const { availabilityOf: availabilityFor, refresh: refreshBox } = useBoxAvailability(product, colour.id);
   /* The box has one variant, so one read and one answer. */
   const soldOut = isBox ? !boxSizeSellable(size, availabilityFor(size.id)) : undefined;
 
@@ -260,7 +260,10 @@ export function ProductBuySection({
             onQuantityChange={setQuantity}
             maxQty={maxQty}
             boxSellable={isBox ? !soldOut : undefined}
+            boxCues={isBox ? boxCuesOf(availabilityFor(size.id)) : undefined}
             onAdded={() => {
+              /* An add can move the box's cues; re-read them. */
+              if (isBox) refreshBox();
               if (leaveOut && optOut) intentRef.current = optOut.id;
             }}
             addOnControl={
