@@ -6,23 +6,31 @@ import type { Product } from "../data/types";
 import { fetchVariantAvailability, isMysteryBox } from "../data/mystery-box";
 import type { VariantAvailability } from "../data/mystery-box";
 
+/** How often the box's cues are re-read while the tab is visible. */
+const REFRESH_MS = 60_000;
+
 /**
- * The box's live, fillable stock, per size — read in the browser on mount.
+ * The box's live availability, per size, read in the browser.
  *
  * Shared by the product page's buy box and the listing card's quick-add, so
- * both call a size sold out by the same read. Does nothing for an ordinary
- * product: the product payload's own stock is right for those.
+ * both call the box sold out by the same read. Does nothing for an ordinary
+ * product.
  *
- * UNCACHED UPSTREAM, AND NEVER ON THE SERVER RENDER. Until an answer lands the
- * lookup returns null, which every caller reads as buyable — checkout is the
- * real authority, and "sold out" flashing on every box while loading is worse.
+ * ═══ FRESHNESS ═══
+ * The cues ("Only 22 left", "Just dropped 2 hours ago") are only as fresh as
+ * the last read, so it is re-read on mount, when the tab becomes visible again,
+ * every minute while it is visible, and whenever `refresh` is called (after an
+ * add to cart). Never cached, never on the server render. Until the first
+ * answer lands the lookup returns null: no cues, and buyable.
  */
 export function useBoxAvailability(
   product: Pick<Product, "boxMode" | "variantIds">,
   colourId: string,
-): (sizeId: string) => VariantAvailability | null {
+): { availabilityOf: (sizeId: string) => VariantAvailability | null; refresh: () => void } {
   const isBox = isMysteryBox(product);
   const [bySize, setBySize] = React.useState<Record<string, VariantAvailability>>({});
+  const [tick, setTick] = React.useState(0);
+  const refresh = React.useCallback(() => setTick((n) => n + 1), []);
 
   React.useEffect(() => {
     if (!isBox) return undefined;
@@ -33,7 +41,25 @@ export function useBoxAvailability(
       });
     }
     return () => controller.abort();
-  }, [isBox, product.variantIds]);
+  }, [isBox, product.variantIds, tick]);
 
-  return (sizeId) => bySize[product.variantIds[`${colourId}:${sizeId}`] ?? ""] ?? null;
+  React.useEffect(() => {
+    if (!isBox) return undefined;
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") refresh();
+    }, REFRESH_MS);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [isBox, refresh]);
+
+  return {
+    availabilityOf: (sizeId) => bySize[product.variantIds[`${colourId}:${sizeId}`] ?? ""] ?? null,
+    refresh,
+  };
 }

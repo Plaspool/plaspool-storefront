@@ -1,4 +1,4 @@
-import type { Product, SizeOption, VariantStock } from "./types";
+import type { MysteryBoxContent, Product, SizeOption, VariantStock } from "./types";
 
 /**
  * Mystery boxes: the one seam every box surface reads through.
@@ -41,8 +41,28 @@ export interface VariantAvailability {
   variantId: string;
   available: number | null;
   backorderable: boolean;
-  /** Boxes the pool can still fill; null on an ordinary variant. */
+  /** Boxes that can still be filled; null on an ordinary variant. */
   canFill: number | null;
+  /** The box's live cues; null on an ordinary variant and on an older API. */
+  box: BoxAvailability | null;
+}
+
+/**
+ * A cue the admin has already resolved: thresholds, time windows, on/off and
+ * wording are all the owner's, applied server-side. `text` is printed as sent.
+ * `kind` is for STYLING ONLY, and is a plain string because a newer API may
+ * send a kind this build has never heard of, which still renders.
+ */
+export interface BoxCue {
+  kind: string;
+  text: string;
+}
+
+export interface BoxAvailability {
+  /** Epoch ms the box last went on sale; null while it is off. */
+  onSaleSince: number | null;
+  /** In the order to render. Empty means no cue applies right now. */
+  cues: BoxCue[];
 }
 
 /** Parses one availability body, or null when it is not one. */
@@ -56,7 +76,56 @@ export function parseAvailability(body: unknown): VariantAvailability | null {
     available: num(raw.available),
     backorderable: raw.backorderable === true,
     canFill: num(raw.canFill),
+    box: parseBoxAvailability(raw.box),
   };
+}
+
+/** The `box` object, or null. A cue with no usable text is dropped, since
+ *  there is nothing to print; one with an unknown kind is kept. */
+function parseBoxAvailability(value: unknown): BoxAvailability | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const cues = Array.isArray(raw.cues) ? raw.cues : [];
+  return {
+    onSaleSince: typeof raw.onSaleSince === "number" && Number.isFinite(raw.onSaleSince) ? raw.onSaleSince : null,
+    cues: cues.flatMap((cue): BoxCue[] => {
+      if (!cue || typeof cue !== "object") return [];
+      const { kind, text } = cue as Record<string, unknown>;
+      if (typeof text !== "string" || !text.trim()) return [];
+      return [{ kind: typeof kind === "string" ? kind : "", text }];
+    }),
+  };
+}
+
+/**
+ * `product.mysteryBox` off the wire, or null. Defaulted HERE so no component
+ * writes its own `?? null`: a missing title reads "How it works", missing steps
+ * read as none, and a blank size reads as no size.
+ */
+export function normaliseMysteryBox(value: unknown): MysteryBoxContent | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const how = (raw.howItWorks && typeof raw.howItWorks === "object" ? raw.howItWorks : {}) as Record<string, unknown>;
+  const size = typeof raw.size === "string" && raw.size.trim() ? raw.size.trim() : null;
+  const title = typeof how.title === "string" && how.title.trim() ? how.title.trim() : "How it works";
+  const steps = Array.isArray(how.steps)
+    ? how.steps.filter((step): step is string => typeof step === "string" && step.trim() !== "").map((step) => step.trim())
+    : [];
+  return {
+    size,
+    itemCount: typeof raw.itemCount === "number" && raw.itemCount > 0 ? raw.itemCount : null,
+    howItWorks: { title, steps },
+  };
+}
+
+/** The box's content from a product, defaulted: null for anything but the box. */
+export function mysteryBoxOf(product: Pick<Product, "boxMode" | "mysteryBox">): MysteryBoxContent | null {
+  return isMysteryBox(product) ? (product.mysteryBox ?? null) : null;
+}
+
+/** The cues to render, or none — before the first read, and for an ordinary variant. */
+export function boxCuesOf(availability: VariantAvailability | null | undefined): BoxCue[] {
+  return availability?.box?.cues ?? [];
 }
 
 /** Same-origin proxy — the upstream route sends no CORS header. See the route. */

@@ -61,6 +61,25 @@ export interface SizeOption {
  */
 export type BoxMode = "pack" | "built" | "auto";
 
+/**
+ * The box's shopper-facing words, written by the owner in Settings → Mystery
+ * box. Null on every ordinary product. Plain text throughout: rendered as text,
+ * never as HTML. `normaliseMysteryBox` in `mystery-box.ts` is the one reader of
+ * the wire shape.
+ */
+export interface MysteryBoxContent {
+  /** "Large", or null for no size section at all. */
+  size: string | null;
+  /** Items in every box; the same number as the variant's `boxItemCount`. */
+  itemCount: number | null;
+  howItWorks: {
+    /** Never empty; "How it works" unless the owner changed it. */
+    title: string;
+    /** 0..8 sentences in order. Empty hides the section. */
+    steps: string[];
+  };
+}
+
 /** A quantity ladder. `minQty` ascending, no duplicates. */
 /**
  * One rung of the quantity ladder, as the API resolves it.
@@ -138,6 +157,9 @@ export interface Product {
    * sets it, and `isMysteryBox` is the one reader.
    */
   boxMode?: BoxMode | null;
+  /** The box's content from the admin; null on an ordinary product and on an
+   *  API too old to send it. Optional so fixtures need not spell it. */
+  mysteryBox?: MysteryBoxContent | null;
   categorySlug: string;
   /**
    * NULLABLE SINCE THE CATALOGUE WENT LIVE. The API has no material column —
