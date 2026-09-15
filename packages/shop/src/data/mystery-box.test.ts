@@ -4,6 +4,7 @@ import { lineImagesFrom, toProduct, type AdaptContext, type ApiProduct, type Api
 import {
   boxCountLine,
   boxItemCountOf,
+  boxQuickAddSize,
   boxSizeSellable,
   boxStock,
   isMysteryBox,
@@ -94,6 +95,27 @@ describe("toProduct on a mystery box", () => {
     expect(product.colours[0].name).toBe("");
   });
 
+  it("treats an ordinary product with LEFTOVER box fields as ordinary", () => {
+    /* PLA Basic on production, 2026-09-15: boxMode null, but four variants
+       still carried boxItemCount: 3 and a pool tag from the earlier admin. */
+    const plaBasic = toProduct(
+      box({
+        slug: "pla-basic",
+        boxMode: null,
+        variants: [
+          variant({ id: "var_black", optionValues: { Size: "1kg", Color: "Black" }, boxItemCount: 3, boxPoolTag: "mystery-pla" }),
+        ],
+      }),
+      ctx,
+    )!;
+    expect(isMysteryBox(plaBasic)).toBe(false);
+    expect(plaBasic.sizes[0].label).toBe("1kg");
+    expect(plaBasic.sizes[0].boxItemCount).toBeNull();
+    expect(plaBasic.colours[0].name).toBe("Black");
+    expect(JSON.stringify(plaBasic)).not.toContain("mystery-pla");
+    expect(lineImagesFrom([box({ boxMode: null, variants: [variant({ id: "var_black", boxItemCount: 3 })] })]).var_black?.isBox).toBeUndefined();
+  });
+
   it("never carries the internal pool tag anywhere on the product", () => {
     expect(JSON.stringify(toProduct(box(), ctx))).not.toContain("mystery-pla");
   });
@@ -114,8 +136,8 @@ describe("box counts", () => {
   });
 
   it("words the promise, singular and plural", () => {
-    expect(boxCountLine({ boxItemCount: 3 })).toBe("3 surprise items, packed for your order.");
-    expect(boxCountLine({ boxItemCount: 1 })).toBe("1 surprise item, packed for your order.");
+    expect(boxCountLine({ boxItemCount: 3 })).toBe("3 surprise items in every box.");
+    expect(boxCountLine({ boxItemCount: 1 })).toBe("1 surprise item in every box.");
     expect(boxCountLine({ boxItemCount: null })).toBeNull();
   });
 });
@@ -153,6 +175,20 @@ describe("availability", () => {
     const shelf = { available: 24, backorderable: false };
     expect(boxStock(shelf, null)).toBe(shelf);
     expect(boxStock(shelf, read({ available: 1 }))).toEqual({ available: 1, backorderable: false });
+  });
+
+  it("quick-adds the cheapest size that can be sold, or nothing", () => {
+    const sizes = [
+      { id: "big", priceMinor: 3000000, boxItemCount: 5 },
+      { id: "small", priceMinor: 1500000, boxItemCount: 3 },
+      { id: "unset", priceMinor: 1000000, boxItemCount: null },
+    ];
+    const none = () => null;
+    expect(boxQuickAddSize(sizes, none)?.id).toBe("small");
+    const smallOut = (id: string) => (id === "small" ? read({ available: 0, canFill: 0 }) : null);
+    expect(boxQuickAddSize(sizes, smallOut)?.id).toBe("big");
+    expect(boxQuickAddSize(sizes, () => read({ available: 0 }))).toBeNull();
+    expect(boxQuickAddSize([{ id: "unset", priceMinor: 1, boxItemCount: null }], none)).toBeNull();
   });
 
   it("asks the same-origin proxy", () => {

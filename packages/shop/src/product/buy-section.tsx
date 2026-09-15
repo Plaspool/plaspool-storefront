@@ -11,13 +11,8 @@ import { fetchProductAddOns } from "../data/add-ons-api";
 import { setAddOnChoice } from "../data/checkout-api";
 import { useCart } from "../cart/cart-context";
 import { maxQtyFor, stockOf } from "../cart/stock";
-import {
-  boxSizeSellable,
-  boxStock,
-  fetchVariantAvailability,
-  isMysteryBox,
-} from "../data/mystery-box";
-import type { VariantAvailability } from "../data/mystery-box";
+import { boxSizeSellable, boxStock, isMysteryBox } from "../data/mystery-box";
+import { useBoxAvailability } from "../components/use-box-availability";
 import { Gallery } from "./gallery";
 import { BuyBox } from "./buy-box";
 import { AddOnOptOut } from "./add-on-opt-out";
@@ -75,25 +70,8 @@ export function ProductBuySection({
   const colour = product.colours.find((c) => c.id === colourId) ?? product.colours[0];
   const size = product.sizes.find((s) => s.id === sizeId) ?? product.sizes[0];
 
-  /* ═══ A BOX'S LIVE, POOL-AWARE STOCK ═══
-     The product payload's `available` is the box's own sales cap and cannot
-     know the pool is empty, so a box page asks `/variants/:id/availability`
-     once per size on mount. Until an answer lands every size stays buyable —
-     flashing "sold out" on every box during load is worse, and checkout is
-     the real authority. Never cached, never on the server render. */
-  const [availability, setAvailability] = React.useState<Record<string, VariantAvailability>>({});
-  React.useEffect(() => {
-    if (!isBox) return undefined;
-    const controller = new AbortController();
-    for (const id of new Set(Object.values(product.variantIds))) {
-      void fetchVariantAvailability(id, controller.signal).then((result) => {
-        if (result) setAvailability((prev) => ({ ...prev, [id]: result }));
-      });
-    }
-    return () => controller.abort();
-  }, [isBox, product.variantIds]);
-  const availabilityFor = (sizeOptionId: string) =>
-    availability[product.variantIds[`${colour.id}:${sizeOptionId}`] ?? ""] ?? null;
+  /* The box's live, fillable stock — see `useBoxAvailability`. */
+  const availabilityFor = useBoxAvailability(product, colour.id);
   const boxChoices = isBox
     ? product.sizes.map((option) => ({
         size: option,

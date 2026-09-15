@@ -58,6 +58,16 @@ describe("BoxContents", () => {
   });
 });
 
+describe("BoxContents on a cancelled order", () => {
+  it("promises no surprise when the order was cancelled and refunded", () => {
+    expect(render({ isBox: true, qty: 1, cancelled: true })).toBe("");
+  });
+
+  it("still lists boxes that were delivered, without the surprise line", () => {
+    expect(text(render({ isBox: true, boxes: [BOX_2], qty: 2, cancelled: true }))).toBe("Inside Box 1 PETG · Clear");
+  });
+});
+
 describe("boxItemLabel", () => {
   it("joins the title and option values, tolerating missing values", () => {
     expect(boxItemLabel({ title: "PLA", optionValues: { a: "Red", b: " " } })).toBe("PLA · Red");

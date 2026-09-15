@@ -97,15 +97,15 @@ export function shortfallBody(
      they know what they asked for and now they know what there is. */
   if (shortfalls.length === 1) {
     const { requested, available, variantId } = shortfalls[0];
-    /* ═══ A BOX IS REFUSED BY ITS POOL, NOT A SHELF ═══
-       For a box, `available` is already how many more the pool can fill, so
-       "only 1 left" would describe stock that does not exist as such. The
-       instruction — lower it or remove it — is the same. */
+    /* ═══ A BOX IS REFUSED BY WHAT CAN BE FILLED, NOT A SHELF ═══
+       For a box, `available` is already how many more can be filled, so the
+       sentence talks about boxes. The instruction — lower it or remove it — is
+       the same. */
     if (variantId !== undefined && boxVariantIds.has(variantId)) {
       if (available <= 0) {
         return "This box has just sold out. Go back to the cart and remove it to continue.";
       }
-      return `Only ${available} more ${available === 1 ? "box" : "boxes"} like this can be packed. Go back to the cart and lower the quantity to continue.`;
+      return `Only ${available} more ${available === 1 ? "box like this is" : "boxes like this are"} available. Go back to the cart and lower the quantity to continue.`;
     }
     /* `available` CAN BE ZERO — the stock went while they were checking out.
        "Only 0 left" is a sentence no shop should print; the item is gone and

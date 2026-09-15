@@ -7,6 +7,8 @@ import { cn } from "@plaspool/ui";
 import type { Product } from "../data/types";
 import { cheapestSize, firstInStockColour } from "../data/money";
 import { useCart } from "../cart/cart-context";
+import { boxQuickAddSize, isMysteryBox } from "../data/mystery-box";
+import { useBoxAvailability } from "./use-box-availability";
 
 /**
  * The add button that sits in a `ProductCard`'s image well.
@@ -27,7 +29,14 @@ const CONFIRM_MS = 1800;
 export function CardAddButton({ product }: { product: Product }) {
   const cart = useCart();
   const colour = firstInStockColour(product);
-  const size = cheapestSize(product);
+  /* ═══ THE BOX ADDS A SIZE THAT CAN BE SOLD ═══
+     `cheapestSize` may be sold out, or not set up at all, and a quick-add of it
+     only moves the refusal to checkout. For the box, the cheapest SELLABLE size
+     is added instead, and the button is disabled when there is none. */
+  const isBox = isMysteryBox(product);
+  const availabilityOf = useBoxAvailability(product, colour.id);
+  const boxSize = isBox ? boxQuickAddSize(product.sizes, availabilityOf) : null;
+  const size = boxSize ?? cheapestSize(product);
   const [justAdded, setJustAdded] = React.useState(false);
   const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -37,7 +46,7 @@ export function CardAddButton({ product }: { product: Product }) {
     };
   }, []);
 
-  const soldOut = !colour.inStock;
+  const soldOut = isBox ? boxSize === null : !colour.inStock;
 
   function handleClick() {
     cart.add(
@@ -49,7 +58,8 @@ export function CardAddButton({ product }: { product: Product }) {
     timeoutRef.current = setTimeout(() => setJustAdded(false), CONFIRM_MS);
   }
 
-  const label = `Add ${product.name}, ${colour.name}, ${size.label} to cart`;
+  /* A box's colour has no name, so it is filtered out rather than read as ", ,". */
+  const label = `Add ${[product.name, colour.name, size.label].filter(Boolean).join(", ")} to cart`;
 
   return (
     <>

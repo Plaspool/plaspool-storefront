@@ -22,11 +22,11 @@ export function boxItemCountOf(size: Pick<SizeOption, "boxItemCount">): number |
   return typeof count === "number" && count > 0 ? count : null;
 }
 
-/** "3 surprise items, packed for your order." — null when there is no count. */
+/** "3 surprise items in every box." — null when there is no count. */
 export function boxCountLine(size: Pick<SizeOption, "boxItemCount">): string | null {
   const count = boxItemCountOf(size);
   if (count === null) return null;
-  return `${count} surprise ${count === 1 ? "item" : "items"}, packed for your order.`;
+  return `${count} surprise ${count === 1 ? "item" : "items"} in every box.`;
 }
 
 /**
@@ -109,4 +109,26 @@ export function boxStock(
 ): VariantStock | null | undefined {
   if (!availability) return catalogue;
   return { available: availability.available, backorderable: availability.backorderable };
+}
+
+/**
+ * The size a listing card's quick-add puts in the basket for the box: the
+ * CHEAPEST size that can be sold right now, or null when none can.
+ *
+ * Cheapest because that is the "from" price the card prints, so whenever that
+ * size is sellable the price shown and the price added still agree. When it is
+ * sold out, adding it anyway just moves the refusal to checkout — so the next
+ * cheapest sellable size is added instead, and the button's accessible name
+ * says which. `availabilityOf` answers null until a read lands, which counts
+ * as buyable, the same rule the product page follows.
+ */
+export function boxQuickAddSize<S extends Pick<SizeOption, "id" | "priceMinor" | "boxItemCount">>(
+  sizes: readonly S[],
+  availabilityOf: (sizeId: string) => VariantAvailability | null | undefined,
+): S | null {
+  return (
+    [...sizes]
+      .sort((a, b) => a.priceMinor - b.priceMinor)
+      .find((size) => boxSizeSellable(size, availabilityOf(size.id))) ?? null
+  );
 }

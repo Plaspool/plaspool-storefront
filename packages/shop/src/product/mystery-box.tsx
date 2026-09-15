@@ -34,7 +34,9 @@ export function MysteryBoxLabel({ className }: { className?: string }) {
 
 /** Three plain sentences, no numbered markers. */
 export const BOX_HOW_IT_WORKS = [
-  "You pick the size. We pack it by hand from what's in stock.",
+  /* True for all three of the owner's filling modes — hand-packed, packed
+     ahead, or picked automatically — so it says neither who packs nor when. */
+  "Pick a size. Every box is made up of items we have in stock.",
   "You won't know what's inside until it arrives.",
   "Once it's delivered, your order page lists everything that was in the box.",
 ] as const;

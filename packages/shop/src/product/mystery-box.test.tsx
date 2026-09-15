@@ -37,7 +37,7 @@ describe("BoxHowItWorks", () => {
   it("renders three plain sentences with no numbered markers", () => {
     const html = renderToStaticMarkup(<BoxHowItWorks />);
     expect(text(html)).toBe(
-      "How it works You pick the size. We pack it by hand from what's in stock. You won't know what's inside until it arrives. Once it's delivered, your order page lists everything that was in the box.",
+      "How it works Pick a size. Every box is made up of items we have in stock. You won't know what's inside until it arrives. Once it's delivered, your order page lists everything that was in the box.",
     );
     expect(html).not.toContain("<ol");
     expect(html).not.toMatch(/>\s*1\./);
@@ -50,7 +50,7 @@ describe("BoxSizePicker", () => {
 
   it("renders the owner's labels as they come, and the selected size's count", () => {
     const html = render([{ size: PLA, sellable: true }, { size: PETG, sellable: true }]);
-    expect(text(html)).toBe("Box size PLA · 3 spools PETG · 5 spools 3 surprise items, packed for your order.");
+    expect(text(html)).toBe("Box size PLA · 3 spools PETG · 5 spools 3 surprise items in every box.");
     expect(html).not.toContain("disabled");
   });
 
