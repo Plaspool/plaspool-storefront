@@ -189,3 +189,14 @@ describe("facetsFor", () => {
     expect(facetsFor([]).priceBounds).toEqual([0, 0]);
   });
 });
+
+describe("facetsFor with a mystery box", () => {
+  it("offers no colour facet for a box's nameless placeholder colour", () => {
+    const box = product({
+      slug: "box",
+      boxMode: "pack",
+      colours: [{ id: "default", name: "", hex: "#8a8a94", inStock: true, imageUrl: null }],
+    });
+    expect(facetsFor([product(), box]).colours.map((c) => c.id)).toEqual(["black"]);
+  });
+});

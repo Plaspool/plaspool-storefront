@@ -16,6 +16,8 @@ import { RatingStars } from "../components/rating-stars";
 import { QuantityStepper } from "../components/quantity-stepper";
 import { BulkTierTable } from "../components/bulk-tier-table";
 import { NextTierHint } from "./next-tier-hint";
+import { BoxHowItWorks, BoxSizePicker, MysteryBoxLabel } from "./mystery-box";
+import type { BoxSizeChoice } from "./mystery-box";
 import { AddToCartButton } from "../cart/add-to-cart";
 import type { CartLineKey } from "../cart/types";
 import { useCart } from "../cart/cart-context";
@@ -123,6 +125,12 @@ export interface BuyBoxProps {
    *  intent against the cart that is about to exist. Dispatch, not
    *  completion — see `AddToCartButtonProps.onAdded`. */
   onAdded?: () => void;
+  /**
+   * PRESENT ONLY FOR A MYSTERY BOX: every box size with whether it can be
+   * bought right now. Its presence is what switches the box layout on — the
+   * section above decides box-ness once, through `isMysteryBox`.
+   */
+  boxChoices?: BoxSizeChoice[];
   className?: string;
 }
 
@@ -138,8 +146,10 @@ export function BuyBox({
   maxQty,
   addOnControl,
   onAdded,
+  boxChoices,
   className,
 }: BuyBoxProps) {
+  const isBox = boxChoices !== undefined;
   /* Real reviews only. This read the invented fixtures behind a feature flag
      until there was an API to ask; a product nobody has reviewed now shows no
      stars rather than a manufactured score. */
@@ -161,7 +171,11 @@ export function BuyBox({
     colourId: colour.id,
     sizeId: size.id,
   };
-  const outOfStock = !colour.inStock;
+  /* A BOX IS SOLD OUT BY ITS POOL, which the colour flag cannot know — see
+     `boxSizeSellable`. `allBoxesOut` is what turns the button into "Sold out". */
+  const selectedBoxSellable = boxChoices?.find((c) => c.size.id === size.id)?.sellable ?? false;
+  const allBoxesOut = isBox && !boxChoices.some((c) => c.sellable);
+  const outOfStock = isBox ? !selectedBoxSellable : !colour.inStock;
 
   /* A single-size product still renders the control, disabled: an absent
      control reads as an unanswered question about what you are buying. */
@@ -179,6 +193,7 @@ export function BuyBox({
   return (
     <div className={cn("flex w-full min-w-0 flex-col gap-5", className)}>
       <div>
+        {isBox && <MysteryBoxLabel className="mb-3" />}
         <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
           {product.name}
         </h1>
@@ -202,6 +217,7 @@ export function BuyBox({
         size="lg"
       />
 
+      {!isBox && (
       <div>
         <p className="text-sm font-semibold text-foreground">Colour</p>
         <ColourSwatches
@@ -217,8 +233,13 @@ export function BuyBox({
             the hues apart. */}
         <p className="mt-1.5 text-sm text-muted-foreground">{colour.name}</p>
       </div>
+      )}
 
-      {showSizes && (
+      {isBox && (
+        <BoxSizePicker choices={boxChoices} selectedId={size.id} onSelect={onSizeChange} />
+      )}
+
+      {!isBox && showSizes && (
         <div>
           <p id={sizeLabelId} className="text-sm font-semibold text-foreground">
             Size
@@ -304,6 +325,8 @@ export function BuyBox({
         ))}
       </ul>
 
+      {isBox && <BoxHowItWorks />}
+
       {/* Delivery certainty is a live objection in this market, not a
           footnote at the bottom of the page. */}
       <div className="flex gap-2 border-t border-brand-line pt-5">
@@ -314,9 +337,16 @@ export function BuyBox({
         </ul>
       </div>
 
-      {outOfStock && (
+      {outOfStock && !isBox && (
         <p className="text-sm text-foreground">
           {colour.name} is out of stock. Pick another colour.
+        </p>
+      )}
+      {outOfStock && isBox && (
+        <p className="text-sm text-foreground">
+          {allBoxesOut
+            ? "Every box size is sold out right now."
+            : "This box size is sold out. Pick another size."}
         </p>
       )}
 
@@ -325,7 +355,14 @@ export function BuyBox({
           would put a secondary choice in front of the page's whole purpose.
           Out of stock, there is nothing to opt out of, so it goes too. */}
       <div className="flex flex-wrap gap-3">
-        <AddToCartButton line={line} qty={quantity} disabled={outOfStock} onAdded={onAdded} />
+        <AddToCartButton
+          line={line}
+          qty={quantity}
+          disabled={outOfStock}
+          onAdded={onAdded}
+          label={allBoxesOut ? "Sold out" : undefined}
+          srLabel={allBoxesOut ? "Add to cart" : undefined}
+        />
         <BuyNowButton line={line} qty={quantity} disabled={outOfStock} />
       </div>
 

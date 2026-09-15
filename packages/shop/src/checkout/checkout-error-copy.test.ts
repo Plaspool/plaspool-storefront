@@ -323,3 +323,33 @@ describe("an answer to an add-on the shop is no longer offering", () => {
     );
   });
 });
+
+describe("a stock refusal on a mystery box", () => {
+  const boxes = new Set(["var_box"]);
+  const refuse = (variantId: string, available: number) =>
+    errorCopy(
+      { code: "insufficient_stock", shortfalls: [{ variantId, requested: 2, available }] },
+      "district",
+      boxes,
+    ).body;
+
+  it("says how many more boxes can be packed", () => {
+    expect(refuse("var_box", 1)).toBe(
+      "Only 1 more box like this can be packed. Go back to the cart and lower the quantity to continue.",
+    );
+    expect(refuse("var_box", 3)).toContain("Only 3 more boxes like this can be packed.");
+  });
+
+  it("says the box has just sold out at zero", () => {
+    expect(refuse("var_box", 0)).toBe(
+      "This box has just sold out. Go back to the cart and remove it to continue.",
+    );
+  });
+
+  it("leaves an ordinary line, and a call with no box ids, worded as stock", () => {
+    expect(refuse("var_spool", 1)).toContain("only 1 is left");
+    expect(
+      errorCopy({ code: "insufficient_stock", shortfalls: [{ variantId: "var_box", requested: 2, available: 1 }] }).body,
+    ).toContain("only 1 is left");
+  });
+});

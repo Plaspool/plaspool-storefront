@@ -1,5 +1,25 @@
 import type { CheckoutError } from "../data/checkout-api";
 import type { AddressMode } from "../data/delivery-config";
+import { isMysteryBox } from "../data/mystery-box";
+import type { ResolvedLine } from "../cart/types";
+
+/** Which variant ids in the basket are mystery boxes. See `boxVariantIdsOf`. */
+export type BoxVariantIds = ReadonlySet<string>;
+
+/**
+ * The basket's mystery-box variant ids, looked up through the catalogue entry
+ * each line was resolved against — a `Shortfall` names a variant and nothing
+ * else, so the cart is the only place that knows whether it is a box.
+ */
+export function boxVariantIdsOf(lines: readonly ResolvedLine[]): BoxVariantIds {
+  const ids = new Set<string>();
+  for (const line of lines) {
+    if (!isMysteryBox(line.product)) continue;
+    const id = line.product.variantIds[`${line.colour.id}:${line.size.id}`];
+    if (id) ids.add(id);
+  }
+  return ids;
+}
 
 /**
  * Checkout's failure copy, lifted out of `checkout-flow.tsx`.
@@ -60,7 +80,10 @@ export function retryWaitLabel(retryAfter: number | null): string {
  * fresher than anything this refusal could reconstruct. See `stock.ts`.
  * ═══════════════════════════════════════════════════════════════════════════
  */
-export function shortfallBody(shortfalls: { requested: number; available: number }[]): string {
+export function shortfallBody(
+  shortfalls: { variantId?: string; requested: number; available: number }[],
+  boxVariantIds: BoxVariantIds = new Set(),
+): string {
   /* A refusal with no detail is still a refusal, and it must not render as
      "0 items". The API always sends at least one, so this is the shape-changed
      case rather than an expected one — and it degrades to the instruction,
@@ -73,7 +96,17 @@ export function shortfallBody(shortfalls: { requested: number; available: number
      distance, and it is the one where the shopper can act without hunting:
      they know what they asked for and now they know what there is. */
   if (shortfalls.length === 1) {
-    const { requested, available } = shortfalls[0];
+    const { requested, available, variantId } = shortfalls[0];
+    /* ═══ A BOX IS REFUSED BY ITS POOL, NOT A SHELF ═══
+       For a box, `available` is already how many more the pool can fill, so
+       "only 1 left" would describe stock that does not exist as such. The
+       instruction — lower it or remove it — is the same. */
+    if (variantId !== undefined && boxVariantIds.has(variantId)) {
+      if (available <= 0) {
+        return "This box has just sold out. Go back to the cart and remove it to continue.";
+      }
+      return `Only ${available} more ${available === 1 ? "box" : "boxes"} like this can be packed. Go back to the cart and lower the quantity to continue.`;
+    }
     /* `available` CAN BE ZERO — the stock went while they were checking out.
        "Only 0 left" is a sentence no shop should print; the item is gone and
        the instruction is different. */
@@ -97,12 +130,14 @@ export function errorCopy(
    *  `outside_delivery_area` case. Defaults to `district`, so a call site that
    *  does not know the mode gets the wording this function always had. */
   mode: AddressMode = "district",
+  /** Mystery-box variant ids in the basket, so a box shortfall reads as one. */
+  boxVariantIds?: BoxVariantIds,
 ): { title: string; body: string } {
   switch (error.code) {
     case "empty_cart":
       return { title: "Your cart is empty", body: "Add something to the cart before checking out." };
     case "insufficient_stock":
-      return { title: "Not enough in stock", body: shortfallBody(error.shortfalls) };
+      return { title: "Not enough in stock", body: shortfallBody(error.shortfalls, boxVariantIds) };
     case "no_shipping_address":
       return { title: "No delivery address on file", body: "Enter a delivery address before choosing a delivery option." };
     case "outside_delivery_area":

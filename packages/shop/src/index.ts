@@ -151,6 +151,9 @@ export * from "./account/avatar";
 export * from "./account/account-menu";
 export * from "./account/settings-page";
 export * from "./account/order-detail";
+export * from "./account/box-contents";
+export * from "./data/mystery-box";
+export * from "./product/mystery-box";
 /* `/account/orders/[orderNumber]/status` — the whole journey of one order.
    `order-progress` is exported alongside it because both surfaces read the
    same `resolveStops`/`headlineFor`/`outcomeOf`, and the bench needs them to

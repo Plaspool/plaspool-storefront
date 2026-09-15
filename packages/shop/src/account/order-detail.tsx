@@ -30,6 +30,7 @@ import { useCart } from "../cart/cart-context";
 import { getOrder, getOrderEvents } from "../data/orders-api";
 import type { Order, OrderAddOn, OrderEvent, OrderLine } from "../data/orders-api";
 import type { LineImageIndex } from "../data/catalog";
+import { BoxContents } from "./box-contents";
 import { majorUnits } from "../data/cart-api";
 import { formatNaira } from "../data/money";
 import { addOnRowsFor, savingLabel } from "../checkout/add-ons";
@@ -417,6 +418,11 @@ export function OrderDetail({
                     {naira(line.unitAmount)}
                   </p>
                   <LineFulfilment line={line} delivered={delivered} />
+                  <BoxContents
+                    isBox={lineImages[line.variantId]?.isBox ?? false}
+                    boxes={line.boxes}
+                    qty={line.qty}
+                  />
                 </div>
               </div>
               <span className="shrink-0 font-mono text-sm tabular-nums text-foreground">

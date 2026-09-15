@@ -86,6 +86,19 @@ export interface OrderLine {
   lineTotal: number;
   /** How much of `qty` is covered by a non-cancelled fulfilment. */
   fulfilledQty: number;
+  /**
+   * MYSTERY BOXES ONLY, AND ONLY ONCE DELIVERED: what was packed, one entry per
+   * box in box order. Absent means "not revealed yet" — not filled, not sent,
+   * or on its way — and a partly delivered line carries only the boxes that
+   * arrived. Only on the order DETAIL route, which needs the shopper's session
+   * or guest token; never put it anywhere cached.
+   */
+  boxes?: OrderBox[];
+}
+
+/** One packed box. Titles are purchase-time snapshots: render them verbatim. */
+export interface OrderBox {
+  items: Array<{ title: string; optionValues: Record<string, string> }>;
 }
 
 /**
