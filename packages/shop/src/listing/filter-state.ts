@@ -1,5 +1,6 @@
 import type { Product } from "../data/types";
 import { priceFrom } from "../data/money";
+import { isMysteryBox } from "../data/mystery-box";
 
 /**
  * `priceFrom` is MINOR UNITS; `min` and `max` in the URL are WHOLE ones.
@@ -216,7 +217,10 @@ export function facetsFor(products: Product[]): Facets {
     if (p.diameterMm !== null)
       diameters.set(p.diameterMm, (diameters.get(p.diameterMm) ?? 0) + 1);
 
-    for (const colour of new Map(p.colours.map((c) => [c.id, c])).values()) {
+    /* A mystery box's one "colour" is a nameless grey placeholder, not a
+       filament colour; as a facet it would be a blank swatch selecting boxes. */
+    const facetColours = isMysteryBox(p) ? [] : p.colours;
+    for (const colour of new Map(facetColours.map((c) => [c.id, c])).values()) {
       const existing = colours.get(colour.id);
       if (existing) existing.count += 1;
       else
