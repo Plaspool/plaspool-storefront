@@ -50,6 +50,9 @@ export interface StickyBuyBarProps {
    * `max` and whose value came from different variants.
    */
   maxQty: number;
+  /** A mystery box's pool-aware sold-out state; ordinary products leave it
+   *  unset and keep reading `colour.inStock`. */
+  soldOut?: boolean;
   className?: string;
 }
 
@@ -60,8 +63,10 @@ export function StickyBuyBar({
   quantity,
   onQuantityChange,
   maxQty,
+  soldOut,
   className,
 }: StickyBuyBarProps) {
+  const unavailable = soldOut ?? !colour.inStock;
   const unit = unitPriceFor(size.priceMinor, product.bulkTiers, quantity);
   const line: CartLineKey = {
     productSlug: product.slug,
@@ -92,7 +97,8 @@ export function StickyBuyBar({
           <p className="truncate text-sm font-semibold text-foreground">
             {product.name}
           </p>
-          <p className="truncate text-xs text-muted-foreground">{colour.name}</p>
+          {/* A box's colour has no name; its size label is what was chosen. */}
+          <p className="truncate text-xs text-muted-foreground">{colour.name || size.label}</p>
         </div>
 
         {/*
@@ -132,7 +138,7 @@ export function StickyBuyBar({
           <AddToCartButton
             line={line}
             qty={quantity}
-            disabled={!colour.inStock}
+            disabled={unavailable}
             /* "Add to cart" plus a cart glyph does not fit a third of a 320px
                viewport. The bar uses the short label at every width rather
                than swapping at a breakpoint — the compact form is correct
@@ -147,7 +153,7 @@ export function StickyBuyBar({
           <BuyNowButton
             line={line}
             qty={quantity}
-            disabled={!colour.inStock}
+            disabled={unavailable}
             className="min-w-0 flex-1 px-3 sm:flex-none sm:px-5"
           />
         </div>

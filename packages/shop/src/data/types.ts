@@ -43,7 +43,23 @@ export interface SizeOption {
    *  variant's own `price.currency` — never assumed, never inferred from the
    *  shop's default. */
   currency: CurrencyCode;
+  /**
+   * MYSTERY BOXES ONLY: how many surprise items one box holds — the promise the
+   * size button makes. Null on an ordinary size, and null on a box size whose
+   * pool the owner has not set up yet, which cannot be sold.
+   *
+   * Optional so a fixture need not spell it; `sizesFrom` always sets it, and
+   * `boxItemCountOf` in `mystery-box.ts` is the one reader.
+   */
+  boxItemCount?: number | null;
 }
+
+/**
+ * How the admin assembles a mystery box. Only `null` versus non-null matters
+ * to a shopper: `"built"` and `"auto"` are later admin phases and change
+ * nothing on this side, so no surface may branch on which one it is.
+ */
+export type BoxMode = "pack" | "built" | "auto";
 
 /** A quantity ladder. `minQty` ascending, no duplicates. */
 /**
@@ -116,6 +132,12 @@ export type Badge = "Bulk sale" | "New" | "Low stock" | "Sale";
 export interface Product {
   slug: string;
   name: string;
+  /**
+   * Non-null when the owner has switched this product into a mystery box.
+   * Optional on the type so fixtures need not spell it; `toProduct` always
+   * sets it, and `isMysteryBox` is the one reader.
+   */
+  boxMode?: BoxMode | null;
   categorySlug: string;
   /**
    * NULLABLE SINCE THE CATALOGUE WENT LIVE. The API has no material column —

@@ -11,6 +11,13 @@ import { fetchProductAddOns } from "../data/add-ons-api";
 import { setAddOnChoice } from "../data/checkout-api";
 import { useCart } from "../cart/cart-context";
 import { maxQtyFor, stockOf } from "../cart/stock";
+import {
+  boxSizeSellable,
+  boxStock,
+  fetchVariantAvailability,
+  isMysteryBox,
+} from "../data/mystery-box";
+import type { VariantAvailability } from "../data/mystery-box";
 import { Gallery } from "./gallery";
 import { BuyBox } from "./buy-box";
 import { AddOnOptOut } from "./add-on-opt-out";
@@ -55,11 +62,47 @@ export function ProductBuySection({
   className,
 }: ProductBuySectionProps) {
   const [colourId, setColourId] = React.useState(() => firstInStockColour(product).id);
-  const [sizeId, setSizeId] = React.useState(() => cheapestSize(product).id);
+  const isBox = isMysteryBox(product);
+  const [sizeId, setSizeId] = React.useState(() =>
+    /* A box opens on a size that can be sold — one with a pool behind it —
+       rather than the cheapest, which may be a size nobody has set up. */
+    isBox
+      ? (product.sizes.find((s) => boxSizeSellable(s, null)) ?? cheapestSize(product)).id
+      : cheapestSize(product).id,
+  );
   const [chosenQuantity, setQuantity] = React.useState(1);
 
   const colour = product.colours.find((c) => c.id === colourId) ?? product.colours[0];
   const size = product.sizes.find((s) => s.id === sizeId) ?? product.sizes[0];
+
+  /* ═══ A BOX'S LIVE, POOL-AWARE STOCK ═══
+     The product payload's `available` is the box's own sales cap and cannot
+     know the pool is empty, so a box page asks `/variants/:id/availability`
+     once per size on mount. Until an answer lands every size stays buyable —
+     flashing "sold out" on every box during load is worse, and checkout is
+     the real authority. Never cached, never on the server render. */
+  const [availability, setAvailability] = React.useState<Record<string, VariantAvailability>>({});
+  React.useEffect(() => {
+    if (!isBox) return undefined;
+    const controller = new AbortController();
+    for (const id of new Set(Object.values(product.variantIds))) {
+      void fetchVariantAvailability(id, controller.signal).then((result) => {
+        if (result) setAvailability((prev) => ({ ...prev, [id]: result }));
+      });
+    }
+    return () => controller.abort();
+  }, [isBox, product.variantIds]);
+  const availabilityFor = (sizeOptionId: string) =>
+    availability[product.variantIds[`${colour.id}:${sizeOptionId}`] ?? ""] ?? null;
+  const boxChoices = isBox
+    ? product.sizes.map((option) => ({
+        size: option,
+        sellable: boxSizeSellable(option, availabilityFor(option.id)),
+      }))
+    : undefined;
+  const soldOut = boxChoices
+    ? !(boxChoices.find((c) => c.size.id === size.id)?.sellable ?? false)
+    : undefined;
 
   /**
    * ═══ STOCK IS A PROPERTY OF THE VARIANT, SO IT MOVES WHEN THE PICKER DOES ═══
@@ -68,7 +111,8 @@ export function ProductBuySection({
    * THIS weight in THIS colour there are. `variantStock` is keyed on the pair,
    * which is the only key that can answer.
    */
-  const maxQty = maxQtyFor(stockOf(product, colour.id, size.id));
+  const shelf = stockOf(product, colour.id, size.id);
+  const maxQty = maxQtyFor(isBox ? boxStock(shelf, availabilityFor(size.id)) : shelf);
   const cart = useCart();
 
   /**
@@ -250,6 +294,7 @@ export function ProductBuySection({
             onSizeChange={setSizeId}
             onQuantityChange={setQuantity}
             maxQty={maxQty}
+            boxChoices={boxChoices}
             onAdded={() => {
               if (leaveOut && optOut) intentRef.current = optOut.id;
             }}
@@ -274,6 +319,7 @@ export function ProductBuySection({
         quantity={quantity}
         onQuantityChange={setQuantity}
         maxQty={maxQty}
+        soldOut={soldOut}
       />
     </div>
   );

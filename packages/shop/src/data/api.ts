@@ -92,6 +92,15 @@ export interface ApiVariant {
   /** Relative (`/api/public/images/…`); null until this colour is photographed.
    *  Resolved server-side — see `Plaspool/plaspool-admin#39`. */
   imageUrl?: string | null;
+  /** Items in one mystery box; null on an ordinary variant, and on a box
+   *  variant whose pool is not set up. Absent on an older API. */
+  boxItemCount?: number | null;
+  /**
+   * The owner's INTERNAL pool name (`mystery-pla`). DELIBERATELY UNREAD — it
+   * is on the wire only because it is harmless, and it is never shopper copy.
+   * Declared so that is a documented decision rather than an oversight.
+   */
+  boxPoolTag?: string | null;
 }
 
 export interface ApiProduct {
@@ -157,6 +166,8 @@ export interface ApiProduct {
    * wire, not because one shape of response omits it.
    */
   variants?: ApiVariant[];
+  /** Non-null when this product is a mystery box. Absent on an older API. */
+  boxMode?: "pack" | "built" | "auto" | null;
 }
 
 export interface ApiCategory {
@@ -523,6 +534,7 @@ export function sizesFrom(variants: ApiVariant[]): SizeOption[] {
       minor: number;
       compareMinor: number | null;
       currency: CurrencyCode;
+      boxItemCount: number | null;
     }
   >();
   for (const variant of variants) {
@@ -546,6 +558,7 @@ export function sizesFrom(variants: ApiVariant[]): SizeOption[] {
         existing.currency = currencyOf(variant.price.currency);
       }
       existing.grams = existing.grams ?? grams;
+      existing.boxItemCount = existing.boxItemCount ?? variant.boxItemCount ?? null;
     } else {
       byLabel.set(key, {
         label,
@@ -553,6 +566,7 @@ export function sizesFrom(variants: ApiVariant[]): SizeOption[] {
         minor: variant.price.amount,
         compareMinor: variant.compareAtMinor ?? null,
         currency: currencyOf(variant.price.currency),
+        boxItemCount: variant.boxItemCount ?? null,
       });
     }
   }
@@ -573,6 +587,7 @@ export function sizesFrom(variants: ApiVariant[]): SizeOption[] {
          shown. */
       compareAtMinor: s.compareMinor,
       currency: s.currency,
+      boxItemCount: s.boxItemCount,
     }))
     .sort((a, b) => a.priceMinor - b.priceMinor);
 }
@@ -755,6 +770,12 @@ export interface LineImage {
    * answer is an "unknown level" mode in `SpoolImage`, not a guess here.
    */
   weightGrams: number;
+  /**
+   * The variant belongs to a mystery box. How an order line that has not been
+   * revealed yet knows to say the contents are still a surprise — the line's
+   * own snapshot carries no box flag. Optional: absent reads as "not a box".
+   */
+  isBox?: boolean;
 }
 
 /**
@@ -831,6 +852,8 @@ export function lineImagesFrom(products: ApiProduct[]): LineImageIndex {
            than the fallback it looks like. */
         weightGrams:
           variant.weightGrams ?? gramsFrom(option(variant, WEIGHT_KEYS)) ?? 0,
+        /* Only ever set true, so an ordinary line's entry is unchanged. */
+        ...((product.boxMode ?? null) !== null ? { isBox: true } : {}),
       };
     }
   }
@@ -874,6 +897,33 @@ export function badgesFrom(variants: ApiVariant[], publishedAt: number | null, n
   return badges;
 }
 
+/**
+ * A mystery-box variant, re-shaped onto the (colour, size) model every surface
+ * already reads.
+ *
+ * ═══ WHY THE VARIANT IS REWRITTEN RATHER THAN SPECIAL-CASED DOWNSTREAM ═══
+ * A box has no colour axis and names its size in whatever keys the owner typed
+ * ("PLA · 3 spools"). Left as sent, `variantIdsFrom` skips every variant for
+ * want of a colour — a buy box whose Add to cart adds nothing — and
+ * `sizeLabelOf` finds no weight key and leaves the label blank. Rewriting the
+ * option values once, here, keeps `sizesFrom`, `variantIdsFrom` and
+ * `variantStockFrom` deriving their keys identically, which is the invariant
+ * those three depend on.
+ *
+ * The label is the option VALUES joined as they came, per the owner's wording.
+ * Only this projection is rewritten — the order line keeps its own snapshot.
+ */
+function asBoxVariant(variant: ApiVariant): ApiVariant {
+  const label = Object.values(variant.optionValues ?? {})
+    .map((v) => (typeof v === "string" ? v.trim() : ""))
+    .filter(Boolean)
+    .join(" · ");
+  return { ...variant, colorHex: null, optionValues: { Colour: BOX_COLOUR, Size: label } };
+}
+
+/** The one "colour" a box has. `idOf` leaves it unchanged, so it is also the id. */
+export const BOX_COLOUR = "default";
+
 // ------------------------------------------------------------------- adapter
 
 export interface AdaptContext {
@@ -911,16 +961,28 @@ export interface AdaptContext {
  */
 export function toProduct(api: ApiProduct, ctx: AdaptContext): Product | null {
   if (!api.slug) return null;
-  const variants = (api.variants ?? []).filter((v) => v.status === "active");
-  const sizes = sizesFrom(variants);
+  const boxMode = api.boxMode ?? null;
+  const active = (api.variants ?? []).filter((v) => v.status === "active");
+  const variants = boxMode === null ? active : active.map(asBoxVariant);
+  const sizes = boxMode === null
+    ? sizesFrom(variants)
+    /* A box size weighs nothing the shopper is buying by; `gramsFrom` would
+       otherwise read "3 spools" as 3 g and print it beside the label. */
+    : sizesFrom(variants).map((size) => ({ ...size, weightGrams: 0 }));
   if (!sizes.length) return null;
 
-  const colours = coloursFrom(variants);
+  /* A box's one "colour" has NO NAME, so every descriptor that joins colour
+     and size (`variantDescriptor`, the cart row, the checkout summary) drops
+     it and reads "PLA · 3 spools" rather than "default · PLA · 3 spools". */
+  const colours = boxMode === null
+    ? coloursFrom(variants)
+    : coloursFrom(variants).map((colour) => ({ ...colour, name: "" }));
   const description = docToBlocks(api.description);
 
   return {
     slug: api.slug,
     name: api.title,
+    boxMode,
     /* The API sends a display NAME; every route in this package is keyed by
        slug. Unknown names fall back to a slugified form so the product still
        has a category page to belong to rather than vanishing from the nav. */

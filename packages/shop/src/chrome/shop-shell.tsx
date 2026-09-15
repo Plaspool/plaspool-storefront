@@ -82,6 +82,8 @@ export async function ShopShell({ children }: ShopShellProps) {
        `maxQtyForLine` deliberately ignores it. The FLAG is the half a cart line
        does not carry at all, and it is the half that almost never changes. */
     variantStock: product.variantStock,
+    /* So checkout can word a stock refusal on a box line as a box. */
+    boxMode: product.boxMode ?? null,
   }));
 
   return (

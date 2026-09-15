@@ -22,7 +22,7 @@ import { maxQtyForLine, stockOf } from "./stock";
 import type { VariantMatch } from "./sellable";
 import type { ApiCartView, CartResult } from "../data/cart-api";
 import type { CartApi, CartLine, CartLineKey, ResolvedLine } from "./types";
-import type { BulkTier, Colour, SizeOption, VariantStock } from "../data/types";
+import type { BulkTier, Colour, Product, SizeOption, VariantStock } from "../data/types";
 
 /**
  * The cart's state, now held by the SERVER.
@@ -86,6 +86,9 @@ export interface CartCatalogEntry {
   variantStock: Record<string, VariantStock>;
   /** The product's own photograph, for a basket row whose colour has none. */
   coverImageUrl: string | null;
+  /** Non-null for a mystery box. Read through `isMysteryBox`; optional so an
+   *  entry built before boxes existed still type-checks. */
+  boxMode?: Product["boxMode"];
 }
 
 export interface CartProviderProps {

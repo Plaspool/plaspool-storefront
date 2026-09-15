@@ -9,6 +9,7 @@ import { CardAddButton } from "./card-add-button";
 import { ProductPhoto } from "./product-photo";
 import { Price } from "./price";
 import { ColourSwatches } from "./colour-swatches";
+import { isMysteryBox } from "../data/mystery-box";
 import { RatingStars } from "./rating-stars";
 
 /**
@@ -44,6 +45,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
   const badge = primaryBadge(product.badges);
   /* Only colours somebody can order. See `availableColours`. */
   const colours = availableColours(product);
+  const isBox = isMysteryBox(product);
 
   return (
     <div className={cn("group relative flex flex-col", className)}>
@@ -57,7 +59,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
                or the drawing, which is tinted to it — may be called by it; the
                product cover standing in is a picture of the product. */
             alt={
-              colour.imageUrl || !product.coverImageUrl
+              !isBox && (colour.imageUrl || !product.coverImageUrl)
                 ? `${product.name} spool in ${colour.name}`
                 : product.name
             }
@@ -84,12 +86,22 @@ export function ProductCard({ product, className }: ProductCardProps) {
 
       {/* The swatch row sits outside the link, so its `sr-only` colour names
           never join the link's accessible name. */}
-      <ColourSwatches
-        colours={colours}
-        max={6}
-        className="mt-3"
-        label={`Colours available for ${product.name}`}
-      />
+      {/* A BOX HAS NO COLOURS TO SHOW. Its one "colour" is a nameless grey
+          placeholder, so the swatch row would be a single grey dot claiming a
+          colour. The row's slot says what the product is instead, at the same
+          offset so the card's title lines up with its neighbours'. */}
+      {isBox ? (
+        <p className="mt-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Mystery box
+        </p>
+      ) : (
+        <ColourSwatches
+          colours={colours}
+          max={6}
+          className="mt-3"
+          label={`Colours available for ${product.name}`}
+        />
+      )}
 
       <Link
         href={`/store/products/${product.slug}`}

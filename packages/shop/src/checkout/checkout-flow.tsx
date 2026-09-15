@@ -58,7 +58,8 @@ import { AddressAutofill } from "./address-autofill-button";
 import { prefillFromGeoHint, suggestDistrict, type GeocodedAddress } from "./address-autofill";
 import { readGeoHint, type GeoHint } from "../data/geo-hint";
 import { NIGERIA } from "../data/nigerian-states";
-import { errorCopy } from "./checkout-error-copy";
+import { boxVariantIdsOf, errorCopy } from "./checkout-error-copy";
+import type { BoxVariantIds } from "./checkout-error-copy";
 import { saveReceiptSnapshot } from "./receipt-snapshot";
 import { getPointsBalance } from "../data/points-api";
 import type { PointsBalance } from "../data/points-api";
@@ -128,15 +129,17 @@ function ErrorBanner({
   error,
   action,
   mode,
+  boxVariantIds,
 }: {
   error: CheckoutError;
   mode?: AddressMode;
+  boxVariantIds?: BoxVariantIds;
   /** A control the customer can actually take, e.g. "gone" sending them back
    *  to the cart. Optional — most errors here are recoverable by trying the
    *  same step again, which the form's own submit already offers. */
   action?: React.ReactNode;
 }) {
-  const { title, body } = errorCopy(error, mode);
+  const { title, body } = errorCopy(error, mode, boxVariantIds);
   /* Only the two codes that carry one. `errorCopy` decides its wording from
      the same value, so the sentence and the line under it cannot disagree. */
   const reference = "requestId" in error ? error.requestId : null;
@@ -1638,6 +1641,7 @@ export function CheckoutFlow() {
           <ErrorBanner
             error={error}
             mode={config.mode}
+            boxVariantIds={boxVariantIdsOf(cart.resolved)}
             action={
               /* A WAY OUT FOR EVERY REFUSAL THAT HAS ONE. Retrying the same
                  step is what the form's own submit already offers, so a button
