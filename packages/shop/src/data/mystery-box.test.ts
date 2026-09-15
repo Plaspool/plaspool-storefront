@@ -11,15 +11,16 @@ import {
   parseAvailability,
   proxiedAvailabilityPath,
 } from "./mystery-box";
-import { stockOf } from "../cart/stock";
+import { maxQtyFor, stockOf } from "../cart/stock";
 
 /**
- * MYSTERY BOXES, AT THE DATA SEAM.
+ * THE MYSTERY BOX, AT THE DATA SEAM — the dedicated-product version (admin
+ * PR #155): one variant, `optionValues: {}`, one price, one item count, and NO
+ * STOCK OF ITS OWN (it sits at zero or below with backorders on).
  *
- * The fixtures here are shaped from the merged admin code (PR #153) and the
- * live product payload read on 2026-09-15, where `boxMode`, `boxItemCount` and
- * `canFill` were present and null. Every null and absent case is pinned, since
- * an older API build and an ordinary product both send them.
+ * Field names were read live on 2026-09-15 with `boxMode` null everywhere; the
+ * non-null shapes are from the merged admin code. Every null and absent case is
+ * pinned, and so is the leftover-fields ordinary product production still has.
  */
 
 const variant = (over: Partial<ApiVariant>): ApiVariant =>
@@ -39,6 +40,16 @@ const variant = (over: Partial<ApiVariant>): ApiVariant =>
 
 const ctx: AdaptContext = { categorySlugByName: new Map(), now: 0 };
 
+/** The box as the admin now sends it: a negative, backorderable, meaningless shelf. */
+const BOX_VARIANT = variant({
+  id: "var_box",
+  optionValues: {},
+  boxItemCount: 3,
+  boxPoolTag: null,
+  available: -2,
+  backorderable: true,
+});
+
 const box = (over: Partial<ApiProduct> = {}): ApiProduct =>
   ({
     id: "prd_box",
@@ -51,20 +62,20 @@ const box = (over: Partial<ApiProduct> = {}): ApiProduct =>
     coverImageUrl: null,
     imageUrls: [],
     publishedAt: null,
-    overview: "",
+    overview: "A surprise mix of PLA Silk and PLA+.",
     bulkTiers: [],
     boxMode: "pack",
-    variants: [
-      variant({ id: "var_pla3", optionValues: { Box: "PLA · 3 spools" }, boxItemCount: 3, boxPoolTag: "mystery-pla" }),
-      variant({ id: "var_petg5", optionValues: { Box: "PETG · 5 spools" }, boxItemCount: 5, price: { amount: 2500000, currency: "NGN" } }),
-    ],
+    variants: [BOX_VARIANT],
     ...over,
   }) as ApiProduct;
 
-describe("toProduct on a mystery box", () => {
-  it("marks the product as a box, and an ordinary or older product as not", () => {
+describe("toProduct on the mystery box", () => {
+  it("marks the product as the box, and an ordinary or older product as not", () => {
     expect(toProduct(box(), ctx)?.boxMode).toBe("pack");
     expect(isMysteryBox(toProduct(box(), ctx)!)).toBe(true);
+    for (const mode of ["built", "auto"] as const) {
+      expect(isMysteryBox(toProduct(box({ boxMode: mode }), ctx)!)).toBe(true);
+    }
     expect(toProduct(box({ boxMode: null }), ctx)?.boxMode).toBeNull();
     const older = box();
     delete (older as { boxMode?: unknown }).boxMode;
@@ -72,38 +83,45 @@ describe("toProduct on a mystery box", () => {
     expect(isMysteryBox({})).toBe(false);
   });
 
-  it("names each size as the owner wrote it, with its count and no weight", () => {
+  it("has one size with no label and the item count, and no weight", () => {
     const product = toProduct(box(), ctx)!;
-    expect(product.sizes.map((s) => [s.label, s.boxItemCount, s.weightGrams])).toEqual([
-      ["PLA · 3 spools", 3, 0],
-      ["PETG · 5 spools", 5, 0],
-    ]);
+    expect(product.sizes.map((s) => [s.label, s.boxItemCount, s.weightGrams])).toEqual([["", 3, 0]]);
   });
 
-  it("can be added to a cart: every size has a variant id and a shelf", () => {
+  it("can be added to a cart: the one variant has an id", () => {
     const product = toProduct(box(), ctx)!;
-    for (const size of product.sizes) {
-      const key = `${product.colours[0].id}:${size.id}`;
-      expect(product.variantIds[key]).toMatch(/^var_/);
-      expect(stockOf(product, product.colours[0].id, size.id)).not.toBeNull();
-    }
+    const [colour] = product.colours;
+    expect(product.variantIds[`${colour.id}:${product.sizes[0].id}`]).toBe("var_box");
   });
 
-  it("gives the colour no name, so descriptors read as the box size alone", () => {
+  it("ignores the box's own negative, backorderable stock", () => {
     const product = toProduct(box(), ctx)!;
-    expect(product.colours).toHaveLength(1);
-    expect(product.colours[0].name).toBe("");
+    const [colour] = product.colours;
+    expect(stockOf(product, colour.id, product.sizes[0].id)).toEqual({ available: null, backorderable: false });
+    expect(product.badges).not.toContain("Low stock");
+    expect(colour.inStock).toBe(true);
+    expect(colour.name).toBe("");
+  });
+
+  it("renders the API's fallback words as ordinary product words", () => {
+    expect(toProduct(box(), ctx)!.overview).toBe("A surprise mix of PLA Silk and PLA+.");
   });
 
   it("treats an ordinary product with LEFTOVER box fields as ordinary", () => {
     /* PLA Basic on production, 2026-09-15: boxMode null, but four variants
-       still carried boxItemCount: 3 and a pool tag from the earlier admin. */
+       still carried boxItemCount: 3 and a pool tag from an earlier admin. */
     const plaBasic = toProduct(
       box({
         slug: "pla-basic",
         boxMode: null,
         variants: [
-          variant({ id: "var_black", optionValues: { Size: "1kg", Color: "Black" }, boxItemCount: 3, boxPoolTag: "mystery-pla" }),
+          variant({
+            id: "var_black",
+            optionValues: { Size: "1kg", Color: "Black" },
+            boxItemCount: 3,
+            boxPoolTag: "mystery-pla",
+            available: 4,
+          }),
         ],
       }),
       ctx,
@@ -112,18 +130,17 @@ describe("toProduct on a mystery box", () => {
     expect(plaBasic.sizes[0].label).toBe("1kg");
     expect(plaBasic.sizes[0].boxItemCount).toBeNull();
     expect(plaBasic.colours[0].name).toBe("Black");
+    expect(stockOf(plaBasic, "black", "1kg")).toEqual({ available: 4, backorderable: false });
     expect(JSON.stringify(plaBasic)).not.toContain("mystery-pla");
-    expect(lineImagesFrom([box({ boxMode: null, variants: [variant({ id: "var_black", boxItemCount: 3 })] })]).var_black?.isBox).toBeUndefined();
   });
 
-  it("never carries the internal pool tag anywhere on the product", () => {
-    expect(JSON.stringify(toProduct(box(), ctx))).not.toContain("mystery-pla");
-  });
-
-  it("flags a box variant in the order-line image index", () => {
-    const index = lineImagesFrom([box(), box({ slug: "plain", boxMode: null, variants: [variant({ id: "var_plain" })] })]);
-    expect(index.var_pla3?.isBox).toBe(true);
-    expect(index.var_plain?.isBox ?? false).toBe(false);
+  it("flags only the box's variant in the order-line image index", () => {
+    const index = lineImagesFrom([
+      box(),
+      box({ slug: "plain", boxMode: null, variants: [variant({ id: "var_plain", boxItemCount: 3 })] }),
+    ]);
+    expect(index.var_box?.isBox).toBe(true);
+    expect(index.var_plain?.isBox).toBeUndefined();
   });
 });
 
@@ -144,54 +161,48 @@ describe("box counts", () => {
 
 describe("availability", () => {
   const read = (over: object) =>
-    parseAvailability({ variantId: "var_a", available: 5, backorderable: false, canFill: 5, ...over });
+    parseAvailability({ variantId: "var_box", available: 5, backorderable: true, canFill: 5, ...over });
 
   it("parses the live shape, and an older one with no canFill", () => {
-    expect(read({})).toEqual({ variantId: "var_a", available: 5, backorderable: false, canFill: 5 });
+    expect(read({})).toEqual({ variantId: "var_box", available: 5, backorderable: true, canFill: 5 });
     expect(parseAvailability({ variantId: "var_a", available: 0, backorderable: false })?.canFill).toBeNull();
     expect(parseAvailability(null)).toBeNull();
     expect(parseAvailability({ available: 1 })).toBeNull();
   });
 
-  it("is buyable until a read lands, and when the read failed", () => {
+  it("is buyable until a read lands, when it failed, and with no canFill", () => {
     expect(boxSizeSellable({ boxItemCount: 3 }, undefined)).toBe(true);
     expect(boxSizeSellable({ boxItemCount: 3 }, null)).toBe(true);
+    expect(boxSizeSellable({ boxItemCount: 3 }, read({ canFill: null }))).toBe(true);
   });
 
-  it("is sold out when the pool or the stock is empty", () => {
-    expect(boxSizeSellable({ boxItemCount: 3 }, read({ available: 0, canFill: 0 }))).toBe(false);
-    expect(boxSizeSellable({ boxItemCount: 3 }, read({ available: 0, canFill: null }))).toBe(false);
-    expect(boxSizeSellable({ boxItemCount: 3 }, read({ available: 24, canFill: 0 }))).toBe(false);
-    expect(boxSizeSellable({ boxItemCount: 3 }, read({}))).toBe(true);
-    expect(boxSizeSellable({ boxItemCount: 3 }, read({ available: null, canFill: null }))).toBe(true);
+  it("reads canFill only: sold out at zero, whatever available and backorderable say", () => {
+    expect(boxSizeSellable({ boxItemCount: 3 }, read({ canFill: 0 }))).toBe(false);
+    expect(boxSizeSellable({ boxItemCount: 3 }, read({ canFill: 0, available: 24 }))).toBe(false);
+    /* Before admin PR #156 the route's `available` read 0 for a box that can fill. */
+    expect(boxSizeSellable({ boxItemCount: 3 }, read({ canFill: 4, available: 0 }))).toBe(true);
+    expect(boxSizeSellable({ boxItemCount: 3 }, read({ canFill: 4, available: -2 }))).toBe(true);
   });
 
-  it("is never sellable without a count, whatever the stock says", () => {
+  it("is never sellable without a count", () => {
     expect(boxSizeSellable({ boxItemCount: null }, read({}))).toBe(false);
     expect(boxSizeSellable({}, null)).toBe(false);
   });
 
-  it("replaces the catalogue's sales cap with the live count once it lands", () => {
-    const shelf = { available: 24, backorderable: false };
-    expect(boxStock(shelf, null)).toBe(shelf);
-    expect(boxStock(shelf, read({ available: 1 }))).toEqual({ available: 1, backorderable: false });
+  it("caps the stepper at canFill once known, and is untracked before", () => {
+    expect(boxStock(null)).toEqual({ available: null, backorderable: false });
+    expect(boxStock(read({ canFill: 2, available: 0 }))).toEqual({ available: 2, backorderable: false });
+    expect(maxQtyFor(boxStock(read({ canFill: 2 })))).toBe(2);
   });
 
-  it("quick-adds the cheapest size that can be sold, or nothing", () => {
-    const sizes = [
-      { id: "big", priceMinor: 3000000, boxItemCount: 5 },
-      { id: "small", priceMinor: 1500000, boxItemCount: 3 },
-      { id: "unset", priceMinor: 1000000, boxItemCount: null },
-    ];
-    const none = () => null;
-    expect(boxQuickAddSize(sizes, none)?.id).toBe("small");
-    const smallOut = (id: string) => (id === "small" ? read({ available: 0, canFill: 0 }) : null);
-    expect(boxQuickAddSize(sizes, smallOut)?.id).toBe("big");
-    expect(boxQuickAddSize(sizes, () => read({ available: 0 }))).toBeNull();
-    expect(boxQuickAddSize([{ id: "unset", priceMinor: 1, boxItemCount: null }], none)).toBeNull();
+  it("quick-adds the box while it can be filled, and nothing when it cannot", () => {
+    const sizes = [{ id: "default", priceMinor: 1500000, boxItemCount: 3 }];
+    expect(boxQuickAddSize(sizes, () => null)?.id).toBe("default");
+    expect(boxQuickAddSize(sizes, () => read({ canFill: 0 }))).toBeNull();
+    expect(boxQuickAddSize([{ id: "default", priceMinor: 1, boxItemCount: null }], () => null)).toBeNull();
   });
 
   it("asks the same-origin proxy", () => {
-    expect(proxiedAvailabilityPath("var_a")).toBe("/api/variants/var_a/availability");
+    expect(proxiedAvailabilityPath("var_box")).toBe("/api/variants/var_box/availability");
   });
 });

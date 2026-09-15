@@ -80,35 +80,35 @@ export async function fetchVariantAvailability(
 }
 
 /**
- * Whether a box size can be put in a basket right now.
+ * Whether the box can be put in a basket right now.
  *
- * - No count: the pool is not set up, so it cannot be sold.
- * - No availability read yet (or it failed): BUYABLE. Checkout decides.
- * - Otherwise sold out at `available <= 0` or `canFill <= 0`, unless the
- *   variant is backorderable — the rule `maxQtyFor` already applies to stock.
+ * ═══ `canFill` DECIDES, NEVER THE BOX'S OWN STOCK ═══
+ * The box keeps no stock: it sits at zero or below with backorders on, so its
+ * `available` and `backorderable` say nothing. Before admin PR #156 the route's
+ * `available` was also clamped to that empty stock and read 0; `canFill` is
+ * right both before and after, so it is the only field read.
+ *
+ * - No item count: not set up, so it cannot be sold.
+ * - No read yet, the read failed, or an older API with no `canFill`: BUYABLE.
+ *   Checkout is the real authority.
+ * - Otherwise sold out at `canFill <= 0`.
  */
 export function boxSizeSellable(
   size: Pick<SizeOption, "boxItemCount">,
   availability: VariantAvailability | null | undefined,
 ): boolean {
   if (boxItemCountOf(size) === null) return false;
-  if (!availability) return true;
-  if (availability.backorderable) return true;
-  if (availability.canFill !== null && availability.canFill <= 0) return false;
-  if (availability.available !== null && availability.available <= 0) return false;
-  return true;
+  const canFill = availability?.canFill ?? null;
+  return canFill === null || canFill > 0;
 }
 
 /**
- * The shelf a box's stepper and "N left" copy read: the live, pool-aware count
- * in place of the catalogue's own sales cap. Unchanged until the read lands.
+ * The shelf the box's stepper and "Only N left" read: `canFill` boxes, never
+ * backorderable. Until a read lands, UNTRACKED (null), which is what
+ * `toProduct` already gives the box, since its own stock is meaningless.
  */
-export function boxStock(
-  catalogue: VariantStock | null | undefined,
-  availability: VariantAvailability | null | undefined,
-): VariantStock | null | undefined {
-  if (!availability) return catalogue;
-  return { available: availability.available, backorderable: availability.backorderable };
+export function boxStock(availability: VariantAvailability | null | undefined): VariantStock {
+  return { available: availability?.canFill ?? null, backorderable: false };
 }
 
 /**

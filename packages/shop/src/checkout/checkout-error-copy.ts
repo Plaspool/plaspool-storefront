@@ -103,9 +103,9 @@ export function shortfallBody(
        the same. */
     if (variantId !== undefined && boxVariantIds.has(variantId)) {
       if (available <= 0) {
-        return "This box has just sold out. Go back to the cart and remove it to continue.";
+        return "The mystery box has just sold out. Go back to the cart and remove it to continue.";
       }
-      return `Only ${available} more ${available === 1 ? "box like this is" : "boxes like this are"} available. Go back to the cart and lower the quantity to continue.`;
+      return `Only ${available} more ${available === 1 ? "box is" : "boxes are"} available. Go back to the cart and lower the quantity to continue.`;
     }
     /* `available` CAN BE ZERO — the stock went while they were checking out.
        "Only 0 left" is a sentence no shop should print; the item is gone and
