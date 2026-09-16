@@ -540,13 +540,19 @@ export function sizesFrom(variants: ApiVariant[]): SizeOption[] {
       compareMinor: number | null;
       currency: CurrencyCode;
       boxItemCount: number | null;
+      imageUrl: string | null;
     }
   >();
   for (const variant of variants) {
     if (!variant.price) continue;
     const label = sizeLabelOf(variant);
     const key = sizeIdOf(variant);
-    const grams = variant.weightGrams ?? gramsFrom(label);
+    /* ═══ A BOX'S WEIGHT IS THE STRUCTURED ONE OR NOTHING ═══
+       `gramsFrom` reads a label, and a box label is not a weight: "3 spools"
+       parses as 3 g and then prints beside the button. The admin sends
+       `weightGrams` for a box that has one (5000 for a 5kg box), so that is
+       the only figure a box may claim. */
+    const grams = variant.weightGrams ?? (variant.boxItemCount === undefined || variant.boxItemCount === null ? gramsFrom(label) : null);
     const existing = byLabel.get(key);
     if (existing) {
       /* THE COMPARE-AT TRAVELS WITH THE PRICE THAT WON. A size aggregates
@@ -564,6 +570,7 @@ export function sizesFrom(variants: ApiVariant[]): SizeOption[] {
       }
       existing.grams = existing.grams ?? grams;
       existing.boxItemCount = existing.boxItemCount ?? variant.boxItemCount ?? null;
+      existing.imageUrl = existing.imageUrl ?? variant.imageUrl ?? null;
     } else {
       byLabel.set(key, {
         label,
@@ -572,6 +579,7 @@ export function sizesFrom(variants: ApiVariant[]): SizeOption[] {
         compareMinor: variant.compareAtMinor ?? null,
         currency: currencyOf(variant.price.currency),
         boxItemCount: variant.boxItemCount ?? null,
+        imageUrl: variant.imageUrl ?? null,
       });
     }
   }
@@ -593,6 +601,8 @@ export function sizesFrom(variants: ApiVariant[]): SizeOption[] {
       compareAtMinor: s.compareMinor,
       currency: s.currency,
       boxItemCount: s.boxItemCount,
+      /* A BOX SIZE'S OWN PHOTOGRAPH. Only the box reads it — see `boxImageUrl`. */
+      boxImageUrl: imageUrl(s.imageUrl),
     }))
     .sort((a, b) => a.priceMinor - b.priceMinor);
 }
@@ -986,9 +996,7 @@ export function toProduct(api: ApiProduct, ctx: AdaptContext): Product | null {
        2026-09-15, with `boxMode: null`. The count means nothing off the box
        product, so it is dropped here rather than trusted downstream. */
     ? sizesFrom(variants).map((size) => ({ ...size, boxItemCount: null }))
-    /* A box size weighs nothing the shopper is buying by; `gramsFrom` would
-       otherwise read "3 spools" as 3 g and print it beside the label. */
-    : sizesFrom(variants).map((size) => ({ ...size, weightGrams: 0 }));
+    : sizesFrom(variants);
   if (!sizes.length) return null;
 
   /* A box's one "colour" has NO NAME, so every descriptor that joins colour
@@ -1008,7 +1016,13 @@ export function toProduct(api: ApiProduct, ctx: AdaptContext): Product | null {
     boxMode,
     /* Only the box has content; a stray value on an ordinary product is not
        rendered, for the same reason leftover `boxItemCount`s are dropped. */
-    mysteryBox: boxMode === null ? null : normaliseMysteryBox(api.mysteryBox),
+    mysteryBox:
+      boxMode === null
+        ? null
+        : normaliseMysteryBox(
+            api.mysteryBox,
+            variants.map((v) => v.id),
+          ),
     /* The API sends a display NAME; every route in this package is keyed by
        slug. Unknown names fall back to a slugified form so the product still
        has a category page to belong to rather than vanishing from the nav. */

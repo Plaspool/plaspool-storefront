@@ -11,7 +11,14 @@ import { fetchProductAddOns } from "../data/add-ons-api";
 import { setAddOnChoice } from "../data/checkout-api";
 import { useCart } from "../cart/cart-context";
 import { maxQtyFor, stockOf } from "../cart/stock";
-import { boxCuesOf, boxSizeSellable, boxStock, isMysteryBox } from "../data/mystery-box";
+import {
+  boxCuesOf,
+  boxSizeOptions,
+  boxSizeSellable,
+  boxStock,
+  isMysteryBox,
+  showBoxSizePicker,
+} from "../data/mystery-box";
 import { useBoxAvailability } from "../components/use-box-availability";
 import { Gallery } from "./gallery";
 import { BuyBox } from "./buy-box";
@@ -58,7 +65,13 @@ export function ProductBuySection({
 }: ProductBuySectionProps) {
   const [colourId, setColourId] = React.useState(() => firstInStockColour(product).id);
   const isBox = isMysteryBox(product);
-  const [sizeId, setSizeId] = React.useState(() => cheapestSize(product).id);
+  /* THE OWNER'S ORDER DECIDES THE DEFAULT on a box — their first size, not the
+     cheapest one. `boxSizeOptions` is also the only list a picker is built
+     from, so a size the admin no longer sells can never be selected. */
+  const boxSizes = React.useMemo(() => boxSizeOptions(product), [product]);
+  const [sizeId, setSizeId] = React.useState(
+    () => (isBox ? boxSizes[0]?.option.id : undefined) ?? cheapestSize(product).id,
+  );
   const [chosenQuantity, setQuantity] = React.useState(1);
 
   const colour = product.colours.find((c) => c.id === colourId) ?? product.colours[0];
@@ -66,8 +79,19 @@ export function ProductBuySection({
 
   /* The box's live, fillable stock — see `useBoxAvailability`. */
   const { availabilityOf: availabilityFor, refresh: refreshBox } = useBoxAvailability(product, colour.id);
-  /* The box has one variant, so one read and one answer. */
-  const soldOut = isBox ? !boxSizeSellable(size, availabilityFor(size.id)) : undefined;
+  /* ═══ EVERY SIZE IS READ, NOT ONLY THE ONE ON SCREEN ═══
+     The sizes share one shelf of spools, so selling a 10kg box lowers what the
+     5kg box can fill. A picker that only re-read the selected size would leave
+     the others' sold-out state as stale as the last selection. */
+  const selectedBox = boxSizes.find((entry) => entry.option.id === size.id) ?? null;
+  const boxChoices = boxSizes.map(({ box, option }) => ({
+    id: option.id,
+    label: box.size,
+    sellable: boxSizeSellable(box, availabilityFor(option.id)),
+  }));
+  const soldOut = isBox
+    ? !boxSizeSellable(selectedBox?.box ?? size, availabilityFor(size.id))
+    : undefined;
 
   /**
    * ═══ STOCK IS A PROPERTY OF THE VARIANT, SO IT MOVES WHEN THE PICKER DOES ═══
@@ -235,7 +259,11 @@ export function ProductBuySection({
             picker made of tinted drawings was the wrong left column. */}
         <Gallery
           name={product.name}
-          colour={colour}
+          /* A BOX SIZE HAS ITS OWN PHOTOGRAPH, and the gallery's picture is
+             keyed by colour. A box has one nameless colour, so the selected
+             size's photo is handed in as that colour's — and a size with none
+             falls through to the product's pictures exactly as before. */
+          colour={isBox ? { ...colour, imageUrl: size.boxImageUrl ?? colour.imageUrl } : colour}
           weightGrams={size.weightGrams}
           productCoverUrl={product.coverImageUrl}
           productImageUrls={product.imageUrls}
@@ -261,6 +289,9 @@ export function ProductBuySection({
             maxQty={maxQty}
             boxSellable={isBox ? !soldOut : undefined}
             boxCues={isBox ? boxCuesOf(availabilityFor(size.id)) : undefined}
+            /* An unnamed single size draws no picker — see `showBoxSizePicker`. */
+            boxChoices={isBox && showBoxSizePicker(boxSizes.map((entry) => entry.box)) ? boxChoices : undefined}
+            boxItemCount={selectedBox?.box.itemCount ?? null}
             onAdded={() => {
               /* An add can move the box's cues; re-read them. */
               if (isBox) refreshBox();

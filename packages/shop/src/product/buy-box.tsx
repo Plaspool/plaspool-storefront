@@ -16,7 +16,8 @@ import { RatingStars } from "../components/rating-stars";
 import { QuantityStepper } from "../components/quantity-stepper";
 import { BulkTierTable } from "../components/bulk-tier-table";
 import { NextTierHint } from "./next-tier-hint";
-import { BoxCues, BoxHowItWorks, BoxItemCountLine, BoxSize, MysteryBoxLabel, placeBoxCues } from "./mystery-box";
+import { BoxCues, BoxHowItWorks, BoxItemCountLine, BoxSizePicker, MysteryBoxLabel, placeBoxCues } from "./mystery-box";
+import type { BoxSizeChoice } from "./mystery-box";
 import { FeatureList } from "./feature-list";
 import { mysteryBoxOf } from "../data/mystery-box";
 import type { BoxCue } from "../data/mystery-box";
@@ -133,8 +134,13 @@ export interface BuyBoxProps {
    * box-ness once, through `isMysteryBox`.
    */
   boxSellable?: boolean;
-  /** The box's live cues, as the admin resolved them; empty until the first read. */
+  /** The box's live cues for the SELECTED size; empty until the first read. */
   boxCues?: BoxCue[];
+  /** The box's sizes, in the owner's order. Empty for a single unnamed size,
+   *  which draws no picker at all. */
+  boxChoices?: BoxSizeChoice[];
+  /** Items in every box of the selected size. */
+  boxItemCount?: number | null;
   className?: string;
 }
 
@@ -152,6 +158,8 @@ export function BuyBox({
   onAdded,
   boxSellable,
   boxCues,
+  boxChoices,
+  boxItemCount,
   className,
 }: BuyBoxProps) {
   const isBox = boxSellable !== undefined;
@@ -246,13 +254,14 @@ export function BuyBox({
       </div>
       )}
 
-      {/* ONE BOX, ONE PRICE: no option picker. The count is the promise, then
-          the urgency lines — replaced by the sold-out words when it is out. */}
-      {isBox && (
-        <BoxItemCountLine size={{ boxItemCount: boxContent?.itemCount ?? size.boxItemCount }} />
-      )}
+      {/* THE COUNT IS THE PROMISE, and it follows the size, as the price,
+          the photo and the cues do. The urgency lines sit under it, replaced
+          by the sold-out words when this size is out. */}
+      {isBox && <BoxItemCountLine size={{ itemCount: boxItemCount, boxItemCount: size.boxItemCount }} />}
       {isBox && !boxSoldOut && <BoxCues cues={cues.price} />}
-      {isBox && <BoxSize size={boxContent?.size ?? null} />}
+      {isBox && boxChoices && boxChoices.length > 0 && (
+        <BoxSizePicker choices={boxChoices} selectedId={size.id} onSelect={onSizeChange} />
+      )}
 
       {!isBox && showSizes && (
         <div>
