@@ -1,3 +1,21 @@
+/**
+ * The POST LIST's skeleton — and it lives in the `(list)` group so that it
+ * covers the list and nothing else.
+ *
+ * ═══ A `loading.tsx` IS A SUSPENSE BOUNDARY OVER EVERY CHILD SEGMENT ═══
+ * At `posts/` this file wrapped `[slug]` too, and that cost the blog its 404s:
+ * Next flushed this shell — status 200, headers gone — and only then resolved
+ * the page, so `notFound()` for a slug that does not exist arrived too late to
+ * change the status. `/posts/anything-at-all` answered 200 on the FIRST
+ * request, with `NEXT_HTTP_ERROR_FALLBACK;404` buried in the payload and the
+ * not-found UI never rendered. Crawlers were told every made-up URL was a page.
+ *
+ * It was also the wrong picture: six card placeholders and a filter row, drawn
+ * over an article nobody was listing.
+ *
+ * `/store/products/[slug]` never had this because the shop has no `loading.tsx`
+ * above it — which is why that route 404s correctly and this one did not.
+ */
 import { Section, Container, Prose } from "@plaspool/ui";
 
 export default function Loading() {
