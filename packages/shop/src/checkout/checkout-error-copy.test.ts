@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { errorCopy, retryWaitLabel } from "./checkout-error-copy";
+import { boxVariantIdsOf, errorCopy, retryWaitLabel } from "./checkout-error-copy";
 
 /**
  * The words a shopper reads when checkout refuses them.
@@ -325,7 +325,10 @@ describe("an answer to an add-on the shop is no longer offering", () => {
 });
 
 describe("a stock refusal on a mystery box", () => {
-  const boxes = new Set(["var_box"]);
+  const boxes = new Map([
+    ["var_box", null],
+    ["var_10kg", "10kg"],
+  ]);
   const refuse = (variantId: string, available: number) =>
     errorCopy(
       { code: "insufficient_stock", shortfalls: [{ variantId, requested: 2, available }] },
@@ -340,6 +343,16 @@ describe("a stock refusal on a mystery box", () => {
     expect(refuse("var_box", 3)).toContain("Only 3 more boxes are available.");
   });
 
+  it("names the size when the box has one", () => {
+    expect(refuse("var_10kg", 1)).toBe(
+      "Only 1 more 10kg box is available. Go back to the cart and lower the quantity to continue.",
+    );
+    expect(refuse("var_10kg", 2)).toContain("Only 2 more 10kg boxes are available.");
+    expect(refuse("var_10kg", 0)).toBe(
+      "That size has just sold out. Go back to the cart and remove it to continue.",
+    );
+  });
+
   it("says the box has just sold out at zero", () => {
     expect(refuse("var_box", 0)).toBe(
       "The mystery box has just sold out. Go back to the cart and remove it to continue.",
@@ -351,5 +364,41 @@ describe("a stock refusal on a mystery box", () => {
     expect(
       errorCopy({ code: "insufficient_stock", shortfalls: [{ variantId: "var_box", requested: 2, available: 1 }] }).body,
     ).toContain("only 1 is left");
+  });
+});
+
+describe("boxVariantIdsOf", () => {
+  const line = (over: object = {}) =>
+    ({
+      key: "k",
+      product: {
+        slug: "mystery-box",
+        boxMode: "auto",
+        variantIds: { "default:10kg": "var_10kg" },
+      },
+      colour: { id: "default" },
+      size: { id: "10kg", label: "10kg" },
+      qty: 1,
+      ...over,
+    }) as unknown as Parameters<typeof boxVariantIdsOf>[0][number];
+
+  it("maps a box line's variant to its size name", () => {
+    expect([...boxVariantIdsOf([line()])]).toEqual([["var_10kg", "10kg"]]);
+  });
+
+  it("carries null for a box with one unnamed size", () => {
+    const unnamed = line({
+      product: { slug: "mystery-box", boxMode: "auto", variantIds: { "default:default": "var_box" } },
+      size: { id: "default", label: "" },
+    });
+    expect([...boxVariantIdsOf([unnamed])]).toEqual([["var_box", null]]);
+  });
+
+  it("skips a line whose size no longer exists on the product, and ordinary lines", () => {
+    /* The size was removed in the admin: the catalogue has no variant for it,
+       so there is nothing to name and the refusal falls back to stock copy. */
+    expect([...boxVariantIdsOf([line({ size: { id: "5kg", label: "5kg" } })])]).toEqual([]);
+    expect([...boxVariantIdsOf([line({ product: { slug: "pla", boxMode: null, variantIds: {} } })])]).toEqual([]);
+    expect([...boxVariantIdsOf([])]).toEqual([]);
   });
 });

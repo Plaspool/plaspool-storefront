@@ -1,4 +1,4 @@
-import type { MysteryBoxContent, Product, SizeOption, VariantStock } from "./types";
+import type { MysteryBoxContent, MysteryBoxSize, Product, SizeOption, VariantStock } from "./types";
 
 /**
  * Mystery boxes: the one seam every box surface reads through.
@@ -16,14 +16,14 @@ export function isMysteryBox(product: Pick<Product, "boxMode">): boolean {
   return (product.boxMode ?? null) !== null;
 }
 
-/** Items in one box of this size, or null when the pool is not set up. */
-export function boxItemCountOf(size: Pick<SizeOption, "boxItemCount">): number | null {
-  const count = size.boxItemCount ?? null;
+/** Items in one box of this size, or null when the size is not set up. */
+export function boxItemCountOf(size: { boxItemCount?: number | null; itemCount?: number | null }): number | null {
+  const count = size.itemCount ?? size.boxItemCount ?? null;
   return typeof count === "number" && count > 0 ? count : null;
 }
 
 /** "3 surprise items in every box." — null when there is no count. */
-export function boxCountLine(size: Pick<SizeOption, "boxItemCount">): string | null {
+export function boxCountLine(size: { boxItemCount?: number | null; itemCount?: number | null }): string | null {
   const count = boxItemCountOf(size);
   if (count === null) return null;
   return `${count} surprise ${count === 1 ? "item" : "items"} in every box.`;
@@ -98,24 +98,80 @@ function parseBoxAvailability(value: unknown): BoxAvailability | null {
 }
 
 /**
- * `product.mysteryBox` off the wire, or null. Defaulted HERE so no component
- * writes its own `?? null`: a missing title reads "How it works", missing steps
- * read as none, and a blank size reads as no size.
+ * `product.mysteryBox` off the wire, or null.
+ *
+ * ═══ THE ONE SEAM WHERE THE SIZES ARE DECIDED ═══
+ * Defaulted HERE so no component writes its own `?? null`: a missing title
+ * reads "How it works", missing steps read as none, a blank size reads as the
+ * unnamed one.
+ *
+ * `sizes` ARRIVED AFTER `size`/`itemCount`, which are deprecated mirrors of its
+ * first entry. An API build that sends only the old pair is folded into a
+ * one-entry list against the first variant, so every surface above reads one
+ * shape and the page still works while a deploy is in flight.
  */
-export function normaliseMysteryBox(value: unknown): MysteryBoxContent | null {
+export function normaliseMysteryBox(value: unknown, variantIds: readonly string[] = []): MysteryBoxContent | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
   const how = (raw.howItWorks && typeof raw.howItWorks === "object" ? raw.howItWorks : {}) as Record<string, unknown>;
-  const size = typeof raw.size === "string" && raw.size.trim() ? raw.size.trim() : null;
   const title = typeof how.title === "string" && how.title.trim() ? how.title.trim() : "How it works";
   const steps = Array.isArray(how.steps)
     ? how.steps.filter((step): step is string => typeof step === "string" && step.trim() !== "").map((step) => step.trim())
     : [];
-  return {
-    size,
-    itemCount: typeof raw.itemCount === "number" && raw.itemCount > 0 ? raw.itemCount : null,
-    howItWorks: { title, steps },
-  };
+
+  const listed = Array.isArray(raw.sizes) ? raw.sizes.flatMap((entry) => boxSizeFrom(entry)) : null;
+  const fallback = boxSizeFrom({ variantId: variantIds[0], size: raw.size, itemCount: raw.itemCount });
+  return { sizes: listed ?? fallback, howItWorks: { title, steps } };
+}
+
+/** One `sizes` entry, or none when it names no variant to sell. */
+function boxSizeFrom(entry: unknown): MysteryBoxSize[] {
+  if (!entry || typeof entry !== "object") return [];
+  const raw = entry as Record<string, unknown>;
+  if (typeof raw.variantId !== "string" || !raw.variantId) return [];
+  return [
+    {
+      variantId: raw.variantId,
+      size: typeof raw.size === "string" && raw.size.trim() ? raw.size.trim() : null,
+      itemCount: typeof raw.itemCount === "number" && raw.itemCount > 0 ? raw.itemCount : null,
+    },
+  ];
+}
+
+/**
+ * The sizes to offer, each paired with the catalogue size that prices and
+ * pictures it — in the OWNER'S order, and only the ones still for sale.
+ *
+ * The join is by `variantId` through `variantIds`, never by position or label:
+ * a box's variants may outlive the sizes the owner sells, and a size the admin
+ * no longer lists must not reach a picker. An entry whose variant has no
+ * catalogue size (unpriced, inactive) is dropped for the same reason.
+ */
+export function boxSizeOptions(
+  product: Pick<Product, "boxMode" | "mysteryBox" | "sizes" | "colours" | "variantIds">,
+): Array<{ box: MysteryBoxSize; option: SizeOption }> {
+  const content = mysteryBoxOf(product);
+  if (!content) return [];
+  const colourId = product.colours[0]?.id ?? "default";
+  const byVariant = new Map<string, SizeOption>();
+  for (const option of product.sizes) {
+    const variantId = product.variantIds[`${colourId}:${option.id}`];
+    if (variantId && !byVariant.has(variantId)) byVariant.set(variantId, option);
+  }
+  return content.sizes.flatMap((box) => {
+    const option = byVariant.get(box.variantId);
+    return option ? [{ box, option }] : [];
+  });
+}
+
+/**
+ * Whether the picker is drawn at all. A single UNNAMED size is a box with one
+ * price and nothing to choose — a heading over one blank pill is the empty
+ * control the owner saw. A single NAMED size still draws, as one pressed
+ * button, because "5kg" is worth saying.
+ */
+export function showBoxSizePicker(sizes: readonly MysteryBoxSize[]): boolean {
+  return sizes.some((size) => size.size !== null);
 }
 
 /** The box's content from a product, defaulted: null for anything but the box. */
@@ -163,7 +219,7 @@ export async function fetchVariantAvailability(
  * - Otherwise sold out at `canFill <= 0`.
  */
 export function boxSizeSellable(
-  size: Pick<SizeOption, "boxItemCount">,
+  size: { boxItemCount?: number | null; itemCount?: number | null },
   availability: VariantAvailability | null | undefined,
 ): boolean {
   if (boxItemCountOf(size) === null) return false;

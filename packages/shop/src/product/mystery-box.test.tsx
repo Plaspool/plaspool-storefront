@@ -5,7 +5,7 @@ import {
   BoxCues,
   BoxHowItWorks,
   BoxItemCountLine,
-  BoxSize,
+  BoxSizePicker,
   MysteryBoxLabel,
   placeBoxCues,
 } from "./mystery-box";
@@ -43,15 +43,42 @@ describe("BoxItemCountLine", () => {
   });
 });
 
-describe("BoxSize", () => {
-  it("shows the owner's size as one pill under a heading", () => {
-    const html = render(<BoxSize size="Large" />);
-    expect(text(html)).toBe("Size Large");
-    expect(html).not.toContain("<button");
+describe("BoxSizePicker", () => {
+  const CHOICES = [
+    { id: "5kg", label: "5kg", sellable: true },
+    { id: "10kg", label: "10kg", sellable: true },
+  ];
+  const picker = (choices: typeof CHOICES, selectedId = "5kg") =>
+    render(<BoxSizePicker choices={choices} selectedId={selectedId} onSelect={() => {}} />);
+
+  it("renders the owner's sizes in order, with the selected one pressed", () => {
+    const html = picker(CHOICES);
+    expect(text(html)).toBe("Size 5kg 10kg");
+    expect(html.indexOf("5kg")).toBeLessThan(html.indexOf("10kg"));
+    expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);
+    expect(html).not.toContain("disabled");
   });
 
-  it("renders no section at all with no size", () => {
-    expect(render(<BoxSize size={null} />)).toBe("");
+  it("keeps a sold-out size visible, named and unselectable", () => {
+    const html = picker([CHOICES[0], { id: "10kg", label: "10kg", sellable: false }]);
+    expect(text(html)).toContain("10kg Sold out");
+    expect(html.match(/disabled=""/g)).toHaveLength(1);
+  });
+
+  it("keeps a sold-out size SELECTED when it is the one chosen", () => {
+    const html = picker([{ id: "5kg", label: "5kg", sellable: false }, CHOICES[1]], "5kg");
+    expect(text(html)).toContain("5kg Sold out");
+    expect(html).toContain('aria-pressed="true"');
+  });
+
+  it("renders one named size as a single pressed button", () => {
+    const html = picker([CHOICES[0]]);
+    expect(text(html)).toBe("Size 5kg");
+    expect(html.match(/<button/g)).toHaveLength(1);
+  });
+
+  it("renders nothing with no choices — the single unnamed size", () => {
+    expect(picker([])).toBe("");
   });
 });
 
