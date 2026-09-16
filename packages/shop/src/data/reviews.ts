@@ -82,7 +82,44 @@ export interface PublicReview {
   /** Always an array, empty when there are none. Approved replies only —
    *  including to their own author, which is why the reply form has to say so. */
   replies: ReviewReply[];
+  /**
+   * Customer photos, in the order the reviewer put them. Always an array on
+   * today's wire — and typed optional anyway, for the reason `threadReplies`
+   * spells out: a product page frozen in the incremental cache before photos
+   * shipped carries no such key. Read it through `reviewPhotos()`.
+   */
+  photos?: ReviewPhoto[];
 }
+
+/**
+ * One photo on an approved review.
+ *
+ * `url` IS RELATIVE and points at the API, which answers a `302` to a signed
+ * image URL. It is deliberately NOT routed through the storefront's own
+ * `/images/shop/<id>` proxy the way catalogue images are: that proxy serves
+ * `immutable`, and a photo must STOP being served the moment its review is
+ * rejected — the API answers `404` then, and an immutable copy would outlive it.
+ */
+export interface ReviewPhoto {
+  id: string;
+  url: string;
+  width: number | null;
+  height: number | null;
+}
+
+/** The photos on a review, tolerating a cached payload from before they existed. */
+export function reviewPhotos(review: Pick<PublicReview, "photos">): ReviewPhoto[] {
+  return Array.isArray(review.photos) ? review.photos : [];
+}
+
+/** A photo's `<img src>`: the API origin in front of the relative path. */
+export function reviewPhotoSrc(url: string): string {
+  if (/^https?:\/\//.test(url)) return url;
+  return `${COMMERCE_API_BASE}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+
+/** How many photos one review may carry. The API refuses a fifth. */
+export const MAX_REVIEW_PHOTOS = 4;
 
 /** One reply and the replies hanging off it. One level, then stop. */
 export interface ReplyNode {
@@ -293,16 +330,28 @@ export interface SubmitReviewInput {
   rating: number;
   title: string;
   body: string;
-  /* NO `authorName`/`authorEmail`. The API derives the author from the session
-     cookie and answers `401 {"error":"unauthenticated"}` without one. Sending
-     them would be the shopper's email crossing the wire to say something the
-     cookie already says — and nothing would stop it naming somebody else. */
+  /**
+   * The BYLINE, not the identity. The API still derives who wrote the review
+   * from the session (or the review link); this is only the name printed under
+   * it. It was never sent, and a customer with no display name on the account —
+   * most of them — got `400 detail:"authorName"` shown as "invalid". Omitted
+   * when blank, so the server can fall back to the first name on the order.
+   *
+   * THERE IS STILL NO `authorEmail`, and never will be: the server ignores it,
+   * and it would be the shopper's email crossing the wire for nothing.
+   */
+  authorName?: string;
+  /** Uploaded first by `uploadReviewPhoto`, sent in display order. */
+  photoIds?: string[];
+  /** The token from `/review?token=…`. Stands in for a session. */
+  reviewLink?: string;
 }
 
 export interface SubmitReviewResult {
   reviewId: string;
   status: string;
   sentiment: SentimentLabel;
+  photoCount?: number;
 }
 
 /**
@@ -322,6 +371,12 @@ export type SubmitError =
   | "already-reviewed"
   /** Reviews are for people who bought the thing. */
   | "purchase-required"
+  /** The review link is expired, tampered with, or for an unpaid order. */
+  | "review-link-invalid"
+  /** `400 detail:"authorName"` — no byline anywhere, typed or on the order. */
+  | "author-name"
+  /** `400 detail:"photoIds"` — an id that is not this reviewer's fresh upload. */
+  | "photo-ids"
   | "rate-limited"
   | "rejected"
   | "invalid"
@@ -560,6 +615,7 @@ export async function reviewEligibility(
 const FORBIDDEN_REASONS: Record<string, SubmitError | undefined> = {
   already_reviewed: "already-reviewed",
   purchase_required: "purchase-required",
+  review_link_invalid: "review-link-invalid",
 };
 
 /**
@@ -576,7 +632,21 @@ async function forbiddenReason(res: Response): Promise<SubmitError> {
   return mapped ?? "rejected";
 }
 
+/**
+ * Which `400` a submission is. `detail` names the field, and two of them are
+ * things the customer can fix from the form — so they get their own message
+ * rather than the old blanket "invalid", which told a nameless account to
+ * "check the fields" when there was no field to check.
+ */
+async function badRequestKind(res: Response): Promise<SubmitError> {
+  const body = (await res.json().catch(() => ({}))) as { detail?: string };
+  if (body.detail === "authorName") return "author-name";
+  if (body.detail === "photoIds") return "photo-ids";
+  return "invalid";
+}
+
 export async function submitReview(input: SubmitReviewInput): Promise<SubmitReviewResult> {
+  const authorName = input.authorName?.trim();
   let res: Response;
   try {
     res = await fetch(`${COMMERCE_API_BASE}/api/shop/reviews/submit`, {
@@ -594,6 +664,9 @@ export async function submitReview(input: SubmitReviewInput): Promise<SubmitRevi
            an untouched field is omitted rather than sent blank. */
         ...(input.title.trim() ? { title: input.title.trim() } : {}),
         body: input.body.trim(),
+        ...(authorName ? { authorName } : {}),
+        ...(input.photoIds && input.photoIds.length > 0 ? { photoIds: input.photoIds } : {}),
+        ...(input.reviewLink ? { reviewLink: input.reviewLink } : {}),
       }),
     });
   } catch {
@@ -609,7 +682,158 @@ export async function submitReview(input: SubmitReviewInput): Promise<SubmitRevi
   if (res.status === 401) throw new ReviewSubmitError("signed-out");
   if (res.status === 429) throw new ReviewSubmitError("rate-limited");
   if (res.status === 403) throw new ReviewSubmitError(await forbiddenReason(res));
-  if (res.status === 400 || res.status === 422) throw new ReviewSubmitError("invalid");
+  if (res.status === 400 || res.status === 422) {
+    throw new ReviewSubmitError(await badRequestKind(res));
+  }
   if (!res.ok) throw new ReviewSubmitError("failed");
   return (await res.json()) as SubmitReviewResult;
+}
+
+/* ─── Review photos ─────────────────────────────────────────────────────── */
+
+export type PhotoUploadError =
+  | "signed-out"
+  | "review-link-invalid"
+  /** `400 detail:"file_type"`, or a picture this browser could not decode. */
+  | "file-type"
+  | "file-too-large"
+  /** Missing, empty or damaged. */
+  | "file"
+  /** Uploads are not configured on that environment. Nobody can fix it here. */
+  | "storage"
+  | "rate-limited"
+  | "failed";
+
+export class ReviewPhotoUploadError extends Error {
+  constructor(
+    readonly kind: PhotoUploadError,
+    /** Seconds, from `retry-after`, when the API sent one. */
+    readonly retryAfter: number | null = null,
+  ) {
+    super(kind);
+    this.name = "ReviewPhotoUploadError";
+  }
+}
+
+export interface UploadedReviewPhoto {
+  photoId: string;
+  width: number | null;
+  height: number | null;
+}
+
+const UPLOAD_DETAILS: Record<string, PhotoUploadError | undefined> = {
+  file_type: "file-type",
+  file_too_large: "file-too-large",
+  file: "file",
+  storage: "storage",
+};
+
+/**
+ * Upload ONE photo, before the review exists. The returned id goes into
+ * `photoIds` on submit; a photo uploaded and then removed from the form is
+ * simply never referenced — there is nothing to delete.
+ *
+ * NO `content-type` HEADER, on purpose: `FormData` needs the browser to write
+ * the multipart boundary, and setting the header by hand drops it.
+ *
+ * The caller re-encodes first (see `prepareReviewPhoto`) — that is what keeps
+ * a phone photo the right way up once the server strips its EXIF.
+ */
+export async function uploadReviewPhoto(
+  photo: Blob,
+  options: { reviewLink?: string; filename?: string } = {},
+): Promise<UploadedReviewPhoto> {
+  const form = new FormData();
+  form.append("file", photo, options.filename ?? "photo.jpg");
+  if (options.reviewLink) form.append("reviewLink", options.reviewLink);
+
+  let res: Response;
+  try {
+    res = await fetch(`${COMMERCE_API_BASE}/api/shop/reviews/photos`, {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+  } catch {
+    throw new ReviewPhotoUploadError("failed");
+  }
+
+  if (res.status === 401) throw new ReviewPhotoUploadError("signed-out");
+  if (res.status === 403) throw new ReviewPhotoUploadError("review-link-invalid");
+  if (res.status === 429) {
+    const seconds = Number(res.headers?.get("retry-after"));
+    throw new ReviewPhotoUploadError(
+      "rate-limited",
+      Number.isFinite(seconds) && seconds > 0 ? seconds : null,
+    );
+  }
+  if (res.status === 400 || res.status === 413) {
+    const body = (await res.json().catch(() => ({}))) as { detail?: string };
+    const mapped = body.detail ? UPLOAD_DETAILS[body.detail] : undefined;
+    throw new ReviewPhotoUploadError(
+      mapped ?? (res.status === 413 ? "file-too-large" : "file"),
+    );
+  }
+  if (!res.ok) throw new ReviewPhotoUploadError("failed");
+
+  const body = (await res.json()) as {
+    photoId: string;
+    width?: number | null;
+    height?: number | null;
+  };
+  return { photoId: body.photoId, width: body.width ?? null, height: body.height ?? null };
+}
+
+/* ─── Review links ──────────────────────────────────────────────────────── */
+
+export interface ReviewLinkProduct {
+  slug: string;
+  title: string;
+  /** Relative to the API origin; read it through `imageUrl()`. */
+  imageUrl: string | null;
+  reviewed: boolean;
+}
+
+export interface ReviewLink {
+  orderNumber: string;
+  firstName: string | null;
+  /** Epoch milliseconds. */
+  expiresAt: number;
+  products: ReviewLinkProduct[];
+}
+
+export type ReviewLinkResult =
+  | { kind: "ok"; link: ReviewLink }
+  /** Expired, tampered with, or for an unpaid or cancelled order. */
+  | { kind: "invalid" }
+  /** The API could not be reached. NOT the same sentence as "invalid". */
+  | { kind: "failed" };
+
+/**
+ * What a review link from the admin covers — the order and its products.
+ *
+ * ═══ NEVER CACHED, ANYWHERE ═══
+ * The API answers `no-store` and so does this: the answer is one customer's
+ * order, keyed by a bearer token, and each product's `reviewed` changes the
+ * moment they submit. A cached copy would be somebody's order on somebody
+ * else's screen, or a form offered for a review already written.
+ *
+ * NEVER THROWS. A `403` is the link being bad; anything else that is not a
+ * `200` is the service being unavailable, and those are different pages — "ask
+ * us for a new link" is the wrong thing to tell somebody whose link is fine.
+ */
+export async function getReviewLink(token: string): Promise<ReviewLinkResult> {
+  if (!token) return { kind: "invalid" };
+  try {
+    const url = new URL(`${COMMERCE_API_BASE}/api/shop/reviews/link`);
+    url.searchParams.set("token", token);
+    const res = await fetch(url, { cache: "no-store" });
+    if (res.status === 400 || res.status === 403) return { kind: "invalid" };
+    if (!res.ok) return { kind: "failed" };
+    const link = (await res.json()) as ReviewLink;
+    if (!Array.isArray(link?.products)) return { kind: "failed" };
+    return { kind: "ok", link };
+  } catch {
+    return { kind: "failed" };
+  }
 }

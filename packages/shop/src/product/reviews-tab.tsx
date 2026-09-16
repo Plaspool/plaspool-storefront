@@ -5,7 +5,8 @@ import { MessageSquareText } from "lucide-react";
 import { Skeleton, SkeletonText, cn } from "@plaspool/ui";
 
 import { REVIEWS_PER_PAGE } from "../data/config";
-import { listReviewsFromBrowser, starsFromAggregate } from "../data/reviews";
+import { listReviewsFromBrowser, reviewPhotos, starsFromAggregate } from "../data/reviews";
+import { ReviewPhotoStrip } from "./review-photos";
 import { myReactions, reviewEligibility, setReaction } from "../data/reviews";
 import { ReviewReplies } from "./review-replies";
 import { ReviewReactions } from "./review-reactions";
@@ -116,6 +117,12 @@ function ReviewCard({
       <p className="mt-3 whitespace-pre-line text-sm leading-6 text-muted-foreground">
         {review.body}
       </p>
+
+      <ReviewPhotoStrip
+        photos={reviewPhotos(review)}
+        authorName={review.authorName}
+        className="mt-3"
+      />
 
       <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
         <span className="text-foreground">{review.authorName}</span>

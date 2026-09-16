@@ -14,7 +14,7 @@ import { CookieBanner, GoogleAnalytics } from "@plaspool/web";
 import { siteConfig } from "@plaspool/brand";
 
 import { Inter as FontSans, JetBrains_Mono, Spectral } from "next/font/google";
-import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
+import { VercelAnalytics } from "../components/vercel-analytics";
 import Script from "next/script";
 
 import type { Metadata } from "next";

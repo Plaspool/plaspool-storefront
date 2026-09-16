@@ -57,14 +57,54 @@ describe("submitReview", () => {
 
   /* THE EMAIL MUST NOT LEAVE THE ACCOUNT. The form stopped asking for it; this
      is the other half — the browser stops sending it. */
-  it("sends no author name and no author email", async () => {
+  it("sends no author email", async () => {
     const spy = stub(200, { reviewId: "rev_1", status: "pending", sentiment: "neutral" });
-    await submitReview(INPUT);
+    await submitReview({ ...INPUT, authorName: "Ada" });
     const [, init] = spy.mock.calls[0] as unknown as [string, RequestInit];
     const sent = JSON.parse(String(init.body)) as Record<string, unknown>;
-    expect(sent).not.toHaveProperty("authorName");
     expect(sent).not.toHaveProperty("authorEmail");
     expect(JSON.stringify(sent)).not.toMatch(/@/);
+  });
+
+  /* ═══ THE BYLINE IS SENT WHEN TYPED, AND OMITTED WHEN BLANK ═══
+     Never sending it gave every account without a display name a 400 shown as
+     "invalid". Blank is omitted so the server falls back to the order's name. */
+  it("sends a typed byline, trimmed, and omits a blank one", async () => {
+    const spy = stub(201, { reviewId: "rev_1", status: "pending", sentiment: "neutral" });
+    await submitReview({ ...INPUT, authorName: "  Ada  " });
+    await submitReview({ ...INPUT, authorName: "   " });
+    const bodies = spy.mock.calls.map(
+      (call) => JSON.parse(String((call as unknown as [string, RequestInit])[1].body)) as Record<string, unknown>,
+    );
+    expect(bodies[0]).toMatchObject({ authorName: "Ada" });
+    expect(bodies[1]).not.toHaveProperty("authorName");
+  });
+
+  it("sends photo ids in order and the review link, and omits them when absent", async () => {
+    const spy = stub(201, { reviewId: "rev_1", status: "pending", sentiment: "neutral" });
+    await submitReview({ ...INPUT, photoIds: ["rvp_b", "rvp_a"], reviewLink: "tok.sig" });
+    await submitReview({ ...INPUT, photoIds: [] });
+    const bodies = spy.mock.calls.map(
+      (call) => JSON.parse(String((call as unknown as [string, RequestInit])[1].body)) as Record<string, unknown>,
+    );
+    expect(bodies[0]).toMatchObject({ photoIds: ["rvp_b", "rvp_a"], reviewLink: "tok.sig" });
+    expect(bodies[1]).not.toHaveProperty("photoIds");
+    expect(bodies[1]).not.toHaveProperty("reviewLink");
+  });
+
+  /* ═══ NOT EVERY 400 IS "INVALID" ═══ `detail` names what to fix. */
+  it("reads the 400's detail", async () => {
+    stub(400, { error: "bad_request", detail: "authorName" });
+    await expect(submitReview(INPUT)).rejects.toMatchObject({ kind: "author-name" });
+    stub(400, { error: "bad_request", detail: "photoIds" });
+    await expect(submitReview(INPUT)).rejects.toMatchObject({ kind: "photo-ids" });
+    stub(400, { error: "bad_request", detail: "body" });
+    await expect(submitReview(INPUT)).rejects.toMatchObject({ kind: "invalid" });
+  });
+
+  it("tells an invalid review link apart from other refusals", async () => {
+    stub(403, { error: "forbidden", reason: "review_link_invalid" });
+    await expect(submitReview(INPUT)).rejects.toMatchObject({ kind: "review-link-invalid" });
   });
 
   it("still sends what a review actually is", async () => {
