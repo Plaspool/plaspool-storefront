@@ -41,9 +41,34 @@ export function GoogleAnalytics() {
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}
           gtag('js', new Date());
-          gtag('config', '${GA_ID}');
+          /* A review link carries a bearer token in ?token=, and it must not
+             reach a page view. Stripped from the recorded location only when
+             present, so every other page is configured exactly as before. */
+          var pageUrl = new URL(window.location.href);
+          if (pageUrl.searchParams.has('token')) {
+            pageUrl.searchParams.delete('token');
+            gtag('config', '${GA_ID}', { page_location: pageUrl.href });
+          } else {
+            gtag('config', '${GA_ID}');
+          }
         `}
       </Script>
     </>
   );
+}
+
+/**
+ * A URL with any `token` query parameter removed. `/review?token=…` carries a
+ * bearer credential for one customer's order, and no analytics event may
+ * record it.
+ */
+export function scrubTokenParam(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (!parsed.searchParams.has("token")) return url;
+    parsed.searchParams.delete("token");
+    return parsed.toString();
+  } catch {
+    return url;
+  }
 }

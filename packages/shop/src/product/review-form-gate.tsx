@@ -99,7 +99,12 @@ export function ReviewFormGate({
      may review is ITS rule — and a second copy of it here would eventually
      refuse somebody the server would have accepted. */
   return (
-    <ReviewForm productSlug={productSlug} productName={productName} className={className} />
+    <ReviewForm
+      productSlug={productSlug}
+      productName={productName}
+      signInHref={signInHref}
+      className={className}
+    />
   );
 }
 

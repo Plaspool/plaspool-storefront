@@ -1,11 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { MessageSquareText } from "lucide-react";
+import { BadgeCheck, MessageSquareText } from "lucide-react";
 import { Skeleton, SkeletonText, cn } from "@plaspool/ui";
 
 import { REVIEWS_PER_PAGE } from "../data/config";
-import { listReviewsFromBrowser, starsFromAggregate } from "../data/reviews";
+import { listReviewsFromBrowser, reviewPhotos, starsFromAggregate } from "../data/reviews";
+import { ReviewPhotoStrip } from "./review-photos";
 import { myReactions, reviewEligibility, setReaction } from "../data/reviews";
 import { ReviewReplies } from "./review-replies";
 import { ReviewReactions } from "./review-reactions";
@@ -82,6 +83,16 @@ const DATE_FORMAT = new Intl.DateTimeFormat("en-NG", {
   timeZone: "UTC",
 });
 
+/** Shown only for `verifiedPurchase === true` — see `PublicReview`. */
+export function VerifiedPurchaseBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 font-semibold text-foreground">
+      <BadgeCheck aria-hidden="true" className="h-3.5 w-3.5 text-brand" />
+      Verified purchase
+    </span>
+  );
+}
+
 function ReviewCard({
   review,
   viewerReaction,
@@ -117,8 +128,15 @@ function ReviewCard({
         {review.body}
       </p>
 
+      <ReviewPhotoStrip
+        photos={reviewPhotos(review)}
+        authorName={review.authorName}
+        className="mt-3"
+      />
+
       <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
         <span className="text-foreground">{review.authorName}</span>
+        {review.verifiedPurchase === true && <VerifiedPurchaseBadge />}
         <span aria-hidden="true">·</span>
         <time dateTime={date.toISOString()} className="font-mono tabular-nums">
           {DATE_FORMAT.format(date)}
