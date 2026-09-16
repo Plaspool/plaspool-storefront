@@ -54,6 +54,11 @@ const MESSAGES: Record<SubmitError, string> = {
   "purchase-required":
     "Replies come from shoppers who have bought the spool. Once your order is paid, you can join in here.",
   rejected: "We could not accept a reply from this page. Please try again later.",
+  /* Submit-only refusals, generic here for the reason `already-reviewed` is:
+     replies carry no review link, no photos, and no typed byline. */
+  "review-link-invalid": "We could not accept a reply from this page. Please try again later.",
+  "author-name": "Something in the reply was not accepted. Check it and try again.",
+  "photo-ids": "Something in the reply was not accepted. Check it and try again.",
   invalid: "Something in the reply was not accepted. Check it and try again.",
   failed: "The reply could not be sent. Check your connection and try again.",
 };

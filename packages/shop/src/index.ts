@@ -110,6 +110,8 @@ export * from "./product/description-tab";
 export * from "./product/parameters-tab";
 export * from "./product/reviews-tab";
 export * from "./product/review-form";
+export { ReviewPhotoStrip } from "./product/review-photos";
+export { ReviewLinkPage, reviewLinkMetadata } from "./review-link/review-link-page";
 export * from "./product/order-info";
 
 // The buy side of the product page. `ProductBuySection` is the one that
