@@ -79,6 +79,12 @@ export interface PublicReview {
    * denominator does not exist on this side and inventing one misrepresents it.
    */
   helpfulCount: number;
+  /**
+   * The server matched this review to a paid order. Badge only when `true`;
+   * `false` and absent (a payload cached before the field existed) show
+   * nothing — the absence of a badge is not a claim the review is unverified.
+   */
+  verifiedPurchase?: boolean;
   /** Always an array, empty when there are none. Approved replies only —
    *  including to their own author, which is why the reply form has to say so. */
   replies: ReviewReply[];
