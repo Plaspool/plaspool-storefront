@@ -52,6 +52,12 @@ export interface SizeOption {
    * `boxItemCountOf` in `mystery-box.ts` is the one reader.
    */
   boxItemCount?: number | null;
+  /**
+   * A BOX SIZE'S OWN PHOTOGRAPH, absolute, or null when that size has none and
+   * the product's pictures stand in. Only a box sets it: an ordinary size
+   * aggregates colours, and the picture belongs to the colour there.
+   */
+  boxImageUrl?: string | null;
 }
 
 /**
@@ -68,16 +74,31 @@ export type BoxMode = "pack" | "built" | "auto";
  * the wire shape.
  */
 export interface MysteryBoxContent {
-  /** "Large", or null for no size section at all. */
-  size: string | null;
-  /** Items in every box; the same number as the variant's `boxItemCount`. */
-  itemCount: number | null;
+  /**
+   * THE SIZES, IN THE OWNER'S ORDER, and the only list a picker may be built
+   * from. A box's own `variants` can hold more than the owner is selling; a
+   * size removed in the admin leaves neither. Never empty on a box on sale.
+   *
+   * One entry with `size: null` is a box with a single unnamed size, which
+   * renders NO size section at all.
+   */
+  sizes: MysteryBoxSize[];
   howItWorks: {
     /** Never empty; "How it works" unless the owner changed it. */
     title: string;
     /** 0..8 sentences in order. Empty hides the section. */
     steps: string[];
   };
+}
+
+/** One box size the owner is selling. */
+export interface MysteryBoxSize {
+  /** The variant to price, picture, check availability for and add to the cart. */
+  variantId: string;
+  /** "5kg"; null only when the box has ONE unnamed size. */
+  size: string | null;
+  /** Items in every box of this size. */
+  itemCount: number | null;
 }
 
 /** A quantity ladder. `minQty` ascending, no duplicates. */

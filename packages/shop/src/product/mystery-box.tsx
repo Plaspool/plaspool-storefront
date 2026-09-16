@@ -2,7 +2,6 @@ import * as React from "react";
 import { Gift } from "lucide-react";
 import { cn } from "@plaspool/ui";
 
-import type { SizeOption } from "../data/types";
 import { boxCountLine } from "../data/mystery-box";
 import type { BoxCue } from "../data/mystery-box";
 
@@ -65,19 +64,67 @@ export function BoxHowItWorks({
   );
 }
 
+export interface BoxSizeChoice {
+  /** The owner's name for this size, or null for the single unnamed one. */
+  label: string | null;
+  /** The catalogue size it selects, whose id is this button's value. */
+  id: string;
+  /** False when this size cannot be filled, or has no item count set up. */
+  sellable: boolean;
+}
+
 /**
- * The box's size, from `mysteryBox.size`. One pill, never a picker: there is
- * only ever one box. No size renders NOTHING, not a heading over an empty pill,
- * which is what shoppers saw when the size came from a blank option value.
+ * The box's sizes, in the owner's order.
+ *
+ * A SOLD-OUT SIZE STAYS VISIBLE, named and unselectable, so a shopper can see
+ * the size exists and that it is gone. "Sold out" is spelled beside it, never
+ * carried by colour alone. Nothing here decides sold-out-ness — see
+ * `boxSizeSellable`; nothing here reorders, either.
  */
-export function BoxSize({ size, className }: { size: string | null; className?: string }) {
-  if (size === null) return null;
+export function BoxSizePicker({
+  choices,
+  selectedId,
+  onSelect,
+  className,
+}: {
+  choices: BoxSizeChoice[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+  className?: string;
+}) {
+  const labelId = React.useId();
+  if (choices.length === 0) return null;
   return (
     <div className={className}>
-      <p className="text-sm font-semibold text-foreground">Size</p>
-      <p className="mt-2 inline-flex rounded-lg border border-brand bg-brand-soft px-3 py-2 text-sm text-foreground">
-        {size}
+      <p id={labelId} className="text-sm font-semibold text-foreground">
+        Size
       </p>
+      <div role="group" aria-labelledby={labelId} className="mt-2 flex flex-wrap gap-2">
+        {choices.map(({ id, label, sellable }) => {
+          const active = id === selectedId;
+          return (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={active}
+              disabled={!sellable}
+              onClick={() => onSelect(id)}
+              className={cn(
+                "inline-flex items-baseline gap-2 rounded-lg border px-3 py-2 transition-colors motion-reduce:transition-none",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                !sellable
+                  ? "cursor-not-allowed border-dashed border-brand-line text-muted-foreground"
+                  : active
+                    ? "border-brand bg-brand-soft text-foreground"
+                    : "border-brand-line text-muted-foreground hover:border-foreground hover:text-foreground",
+              )}
+            >
+              <span className={cn("text-sm", !sellable && "line-through")}>{label}</span>
+              {!sellable && <span className="text-xs">Sold out</span>}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -91,7 +138,7 @@ export function BoxItemCountLine({
   size,
   className,
 }: {
-  size: Pick<SizeOption, "boxItemCount">;
+  size: { boxItemCount?: number | null; itemCount?: number | null };
   className?: string;
 }) {
   const line = boxCountLine(size);

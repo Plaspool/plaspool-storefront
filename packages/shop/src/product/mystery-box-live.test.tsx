@@ -2,9 +2,18 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { toProduct, type AdaptContext, type ApiProduct } from "../data/api";
-import { boxCuesOf, boxSizeSellable, boxStock, isMysteryBox, mysteryBoxOf, parseAvailability } from "../data/mystery-box";
+import {
+  boxCuesOf,
+  boxSizeOptions,
+  boxSizeSellable,
+  boxStock,
+  isMysteryBox,
+  mysteryBoxOf,
+  parseAvailability,
+  showBoxSizePicker,
+} from "../data/mystery-box";
 import { maxQtyFor, stockOf } from "../cart/stock";
-import { BoxCues, BoxHowItWorks, BoxItemCountLine, BoxSize, placeBoxCues } from "./mystery-box";
+import { BoxCues, BoxHowItWorks, BoxItemCountLine, BoxSizePicker, placeBoxCues } from "./mystery-box";
 import { FeatureList } from "./feature-list";
 import { BulkTierTable } from "../components/bulk-tier-table";
 
@@ -38,7 +47,8 @@ const LIVE_PRODUCT = {
   imageUrls: [],
   bulkTiers: [],
   mysteryBox: {
-    size: null,
+    sizes: [{ variantId: "var_mu321xuy8e1debaea68c4465", size: "Large", itemCount: 1 }],
+    size: "Large",
     itemCount: 1,
     howItWorks: {
       title: "How it works",
@@ -57,7 +67,7 @@ const LIVE_PRODUCT = {
       weightGrams: null,
       status: "active",
       colorHex: null,
-      optionValues: {},
+      optionValues: { Size: "Large" },
       boxItemCount: 1,
       price: { amount: 20000000, currency: "NGN" },
       available: 0,
@@ -89,21 +99,35 @@ describe("the live mystery box, 2026-09-15 21:04 UTC", () => {
   const content = mysteryBoxOf(product)!;
   const [size] = product.sizes;
 
-  it("is the box, with one unlabelled size at ₦200,000 and its overview as sent", () => {
+  it("is the box, with one size named Large at ₦200,000 and its overview as sent", () => {
     expect(isMysteryBox(product)).toBe(true);
     expect(product.sizes).toHaveLength(1);
-    expect(size.label).toBe("");
+    expect(size.label).toBe("Large");
     expect(size.priceMinor).toBe(20000000);
     expect(product.overview).toBe("🔮 What's Inside?");
   });
 
-  it("renders no size section: the size is null", () => {
-    expect(content.size).toBeNull();
-    expect(renderToStaticMarkup(<BoxSize size={content.size} />)).toBe("");
+  it("offers that one named size, matched to its variant", () => {
+    const offered = boxSizeOptions(product);
+    expect(offered.map((entry) => [entry.box.size, entry.box.variantId, entry.option.id])).toEqual([
+      ["Large", "var_mu321xuy8e1debaea68c4465", "large"],
+    ]);
+    expect(showBoxSizePicker(content.sizes)).toBe(true);
+    expect(
+      text(
+        renderToStaticMarkup(
+          <BoxSizePicker
+            choices={[{ id: "large", label: "Large", sellable: true }]}
+            selectedId="large"
+            onSelect={() => {}}
+          />,
+        ),
+      ),
+    ).toBe("Size Large");
   });
 
   it("renders the singular count line", () => {
-    expect(text(renderToStaticMarkup(<BoxItemCountLine size={{ boxItemCount: content.itemCount }} />))).toBe(
+    expect(text(renderToStaticMarkup(<BoxItemCountLine size={{ itemCount: content.sizes[0].itemCount }} />))).toBe(
       "1 surprise item in every box.",
     );
   });

@@ -3,8 +3,11 @@ import type { AddressMode } from "../data/delivery-config";
 import { isMysteryBox } from "../data/mystery-box";
 import type { ResolvedLine } from "../cart/types";
 
-/** Which variant ids in the basket are mystery boxes. See `boxVariantIdsOf`. */
-export type BoxVariantIds = ReadonlySet<string>;
+/**
+ * The basket's mystery-box lines: variant id → the size's name, or null for a
+ * box with one unnamed size. See `boxVariantIdsOf`.
+ */
+export type BoxVariantIds = ReadonlyMap<string, string | null>;
 
 /**
  * The basket's mystery-box variant ids, looked up through the catalogue entry
@@ -12,11 +15,14 @@ export type BoxVariantIds = ReadonlySet<string>;
  * else, so the cart is the only place that knows whether it is a box.
  */
 export function boxVariantIdsOf(lines: readonly ResolvedLine[]): BoxVariantIds {
-  const ids = new Set<string>();
+  const ids = new Map<string, string | null>();
   for (const line of lines) {
     if (!isMysteryBox(line.product)) continue;
     const id = line.product.variantIds[`${line.colour.id}:${line.size.id}`];
-    if (id) ids.add(id);
+    /* THE SIZE'S OWN NAME, so the refusal can say WHICH box sold out — a
+       basket may hold two sizes of one box. An unnamed size carries null, and
+       the copy then says "box" rather than naming something that has no name. */
+    if (id) ids.set(id, line.size.label || null);
   }
   return ids;
 }
@@ -82,7 +88,7 @@ export function retryWaitLabel(retryAfter: number | null): string {
  */
 export function shortfallBody(
   shortfalls: { variantId?: string; requested: number; available: number }[],
-  boxVariantIds: BoxVariantIds = new Set(),
+  boxVariantIds: BoxVariantIds = new Map(),
 ): string {
   /* A refusal with no detail is still a refusal, and it must not render as
      "0 items". The API always sends at least one, so this is the shape-changed
@@ -102,10 +108,14 @@ export function shortfallBody(
        sentence talks about boxes. The instruction — lower it or remove it — is
        the same. */
     if (variantId !== undefined && boxVariantIds.has(variantId)) {
+      const sizeName = boxVariantIds.get(variantId) ?? null;
+      const box = sizeName ? `${sizeName} box` : "box";
       if (available <= 0) {
-        return "The mystery box has just sold out. Go back to the cart and remove it to continue.";
+        return sizeName
+          ? `That size has just sold out. Go back to the cart and remove it to continue.`
+          : "The mystery box has just sold out. Go back to the cart and remove it to continue.";
       }
-      return `Only ${available} more ${available === 1 ? "box is" : "boxes are"} available. Go back to the cart and lower the quantity to continue.`;
+      return `Only ${available} more ${available === 1 ? `${box} is` : `${box}es are`} available. Go back to the cart and lower the quantity to continue.`;
     }
     /* `available` CAN BE ZERO — the stock went while they were checking out.
        "Only 0 left" is a sentence no shop should print; the item is gone and

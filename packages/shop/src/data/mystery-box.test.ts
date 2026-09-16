@@ -6,6 +6,7 @@ import {
   boxCuesOf,
   boxItemCountOf,
   boxQuickAddSize,
+  boxSizeOptions,
   boxSizeSellable,
   boxStock,
   isMysteryBox,
@@ -13,6 +14,7 @@ import {
   normaliseMysteryBox,
   parseAvailability,
   proxiedAvailabilityPath,
+  showBoxSizePicker,
 } from "./mystery-box";
 import { maxQtyFor, stockOf } from "../cart/stock";
 
@@ -212,14 +214,13 @@ describe("availability", () => {
 
 describe("the box's admin-written content", () => {
   const CONTENT = {
-    size: "Large",
-    itemCount: 3,
+    sizes: [{ variantId: "var_box", size: "Large", itemCount: 3 }],
     howItWorks: { title: "How it works", steps: ["One.", "Two."] },
   };
 
   it("is carried onto the box product", () => {
     expect(toProduct(box({ mysteryBox: CONTENT }), ctx)!.mysteryBox).toEqual(CONTENT);
-    expect(mysteryBoxOf(toProduct(box({ mysteryBox: CONTENT }), ctx)!)?.size).toBe("Large");
+    expect(mysteryBoxOf(toProduct(box({ mysteryBox: CONTENT }), ctx)!)?.sizes[0].size).toBe("Large");
   });
 
   it("is null on an ordinary product, even if a stray value arrives", () => {
@@ -235,11 +236,10 @@ describe("the box's admin-written content", () => {
 
   it("defaults a missing title, missing steps and a blank size", () => {
     expect(normaliseMysteryBox({ size: "  ", howItWorks: {} })).toEqual({
-      size: null,
-      itemCount: null,
+      sizes: [],
       howItWorks: { title: "How it works", steps: [] },
     });
-    expect(normaliseMysteryBox({ size: null, howItWorks: { title: "Custom", steps: ["a", "", 3, " b "] } })?.howItWorks).toEqual({
+    expect(normaliseMysteryBox({ howItWorks: { title: "Custom", steps: ["a", "", 3, " b "] } })?.howItWorks).toEqual({
       title: "Custom",
       steps: ["a", "b"],
     });
@@ -287,5 +287,133 @@ describe("the box's live cues", () => {
       onSaleSince: null,
       cues: [],
     });
+  });
+});
+
+describe("a box with two sizes", () => {
+  const FIVE = variant({
+    id: "var_5kg",
+    optionValues: { Size: "5kg" },
+    boxItemCount: 5,
+    weightGrams: 5000,
+    imageUrl: "/api/public/images/img_5kg",
+    price: { amount: 15000000, currency: "NGN" },
+    available: 0,
+    backorderable: true,
+  });
+  const TEN = variant({
+    id: "var_10kg",
+    optionValues: { Size: "10kg" },
+    boxItemCount: 10,
+    weightGrams: 10000,
+    imageUrl: null,
+    price: { amount: 28000000, currency: "NGN" },
+    available: 0,
+    backorderable: true,
+  });
+  const twoSizes = (over: object = {}) =>
+    box({
+      variants: [FIVE, TEN],
+      mysteryBox: {
+        sizes: [
+          { variantId: "var_5kg", size: "5kg", itemCount: 5 },
+          { variantId: "var_10kg", size: "10kg", itemCount: 10 },
+        ],
+        size: "5kg",
+        itemCount: 5,
+        howItWorks: { title: "How it works", steps: ["One."] },
+      },
+      ...over,
+    });
+
+  it("offers both sizes in the owner's order, joined to their variants", () => {
+    const product = toProduct(twoSizes(), ctx)!;
+    expect(boxSizeOptions(product).map((e) => [e.box.size, e.box.variantId, e.option.id])).toEqual([
+      ["5kg", "var_5kg", "5kg"],
+      ["10kg", "var_10kg", "10kg"],
+    ]);
+    expect(showBoxSizePicker(mysteryBoxOf(product)!.sizes)).toBe(true);
+  });
+
+  it("gives each size its own price, photo, weight and count", () => {
+    const [five, ten] = boxSizeOptions(toProduct(twoSizes(), ctx)!);
+    expect([five.option.priceMinor, ten.option.priceMinor]).toEqual([15000000, 28000000]);
+    expect([five.option.boxImageUrl, ten.option.boxImageUrl]).toEqual(["/images/shop/img_5kg", null]);
+    expect([five.option.weightGrams, ten.option.weightGrams]).toEqual([5000, 10000]);
+    expect([boxCountLine(five.box), boxCountLine(ten.box)]).toEqual([
+      "5 surprise items in every box.",
+      "10 surprise items in every box.",
+    ]);
+  });
+
+  it("sells each size by its own canFill", () => {
+    const [five, ten] = boxSizeOptions(toProduct(twoSizes(), ctx)!);
+    const read = (canFill: number) =>
+      parseAvailability({ variantId: "v", available: canFill, backorderable: true, canFill });
+    expect(boxSizeSellable(five.box, read(2))).toBe(true);
+    expect(boxSizeSellable(ten.box, read(0))).toBe(false);
+  });
+
+  it("drops a size the owner removed, and one whose variant cannot be sold", () => {
+    const removed = toProduct(
+      twoSizes({
+        variants: [FIVE],
+        mysteryBox: {
+          sizes: [{ variantId: "var_5kg", size: "5kg", itemCount: 5 }],
+          howItWorks: { title: "How it works", steps: [] },
+        },
+      }),
+      ctx,
+    )!;
+    expect(boxSizeOptions(removed).map((e) => e.box.size)).toEqual(["5kg"]);
+
+    /* Listed, but its variant is gone from the catalogue: never offered. */
+    const stale = toProduct(
+      twoSizes({
+        variants: [FIVE],
+        mysteryBox: {
+          sizes: [
+            { variantId: "var_5kg", size: "5kg", itemCount: 5 },
+            { variantId: "var_gone", size: "10kg", itemCount: 10 },
+          ],
+          howItWorks: { title: "How it works", steps: [] },
+        },
+      }),
+      ctx,
+    )!;
+    expect(boxSizeOptions(stale).map((e) => e.box.size)).toEqual(["5kg"]);
+  });
+});
+
+describe("the default seam", () => {
+  it("folds a payload with no `sizes` onto the first variant", () => {
+    const older = toProduct(
+      box({
+        mysteryBox: { size: "Large", itemCount: 4, howItWorks: { title: "How it works", steps: [] } },
+      }),
+      ctx,
+    )!;
+    expect(mysteryBoxOf(older)!.sizes).toEqual([{ variantId: "var_box", size: "Large", itemCount: 4 }]);
+  });
+
+  it("reads a box with one unnamed size as a box that draws no picker", () => {
+    const unnamed = toProduct(
+      box({
+        mysteryBox: {
+          sizes: [{ variantId: "var_box", size: null, itemCount: 1 }],
+          howItWorks: { title: "How it works", steps: [] },
+        },
+      }),
+      ctx,
+    )!;
+    const sizes = mysteryBoxOf(unnamed)!.sizes;
+    expect(showBoxSizePicker(sizes)).toBe(false);
+    expect(boxSizeOptions(unnamed)).toHaveLength(1);
+  });
+
+  it("offers nothing when an older API sends no mysteryBox at all", () => {
+    const product = toProduct(box(), ctx)!;
+    expect(mysteryBoxOf(product)).toBeNull();
+    expect(boxSizeOptions(product)).toEqual([]);
   });
 });
