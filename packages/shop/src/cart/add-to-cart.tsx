@@ -38,8 +38,10 @@ const CONFIRM_MS = 1800;
 export interface AddToCartButtonProps {
   line: CartLineKey;
   qty: number;
-  /** Disable when the selected colour is out of stock. The visible label
-   *  stays put — only the accessible name changes, to carry the reason. */
+  /** Disable when the selected colour is out of stock. Prefer swapping the
+   *  visible label at the call site — a disabled button that still says
+   *  "Add to cart" reads as broken. The accessible name always carries the
+   *  reason when this is set. */
   disabled?: boolean;
   variant?: "default" | "outline";
   label?: string;

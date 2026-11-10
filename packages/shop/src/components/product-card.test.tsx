@@ -44,6 +44,19 @@ describe("ProductCard", () => {
     const html = render(product());
     expect(html).toContain("Colours available for Spool");
     expect(html).not.toContain("Mystery box");
+    expect(html).not.toContain("Out of stock");
+  });
+
+  it("badges a product whose every colour is gone", () => {
+    const html = render(
+      product({
+        colours: [
+          { id: "black", name: "Black", hex: "#000000", inStock: false, imageUrl: null },
+          { id: "red", name: "Red", hex: "#ff0000", inStock: false, imageUrl: null },
+        ],
+      }),
+    );
+    expect(html).toContain("Out of stock");
   });
 
   it("draws no swatch for a box, and says what it is instead", () => {

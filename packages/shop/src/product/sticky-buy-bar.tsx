@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@plaspool/ui";
+import { Button, cn } from "@plaspool/ui";
 
 import type { Colour, Product, SizeOption } from "../data/types";
 import { unitPriceFor } from "../data/money";
@@ -121,6 +121,7 @@ export function StickyBuyBar({
           amountClassName="text-sm sm:text-base"
         />
 
+        {!unavailable && (
         <QuantityStepper
           value={quantity}
           onChange={onQuantityChange}
@@ -128,6 +129,7 @@ export function StickyBuyBar({
           label={product.name}
           className="hidden shrink-0 sm:inline-flex"
         />
+        )}
 
         {/*
           `flex-1` below sm so the two buttons split the reclaimed width and
@@ -135,27 +137,39 @@ export function StickyBuyBar({
           takes the slack instead and the buttons want their natural width.
         */}
         <div className="flex min-w-0 flex-1 gap-2 sm:ml-0 sm:flex-none sm:shrink-0">
-          <AddToCartButton
-            line={line}
-            qty={quantity}
-            disabled={unavailable}
-            /* "Add to cart" plus a cart glyph does not fit a third of a 320px
-               viewport. The bar uses the short label at every width rather
-               than swapping at a breakpoint — the compact form is correct
-               here, and the buy box above still carries the full wording, so
-               nothing is only ever abbreviated. `srLabel` and `addedLabel`
-               keep the accessible name and the announcement whole. */
-            label="Add"
-            srLabel="Add to cart"
-            addedLabel="Added"
-            className="min-w-0 flex-1 px-3 sm:flex-none sm:px-5"
-          />
-          <BuyNowButton
-            line={line}
-            qty={quantity}
-            disabled={unavailable}
-            className="min-w-0 flex-1 px-3 sm:flex-none sm:px-5"
-          />
+          {unavailable ? (
+            <Button
+              type="button"
+              disabled
+              surface="neo"
+              aria-label="Out of stock"
+              className="h-12 min-w-0 flex-1 px-3 text-base sm:flex-none sm:px-5"
+            >
+              Out of stock
+            </Button>
+          ) : (
+            <>
+              <AddToCartButton
+                line={line}
+                qty={quantity}
+                /* "Add to cart" plus a cart glyph does not fit a third of a 320px
+                   viewport. The bar uses the short label at every width rather
+                   than swapping at a breakpoint — the compact form is correct
+                   here, and the buy box above still carries the full wording, so
+                   nothing is only ever abbreviated. `srLabel` and `addedLabel`
+                   keep the accessible name and the announcement whole. */
+                label="Add"
+                srLabel="Add to cart"
+                addedLabel="Added"
+                className="min-w-0 flex-1 px-3 sm:flex-none sm:px-5"
+              />
+              <BuyNowButton
+                line={line}
+                qty={quantity}
+                className="min-w-0 flex-1 px-3 sm:flex-none sm:px-5"
+              />
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -4,7 +4,9 @@ import {
   cheapestSize,
   firstInStockColour,
   formatNaira,
+  isProductSoldOut,
   lineTotal,
+  outOfStockMessage,
   priceFrom,
   ratingSummary,
   savingsFor,
@@ -142,6 +144,27 @@ describe("firstInStockColour", () => {
       ],
     });
     expect(firstInStockColour(p).id).toBe("black");
+  });
+});
+
+describe("outOfStockMessage / isProductSoldOut", () => {
+  it("says the product is out of stock when no colour can be bought", () => {
+    const colours = [
+      { id: "black", name: "Black", hex: "#000000", inStock: false, imageUrl: null },
+      { id: "red", name: "Red", hex: "#ff0000", inStock: false, imageUrl: null },
+    ];
+    expect(outOfStockMessage(colours[0], colours)).toBe("This product is out of stock.");
+    expect(outOfStockMessage(colours[0], colours)).not.toContain("Pick another colour");
+    expect(isProductSoldOut({ colours })).toBe(true);
+  });
+
+  it("names the colour and invites a pick only when another colour is actually in stock", () => {
+    const colours = [
+      { id: "black", name: "Black", hex: "#000000", inStock: false, imageUrl: null },
+      { id: "red", name: "Red", hex: "#ff0000", inStock: true, imageUrl: null },
+    ];
+    expect(outOfStockMessage(colours[0], colours)).toBe("Black is out of stock. Pick another colour.");
+    expect(isProductSoldOut({ colours })).toBe(false);
   });
 });
 

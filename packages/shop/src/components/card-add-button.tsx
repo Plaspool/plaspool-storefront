@@ -104,7 +104,7 @@ export function CardAddButton({ product }: { product: Product }) {
         ) : (
           <ShoppingCart aria-hidden="true" className="h-4 w-4" />
         )}
-        <span aria-hidden="true">{justAdded ? "Added" : "Add to cart"}</span>
+        <span aria-hidden="true">{justAdded ? "Added" : soldOut ? "Out of stock" : "Add to cart"}</span>
       </button>
       <span role="status" aria-live="polite" className="sr-only">
         {justAdded ? `${product.name} added to cart` : ""}
