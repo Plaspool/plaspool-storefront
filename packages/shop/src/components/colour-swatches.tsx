@@ -139,9 +139,11 @@ export function ColourSwatches({
     setFocusIndex(next);
     refs.current[next]?.focus();
     const colour = shown[next];
-    /* Out-of-stock swatches are `aria-disabled`, not `disabled`: focus still
-       reaches them so they can be read, but they do not become the choice. */
-    if (colour.inStock) onSelect?.(colour.id);
+    /* Out-of-stock swatches used to be readable but not choosable. When the
+       whole list is unbuyable — the `availableColours` fallback — that made
+       every disc look like a dead button. Selecting still cannot add them to
+       a cart; it just lets the name and photo follow the tap. */
+    onSelect?.(colour.id);
   };
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -184,18 +186,17 @@ export function ColourSwatches({
             refs.current[index] = node;
           }}
           aria-checked={colour.id === selectedId}
-          aria-disabled={colour.inStock ? undefined : true}
           aria-label={colour.inStock ? colour.name : `${colour.name}, out of stock`}
           tabIndex={index === activeIndex ? 0 : -1}
           onClick={() => {
             setFocusIndex(index);
-            if (colour.inStock) onSelect?.(colour.id);
+            onSelect?.(colour.id);
           }}
           onKeyDown={(event) => onKeyDown(event, index)}
           className={cn(
             "inline-flex h-8 w-8 items-center justify-center rounded-full",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-            colour.inStock ? "cursor-pointer" : "cursor-not-allowed",
+            "cursor-pointer",
           )}
         >
           <Swatch colour={colour} selected={colour.id === selectedId} size={resolvedSize} />

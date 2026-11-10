@@ -6,7 +6,7 @@ import { Button, cn } from "@plaspool/ui";
 
 import type { Colour, Product, SizeOption } from "../data/types";
 import { tierFor } from "../data/bulk";
-import { availableColours, unitPriceFor } from "../data/money";
+import { availableColours, outOfStockMessage, unitPriceFor } from "../data/money";
 import { DELIVERY } from "../data/config";
 import { starsFromAggregate } from "../data/reviews";
 import type { ReviewAggregate } from "../data/reviews";
@@ -66,7 +66,7 @@ export function BuyNowButton({
       type="button"
       variant="outline"
       disabled={disabled}
-      aria-label={disabled ? "Buy Now — out of stock" : undefined}
+      aria-label={disabled ? "Out of stock" : undefined}
       /* ═══ SURFACE PIN — EXCUSED FROM THE FLAG, ON PURPOSE ═══════════════
          Owner decision: "for now leave the add to cart and buy now buttons
          they are okay". Delete this one prop and the button rejoins
@@ -88,7 +88,9 @@ export function BuyNowButton({
         className,
       )}
     >
-      Buy Now
+      {/* A disabled control that still says "Buy Now" looks broken — that
+          was the live complaint. The label has to carry the reason. */}
+      {disabled ? "Out of stock" : "Buy Now"}
     </Button>
   );
 }
@@ -250,7 +252,9 @@ export function BuyBox({
         />
         {/* A swatch grid with no name is unusable for anyone who cannot tell
             the hues apart. */}
-        <p className="mt-1.5 text-sm text-muted-foreground">{colour.name}</p>
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          {colour.inStock ? colour.name : `${colour.name} — out of stock`}
+        </p>
       </div>
       )}
 
@@ -311,6 +315,7 @@ export function BuyBox({
         </div>
       )}
 
+      {!outOfStock && (
       <div>
         <p className="text-sm font-semibold text-foreground">Quantity</p>
         <QuantityStepper
@@ -333,6 +338,7 @@ export function BuyBox({
             nothing without a ladder or on the top rung. */}
         <NextTierHint tiers={product.bulkTiers} quantity={quantity} className="mt-2" />
       </div>
+      )}
 
       <BulkTierTable
         tiers={product.bulkTiers}
@@ -358,8 +364,11 @@ export function BuyBox({
       </div>
 
       {outOfStock && !isBox && (
-        <p className="text-sm text-foreground">
-          {colour.name} is out of stock. Pick another colour.
+        <p
+          role="status"
+          className="rounded-lg border-2 border-foreground bg-background px-3 py-2.5 text-sm font-semibold text-foreground"
+        >
+          {outOfStockMessage(colour, product.colours)}
         </p>
       )}
       {/* The owner's words for sold out, if they left the cue on. Whether it IS
@@ -370,17 +379,25 @@ export function BuyBox({
           shopper has decided to buy, and a checkbox above the primary button
           would put a secondary choice in front of the page's whole purpose.
           Out of stock, there is nothing to opt out of, so it goes too. */}
-      <div className="flex flex-wrap gap-3">
-        <AddToCartButton
-          line={line}
-          qty={quantity}
-          disabled={outOfStock}
-          onAdded={onAdded}
-          label={boxSoldOut ? "Sold out" : undefined}
-          srLabel={boxSoldOut ? "Add to cart" : undefined}
-        />
-        <BuyNowButton line={line} qty={quantity} disabled={outOfStock} />
-      </div>
+      {outOfStock ? (
+        /* ONE button that says the truth. Leaving "Add to cart" and "Buy Now"
+           on screen, disabled, with only an aria-label for the reason, is how
+           a sold-out catalogue read as a broken shop. */
+        <Button
+          type="button"
+          disabled
+          surface="neo"
+          aria-label={boxSoldOut ? "Sold out" : "Out of stock"}
+          className="h-12 w-full px-5 text-base"
+        >
+          {boxSoldOut ? "Sold out" : "Out of stock"}
+        </Button>
+      ) : (
+        <div className="flex flex-wrap gap-3">
+          <AddToCartButton line={line} qty={quantity} onAdded={onAdded} />
+          <BuyNowButton line={line} qty={quantity} />
+        </div>
+      )}
 
       {!outOfStock && addOnControl}
     </div>

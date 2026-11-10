@@ -2,7 +2,7 @@ import { Link } from "./link";
 import { Badge, cn } from "@plaspool/ui";
 
 import type { Product } from "../data/types";
-import { availableColours, cheapestSize, firstInStockColour, priceFrom } from "../data/money";
+import { availableColours, cheapestSize, firstInStockColour, isProductSoldOut, priceFrom } from "../data/money";
 import { bulkAffordance } from "../data/bulk";
 import { primaryBadge } from "../data/badges";
 import { CardAddButton } from "./card-add-button";
@@ -41,11 +41,13 @@ export function ProductCard({ product, className }: ProductCardProps) {
   const colour = firstInStockColour(product);
   const size = cheapestSize(product);
   const rating = product.rating;
-  /* One badge, never a stack — see `primaryBadge` for which one wins. */
-  const badge = primaryBadge(product.badges);
+  const isBox = isMysteryBox(product);
+  /* Sold out wins the one corner slot: a "New" or "Sale" badge over a product
+     nobody can buy is how the grid used to look like a working shop. */
+  const soldOut = !isBox && isProductSoldOut(product);
+  const badge = soldOut ? "Out of stock" : primaryBadge(product.badges);
   /* Only colours somebody can order. See `availableColours`. */
   const colours = availableColours(product);
-  const isBox = isMysteryBox(product);
 
   return (
     <div className={cn("group relative flex flex-col", className)}>
@@ -71,10 +73,10 @@ export function ProductCard({ product, className }: ProductCardProps) {
 
         {badge && (
           <Badge
-            variant={badge === "Low stock" ? "outline" : "default"}
+            variant={badge === "Low stock" || badge === "Out of stock" ? "outline" : "default"}
             className={cn(
               "pointer-events-none absolute left-2 top-2 z-10",
-              badge === "Low stock" && "border-brand-line bg-background",
+              (badge === "Low stock" || badge === "Out of stock") && "border-brand-line bg-background",
             )}
           >
             {badge}

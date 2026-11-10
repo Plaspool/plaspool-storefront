@@ -100,6 +100,29 @@ export function availableColours(product: Product): Colour[] {
   return sellable.length ? sellable : product.colours;
 }
 
+/**
+ * What the buy box says when the chosen colour cannot be bought.
+ *
+ * ═══ NEVER ASK THEM TO PICK ANOTHER COLOUR THAT DOES NOT EXIST ═══
+ * The old line was always "{name} is out of stock. Pick another colour."
+ * `availableColours` hides every unbuyable swatch whenever ANY colour is still
+ * sellable, and the picker used to refuse a click on an unbuyable one. So that
+ * sentence only ever appeared when EVERY colour was gone — the one case where
+ * there is no other colour to pick. Shoppers tapped the remaining discs,
+ * nothing happened, and Buy Now still said Buy Now. Say we are out of stock,
+ * and only invite a pick when one actually exists.
+ */
+export function outOfStockMessage(colour: Colour, colours: Colour[]): string {
+  const another = colours.some((c) => c.inStock && c.id !== colour.id);
+  if (another) return `${colour.name} is out of stock. Pick another colour.`;
+  return "This product is out of stock.";
+}
+
+/** True when no colour on the product can be bought. */
+export function isProductSoldOut(product: Pick<Product, "colours">): boolean {
+  return product.colours.length > 0 && product.colours.every((colour) => !colour.inStock);
+}
+
 export function ratingSummary(reviews: Review[]): RatingSummary {
   const distribution: [number, number, number, number, number] = [0, 0, 0, 0, 0];
   for (const review of reviews) distribution[5 - review.rating] += 1;
